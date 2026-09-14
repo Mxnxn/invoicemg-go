@@ -26,7 +26,7 @@ import "encoding/json"
 // into whichever envelope the matching Node route's catch block sends - the decision is the
 // handler's, as with store.ErrBadID.
 func (f *Form) JSON(name string, dst any) error {
-	return json.Unmarshal([]byte(f.raw(name)), dst)
+	return json.Unmarshal(f.fieldJSON(name), dst)
 }
 
 // JSONOr parses a JSON-encoded field into dst, mirroring `JSON.parse(req.body.name || fallback)`.
@@ -34,16 +34,25 @@ func (f *Form) JSON(name string, dst any) error {
 // error; a non-empty but malformed field still errors, because in JavaScript a non-empty
 // string is truthy and reaches JSON.parse, which throws.
 func (f *Form) JSONOr(name, fallback string, dst any) error {
-	raw := f.raw(name)
-	if raw == "" {
-		raw = fallback
+	raw := f.fieldJSON(name)
+	if len(raw) == 0 {
+		raw = []byte(fallback)
 	}
-	return json.Unmarshal([]byte(raw), dst)
+	return json.Unmarshal(raw, dst)
 }
 
-// raw is the untrimmed form value, the direct equivalent of `req.body.name`. String() trims
-// for the `if (!req.body.x)` checks the rest of the handlers do; JSON parsing must not, or the
-// whitespace-only case diverges from Node.
-func (f *Form) raw(name string) string {
-	return f.r.FormValue(name)
+// fieldJSON is the raw JSON bytes of a field, the direct equivalent of `req.body.name` before
+// JSON.parse. For multipart and urlencoded that is the untrimmed form value (the field carries
+// a JSON string the browser put there); for a JSON body it is the field's own raw message, so
+// JSON()/JSONOr() work on an already-parsed body too - an absent field gives empty bytes, which
+// JSON() errors on (strict) and JSONOr() replaces with the fallback.
+//
+// The value is deliberately NOT trimmed: `JSON.parse("  ")` throws in JavaScript because "  "
+// is truthy, so the fallback fires only on a genuinely empty value (len 0), never on whitespace,
+// which must reach the parser and error the way Node's does.
+func (f *Form) fieldJSON(name string) []byte {
+	if f.jsonBody != nil {
+		return []byte(f.jsonBody[name])
+	}
+	return []byte(f.r.FormValue(name))
 }

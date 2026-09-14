@@ -1,6 +1,9 @@
 package httpx
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,14 +11,23 @@ import (
 
 // Form reads a request body the way multer's upload.none() does.
 //
-// Every route in the Node app is a POST, and the React client sends FormData for all of them -
+// Every route in the Node app is a POST, and the React client sends FormData for most of them -
 // even for reads. So a Go handler that only understood JSON would answer 422 to every real
 // request from the browser while looking perfectly correct in a curl test written with -d.
 //
-// Both encodings are accepted, because ParseMultipartForm falls back to ParseForm for
-// application/x-www-form-urlencoded, and some maintenance scripts post that way.
+// Three encodings are accepted:
+//   - multipart/form-data - the FormData the browser posts for most routes;
+//   - application/x-www-form-urlencoded - what some maintenance scripts post;
+//   - application/json - what axios posts whenever a view hands it a plain object rather than a
+//     FormData, e.g. `axios.post("/unit/list", {})` or `.post("/batch-receive/lookups/open-jobs",
+//     {client_id})`. `/unit/list` is already live here and only passes parity because it ignores
+//     its body; a JSON-body route that actually reads a field would find nothing without this.
+//
+// A JSON body is decoded once into per-field raw messages, so scalar reads (String/Int/Float)
+// and JSON() both work regardless of which encoding a given caller used.
 type Form struct {
-	r *http.Request
+	r        *http.Request
+	jsonBody map[string]json.RawMessage
 }
 
 // maxMemory is what stays in RAM before multipart spills to a temp file. 8MB is well above
@@ -33,12 +45,30 @@ func ReadForm(r *http.Request) (*Form, error) {
 	form := &Form{r: r}
 
 	contentType := r.Header.Get("Content-Type")
-	if strings.HasPrefix(contentType, "multipart/form-data") {
+	switch {
+	case strings.HasPrefix(contentType, "multipart/form-data"):
 		if err := r.ParseMultipartForm(maxMemory); err != nil {
 			return form, err
 		}
-	} else if err := r.ParseForm(); err != nil {
-		return form, err
+	case strings.HasPrefix(contentType, "application/json"):
+		// LimitReader caps the read the way body-parser's 100kb-ish default caps Node; #25 will
+		// formalise the exact limit and the overflow response. An empty body (a bare POST with a
+		// JSON content-type but nothing sent) leaves jsonBody nil, which reads as every field
+		// missing - the same as an unparsed form.
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxMemory))
+		if err != nil {
+			return form, err
+		}
+		if len(bytes.TrimSpace(body)) == 0 {
+			return form, nil
+		}
+		if err := json.Unmarshal(body, &form.jsonBody); err != nil {
+			return form, err
+		}
+	default:
+		if err := r.ParseForm(); err != nil {
+			return form, err
+		}
 	}
 	return form, nil
 }
@@ -46,7 +76,32 @@ func ReadForm(r *http.Request) (*Form, error) {
 // String returns a field, trimmed. Missing and empty are the same thing here, which matches
 // how the Node routes check them: `if (!req.body.client_id)`.
 func (f *Form) String(name string) string {
-	return strings.TrimSpace(f.r.FormValue(name))
+	return strings.TrimSpace(f.field(name))
+}
+
+// field is the untrimmed scalar value of a form field, from whichever encoding the request
+// used. For multipart and urlencoded it is r.FormValue; for a JSON body it is the field coerced
+// to the string Node's `String(req.body.x)` would produce - a JSON string unquoted, a number or
+// boolean rendered as text, and a JSON null read as absent (falsy), so `if (!x)` still holds.
+func (f *Form) field(name string) string {
+	if f.jsonBody == nil {
+		return f.r.FormValue(name)
+	}
+	msg, ok := f.jsonBody[name]
+	if !ok {
+		return ""
+	}
+	s := string(msg)
+	if s == "null" {
+		return ""
+	}
+	if len(s) > 0 && s[0] == '"' {
+		var str string
+		if json.Unmarshal(msg, &str) == nil {
+			return str
+		}
+	}
+	return s
 }
 
 // Has reports whether a field arrived with a non-empty value.
