@@ -40,6 +40,20 @@ Everything marked *Solved* is implemented **and tested** in `InvoiceMG-Go`, not 
 | 16 | Tests that only pass in UTC | Medium | Date logic | Open | Pin the timezone inside the test rather than inheriting it |
 | 17 | XLSX exports will not be byte-identical | Low | 2 routes | Assessed | Verify by opening the file; `excelize` covers every feature in use |
 | 18 | File uploads write paths the database stores | Low | 3 routes | Open | Match the existing filename scheme exactly, or orphan every logo |
+| 19 | Sort tie-break is undefined; `parity.js` compares array order | High | 72 sorts | Open | Append `_id` as final sort key in the store (Mongo & PG); never re-sort in handlers |
+| 20 | `Promise.all` is positional; goroutines aren't | High | 14 routes | Open | `errgroup` + index-addressed result slice; no `append` inside goroutines |
+| 21 | `__v` version key leaks on whole-document responses | Medium | ~all create/update/get-one | Open | Carry `__v` in structs; pass through on whole-doc routes, omit on projected - decide per Node snapshot |
+| 22 | `data` must distinguish `null` vs `[]` vs absent | Medium | Settings, Lifecycle, all lists | Open | No `omitempty` on the envelope; init lists `[]T{}`; single lookups -> `null` |
+| 23 | "Always HTTP 200 + envelope" has real exceptions | High | Webhook, Statistics, Docs | Open | `httpx` escape hatches (raw/plaintext/HTML, real status); whitelist these routes |
+| 24 | JSON encoded inside multipart form fields | High | 14+ routes | Open | `parseJSONField` mirroring `JSON.parse(x\|\|"[]")`; match each route's malformed-parse error |
+| 25 | Default body-size limits differ | Medium | json/urlencoded + multipart | Open | `MaxBytesReader` 100KB; `ParseMultipartForm(1<<20)`; document the overflow response |
+| 26 | Content-Type dispatch is implicit in Node | High | Every route | Open | One `bind()` switching on Content-Type into a unified body map |
+| 27 | Export filenames + download must cut over together | High | download + generate routes | Open | Reuse `<companyId>_<time>_<label>.xlsx`; port `resolveExportPath` guard; re-test `%2F` under chi; pair routes in nginx or share `exports/` |
+| 28 | Reads mutate; company fallback is non-deterministic | High | Every authed request | Open | Reproduce the `CompanySession` upsert; make the "any company" fallback deterministic, verified against Node's natural order |
+| 29 | Enquiry rate-limiter is in-memory per process | Medium | `/enquiry` | Open | Shared store (Redis/PG); IP from `X-Forwarded-For` first hop; copy honeypot-success + exact codes |
+| 30 | Malformed id: 404 (guarded) vs 500 (rest) - refines #14 | Medium | Alert + downloads vs ~88 | Open | Per-route: guarded -> `ErrNotFound` (404), else `store.ErrBadID` (500) |
+| 31 | `$regex` on a string date field | Medium | Statistics | Open | Identical regex on Mongo; escape + `~*` (or a real `DATE` column) at the PG step |
+| 32 | Go `regexp` is RE2 | Low | Any ported regex | Open | Audit for lookahead/backreferences; capture Node outputs in tests |
 
 Four criticals. Two of them — **#3 and #4** — are live defects in production today, not migration
 risks: they will corrupt data whether or not anyone ports anything.
@@ -620,6 +634,31 @@ matters.
 
 ---
 
+# 19-32. Parity-fidelity addendum - response-shape and ordering
+
+These fourteen were found by reading all 209 routes against the eighteen above. None is a
+data-integrity flaw, and that is the point: each is a way the two services return *different
+bytes for the same request*, so each either makes `scripts/parity.js` fail in a way that does
+not point at its cause, or - worse - passes locally and diverges under production data.
+Numbered continuing the listing; all are **Open**.
+
+| # | Issue | Sev | Scope | Root cause & evidence | Solution implementation |
+|---|-------|-----|-------|----------------------|-------------------------|
+| 19 | Sort tie-break undefined; `parity.js` compares array order | High | 72 sorts, esp. 19x `createdAt:-1` | Non-unique / string-`date` sort keys; Mongo breaks ties by natural/`_id` order, Go & PG won't. Amplified by hard caps (`Invoice.js:124/642`, `Sheet.js:106` `.limit(200)`) - the boundary *set* changes | Append `_id` as final key in **store** queries: Mongo `.sort({createdAt:-1,_id:-1})`, PG `ORDER BY created_at DESC, _id DESC`. Store returns ordered; **ban re-sort in handlers** (lint for `sort.Slice`). Fixes Mongo<->PG agreement too |
+| 20 | `Promise.all` is positional; goroutines aren't | High | 14 sites, e.g. `Alert.js:69` `[client,company]` | Results consumed by index; append-on-completion swaps *which entity is which*, not just order | `errgroup.Group` fan-out writing into a pre-sized slice by index (`res[i]=...`); never `append` inside goroutines. Or keep sequential where latency allows |
+| 21 | `__v` version key leaks per-route | Med | ~all whole-doc create/update/get-one | No `versionKey:false`, no strip; `res.json(data:<doc>)` (`Material.js:181`) emits `"__v":0`; `.select([...])`/lean don't | Add `Version int` with `bson:"__v" json:"__v"` and pass through on whole-doc routes; omit on projected routes via a DTO. Decide per route from a Node output snapshot |
+| 22 | `data` must distinguish `null` vs `[]` vs absent | Med | Settings, Lifecycle, all lists | `Settings.js:22/62` `row?...:null`; `Lifecycle.js:938` `job\|\|null`; lists `[]`. Go `omitempty` drops key (!=null); nil slice -> `null` not `[]` | Envelope `Data any` with `json:"data"` and **no** omitempty; lists init `data:=[]T{}`; single lookups set `nil`->`null`. (parity: missing==undefined, null differs) |
+| 23 | "Always HTTP 200 + envelope" has real exceptions | High | WhatsAppWebhook, Statistics, Docs | Webhook uses real `sendStatus(200/403/500)` + **plaintext** challenge (`WhatsAppWebhook.js:91`); `Statistics.js:23` real `401`; `Docs.js:87` **HTML** | Add escape hatches to `httpx`: `Raw(w,status,ctype,body)` + `Status(w,code)`. Whitelist these routes as non-enveloped; a blanket wrapper breaks Meta's webhook verify |
+| 24 | JSON encoded *inside* multipart form fields | High | 14+ sites | `Lifecycle.js`, `Invoice.js:218/322`, `PurchaseInvoice.js:84`, `Person.js:144/216` - `JSON.parse(req.body.x)`; `\|\|"[]"` guards empty only, malformed throws->catch | Helper `parseJSONField(form,key,&dst)` mirroring `JSON.parse(x\|\|"[]")`: empty->default, malformed->that route's exact error code/message |
+| 25 | Default body-size limits differ | Med | JSON/urlencoded + multipart | body-parser default **100kb** (413 HTML, not envelope); multer default ~**1MB** field-value for `rows` string; Go has no implicit cap | `http.MaxBytesReader` 100KB for json/urlencoded; `r.ParseMultipartForm(1<<20)`. Document the overflow response choice (match Node's 413 or wrap) |
+| 26 | Content-Type dispatch is implicit in Node | High | Every route (foundational) | Global body-parser+multer fill `req.body` from multipart/urlencoded/json alike; a Go handler parsing the wrong one gets a silently empty body | One `bind(r,&dst)` switching on Content-Type into a unified body map; every handler binds through it |
+| 27 | Export filenames + download must cut over together | High | `/invoice\|stats/download/:fname`, generate routes | Scheme `<companyId>_<time>_<label>.xlsx` (`ExportFiles.js:20`); `exports/` is per-container disk; `%2F` traversal guard (`Invoice.js:959`) depends on Express param decoding | Reuse exact filename scheme; port `resolveExportPath` incl. `..`/`%2F` guard and **re-test traversal under chi** (pre-decoded params). nginx: move each generate+download pair together, or put `exports/` on a shared volume/object store |
+| 28 | Reads mutate, and pick a company non-deterministically | High | Every authed request (`TokenHelper`) | `resolveCompanyId` upserts `CompanySession` on read; fallback `is_default:true` **then** `findOne({uid})` with no sort = natural order | Reproduce the upsert side-effect; make the "any company" fallback deterministic and **verify it equals Node's natural-order pick** before trusting a tiebreak, or a tab binds to a different tenant |
+| 29 | Enquiry rate-limiter is in-memory per process | Med | `POST /enquiry` | `Enquiry.js:26` `let attempts=new Map()`; splits/resets across sideways pair, restarts, instances; honeypot returns **success** envelope (`:65`) | Move counter to Redis (`INCR`+TTL) or a PG window table; IP from `X-Forwarded-For` first entry (not `RemoteAddr`); copy honeypot-success + exact 400/401/429 messages. Interim: serve `/enquiry` from one service only |
+| 30 | Malformed-id behavior is not uniform (refines #14) | Med | Alert + download routes vs ~88 others | `Alert.js:60` & downloads hand-guard `/^[0-9a-fA-F]{24}$/`->**404**; others let CastError->**500** | Per-route: guarded routes -> `ErrNotFound` (404); others -> `store.ErrBadID` (500). Don't globally map bad id->404 |
+| 31 | `$regex` on a **string** date field | Med | Statistics (reporting) | `Statistics.js:38/74` `date:{$regex:month,$options:"i"}`; Mongo regex != PG `~*`/`ILIKE`; unescaped metacharacters change matching | Build identical regex on Mongo-Go; at PG step escape input + `date ~* $1`, or (preferred) store a real `DATE` column and range-query - verify report output unchanged |
+| 32 | Go `regexp` is RE2 | Low | Any ported regex | RE2 lacks lookahead/backreferences; JS-specific patterns fail at build, not parity | Audit each ported regex for RE2 compatibility (none problematic found); capture Node regex outputs in tests |
+
 ## Recommended order of work
 
 Sequenced so the expensive-to-retrofit decisions land while the surface is still small.
@@ -631,6 +670,11 @@ Sequenced so the expensive-to-retrofit decisions land while the surface is still
 | 3 | Money representation on the wire (#2) | Cheapest before 200 routes serialise it as a JSON number. |
 | 4 | Port on Mongo, route by route, behind `scripts/parity.js` | No data migration; reversible per route; production keeps running. |
 | 5 | Migrate to Postgres; add RLS (#1) | Two moderate risks instead of one large one. RLS is an afternoon once transactions exist. |
+
+> **Parity-fidelity addendum (#19-32):** these land in **step 4** (port on Mongo, route by
+> route). #26 (Content-Type binding) and #24 (JSON-in-form) are prerequisites for porting
+> Lifecycle/Invoice at all, and #19 (sort tie-break) + #20 (`Promise.all` ordering) must be
+> right before any list route's parity diff can be trusted.
 
 ## References
 
