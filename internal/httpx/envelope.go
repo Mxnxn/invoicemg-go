@@ -106,9 +106,14 @@ func Write(w http.ResponseWriter, env Envelope) {
 		status = httpStatusFor(env.Code)
 	}
 	w.WriteHeader(status)
+	writeBody(w, env)
+}
+
+// writeBody encodes the envelope to the response. The status line is already sent by the time
+// this runs, so a failure here has nowhere to go but the log - it means a handler built
+// something json cannot encode. Shared by Write and WriteStatus (see raw.go).
+func writeBody(w http.ResponseWriter, env Envelope) {
 	if err := json.NewEncoder(w).Encode(env); err != nil {
-		// The status line is already sent, so there is nothing to tell the client. Log it:
-		// a serialisation failure here means a handler built something json cannot encode.
 		log.Printf("httpx: encoding response: %v", err)
 	}
 }
