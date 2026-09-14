@@ -75,3 +75,8 @@ INSERT INTO job_reviews (uid, company_id, job_id, client_id, jobcard_id, challan
 VALUES ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'a00000000000000000000001',
         'c00000000000000000000001', 'JOB/26-27/000001-000001', 'JOB/26-27/000001', 'Acme Signs',
         5, 4, 5, 5, 5, 'Fast and clean work.');
+
+-- Bank accounts, so /bank/list has rows on the local stack.
+INSERT INTO banks (uid, company_id, name, opening_balance) VALUES
+    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Cash Drawer',  2500),
+    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'HDFC Current', 50000);

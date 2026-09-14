@@ -24,6 +24,13 @@ func From(ctx context.Context) (store.Session, bool) {
 	return sess, ok
 }
 
+// WithSession attaches a session to a context - the inverse of From, and what Require does
+// internally. Exported so a handler test can stand in for the middleware and exercise a handler
+// directly, without minting a token and threading it through a fake session store.
+func WithSession(ctx context.Context, sess store.Session) context.Context {
+	return context.WithValue(ctx, ctxKey{}, sess)
+}
+
 // MustFrom is for handlers that sit behind Require and would be a programming error without
 // it. It panics rather than returning a zero session, because a zero session has an empty
 // CompanyID, and an empty CompanyID silently widens every query to "no company" instead of
@@ -95,7 +102,7 @@ func (m *Middleware) Require(next http.Handler) http.Handler {
 		}
 		sess.CompanyID = companyID
 
-		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, ctxKey{}, sess)))
+		next.ServeHTTP(w, r.WithContext(WithSession(ctx, sess)))
 	})
 }
 

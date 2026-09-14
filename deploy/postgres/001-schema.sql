@@ -234,3 +234,16 @@ CREATE TABLE units (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX units_key_per_company ON units (company_id, key);
+
+-- Bank accounts for the Batch Receive form's "which bank did this land in" dropdown.
+CREATE TABLE banks (
+    id              text PRIMARY KEY DEFAULT gen_ulid(),
+    uid             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id      text REFERENCES companies(id) ON DELETE CASCADE,
+    name            text NOT NULL,
+    -- Signed opening balance: positive is money in the account, negative an overdraft.
+    opening_balance numeric(14,2) NOT NULL DEFAULT 0,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX banks_company_idx ON banks (company_id);

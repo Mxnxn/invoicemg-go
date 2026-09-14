@@ -311,6 +311,28 @@ type Alerts interface {
 	CreateReview(ctx context.Context, r NewReview) error
 }
 
+// ---------------------------------------------------------------------------------------
+// Banks
+// ---------------------------------------------------------------------------------------
+
+// Bank is a bank account, returned whole - the Node /bank/list sends the entire record, __v
+// and timestamps included, so all of it travels.
+type Bank struct {
+	ID             ID
+	UID            ID
+	CompanyID      ID
+	Name           string
+	OpeningBalance float64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Version        int
+}
+
+type Banks interface {
+	// List returns a company's bank accounts in name order.
+	List(ctx context.Context, companyID ID) ([]Bank, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -318,6 +340,7 @@ type Store interface {
 	Units() Units
 	Users() Users
 	Alerts() Alerts
+	Banks() Banks
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

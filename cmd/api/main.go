@@ -22,6 +22,7 @@ import (
 
 	"github.com/mxnxn/invoicemg-go/internal/alerts"
 	"github.com/mxnxn/invoicemg-go/internal/auth"
+	"github.com/mxnxn/invoicemg-go/internal/bank"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
@@ -127,6 +128,7 @@ func routes(db store.Store) http.Handler {
 	unitHandler := units.New(db.Units())
 	userHandler := users.New(db.Users())
 	alertHandler := alerts.New(db.Alerts())
+	bankHandler := bank.New(db.Banks())
 
 	// Every route is registered TWICE, under two surfaces.
 	//
@@ -167,6 +169,11 @@ func routes(db store.Store) http.Handler {
 
 	mux.Handle("POST /unit/delete", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
 	mux.Handle("DELETE /units/{id}", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
+
+	// Bank accounts, behind the batch_receive feature as routes/Bank.js is. Only the read is
+	// ported; create/update/remove/report are not.
+	mux.Handle("POST /bank/list", feature("batch_receive", bankHandler.List))
+	mux.Handle("GET /banks", feature("batch_receive", bankHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since
