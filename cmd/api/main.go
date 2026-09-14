@@ -31,6 +31,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
 	"github.com/mxnxn/invoicemg-go/internal/units"
 	"github.com/mxnxn/invoicemg-go/internal/users"
+	"github.com/mxnxn/invoicemg-go/internal/whatsapp"
 )
 
 func main() {
@@ -129,6 +130,7 @@ func routes(db store.Store) http.Handler {
 	userHandler := users.New(db.Users())
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
+	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
 
 	// Every route is registered TWICE, under two surfaces.
 	//
@@ -183,6 +185,11 @@ func routes(db store.Store) http.Handler {
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)
+
+	// Meta's webhook verification handshake. Unauthenticated - Meta carries no session - and
+	// it answers with a real status and a bare body, not the envelope (#23). The POST callback
+	// (HMAC over the raw body) is not ported yet.
+	mux.HandleFunc("GET /whatsapp/webhook", whatsappHandler.Verify)
 
 	mux.HandleFunc("GET /healthz", health(db))
 
