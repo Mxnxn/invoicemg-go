@@ -124,6 +124,50 @@ func (h *Handler) Detail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Review is GET /alert/{job_id}/job/{jobcard_id}/review: whether this job has been reviewed,
+// so the page shows what the customer said instead of an empty form they would fill twice.
+func (h *Handler) Review(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("job_id")
+	// Same id guard as Detail (#30/#32) - Node checks it here too before touching the store.
+	if !objectIDRe.MatchString(jobID) {
+		notValid(w)
+		return
+	}
+
+	rev, err := h.store.Review(r.Context(), store.ID(jobID))
+	if errors.Is(err, store.ErrNotFound) {
+		// #22: not reviewed sends `review: null`, not an omitted key. Here the null is a nil
+		// *reviewDTO field inside data (plain encoding/json), so it needs no httpx.Null - that
+		// sentinel is only for the envelope's own data.
+		httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Status: httpx.True(),
+			Data: reviewEnvelope{Reviewed: false, Review: nil}})
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Status: httpx.True(),
+		Data: reviewEnvelope{
+			Reviewed: true,
+			Review: &reviewDTO{
+				ID: string(rev.ID),
+				Scores: scoresDTO{
+					Quality:       rev.Scores.Quality,
+					Speed:         rev.Scores.Speed,
+					Communication: rev.Scores.Communication,
+					Satisfaction:  rev.Scores.Satisfaction,
+					Overall:       rev.Scores.Overall,
+				},
+				Comment: rev.Comment,
+				// #5: httpx.Time, never time.Time - Node's Date.toJSON always writes three
+				// decimal places (…:56.000Z) where Go's default trims them.
+				CreatedAt: httpx.NewTime(rev.CreatedAt),
+			},
+		}})
+}
+
 // findRow matches by _id first (the common case) then by rowId, so a link built from either
 // identifier resolves - Node's findRow.
 func findRow(job store.AlertJob, jobcardID string) (store.AlertRow, bool) {
@@ -211,6 +255,28 @@ type rowDTO struct {
 type clientDTO struct {
 	Name string `json:"name"`
 	Firm string `json:"firm"`
+}
+
+// reviewEnvelope is the /review payload: {reviewed, review}. Review is a pointer so a job with
+// no review sends `"review":null` (a nil pointer, no omitempty), matching Node's `review || null`.
+type reviewEnvelope struct {
+	Reviewed bool       `json:"reviewed"`
+	Review   *reviewDTO `json:"review"`
+}
+
+type reviewDTO struct {
+	ID        string     `json:"_id"`
+	Scores    scoresDTO  `json:"scores"`
+	Comment   string     `json:"comment"`
+	CreatedAt httpx.Time `json:"createdAt"`
+}
+
+type scoresDTO struct {
+	Quality       int `json:"quality"`
+	Speed         int `json:"speed"`
+	Communication int `json:"communication"`
+	Satisfaction  int `json:"satisfaction"`
+	Overall       int `json:"overall"`
 }
 
 type companyDTO struct {

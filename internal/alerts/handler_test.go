@@ -22,6 +22,12 @@ type stubAlerts struct {
 	company    store.AlertCompany
 	companyErr error
 	jobCalls   int
+	review     store.AlertReview
+	reviewErr  error
+}
+
+func (s *stubAlerts) Review(_ context.Context, _ store.ID) (store.AlertReview, error) {
+	return s.review, s.reviewErr
 }
 
 func (s *stubAlerts) Job(_ context.Context, _ store.ID) (store.AlertJob, error) {
@@ -51,6 +57,79 @@ func serve(t *testing.T, s store.Alerts, jobID, jobcardID string) map[string]any
 }
 
 func code(body map[string]any) float64 { c, _ := body["code"].(float64); return c }
+
+func serveReview(t *testing.T, s store.Alerts, jobID string) map[string]any {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", New(s).Review)
+	req := httptest.NewRequest("GET", "/alert/"+jobID+"/job/anycard/review", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("response not json: %v (%s)", err, rec.Body.String())
+	}
+	return body
+}
+
+// #22: a job with no review sends reviewed:false and review:null (the key present, value null).
+func TestReview_NotReviewed(t *testing.T) {
+	body := serveReview(t, &stubAlerts{reviewErr: store.ErrNotFound}, validID)
+	if code(body) != 200 {
+		t.Fatalf("code = %v, want 200", body["code"])
+	}
+	data := body["data"].(map[string]any)
+	if data["reviewed"] != false {
+		t.Errorf("reviewed = %v, want false", data["reviewed"])
+	}
+	v, ok := data["review"]
+	if !ok {
+		t.Error("review key must be present (as null), not omitted")
+	}
+	if v != nil {
+		t.Errorf("review = %v, want null", v)
+	}
+}
+
+// #5 + #21: a reviewed job sends the projected object - _id, scores, comment, createdAt in
+// JavaScript's Date.toJSON shape (…:56.000Z), and NO __v.
+func TestReview_Reviewed(t *testing.T) {
+	s := &stubAlerts{review: store.AlertReview{
+		ID:        "rev-1",
+		Scores:    store.ReviewScores{Quality: 5, Speed: 4, Communication: 5, Satisfaction: 4, Overall: 5},
+		Comment:   "Great work",
+		CreatedAt: time.Date(2026, 9, 14, 12, 34, 56, 0, time.UTC),
+	}}
+	body := serveReview(t, s, validID)
+	if code(body) != 200 {
+		t.Fatalf("code = %v, want 200", body["code"])
+	}
+	data := body["data"].(map[string]any)
+	if data["reviewed"] != true {
+		t.Errorf("reviewed = %v, want true", data["reviewed"])
+	}
+	review := data["review"].(map[string]any)
+	if review["_id"] != "rev-1" || review["comment"] != "Great work" {
+		t.Errorf("review fields wrong: %v", review)
+	}
+	if _, hasV := review["__v"]; hasV {
+		t.Error("review must not carry __v (projection dropped it)")
+	}
+	if review["createdAt"] != "2026-09-14T12:34:56.000Z" {
+		t.Errorf("createdAt = %v, want JS Date.toJSON millis form", review["createdAt"])
+	}
+	scores := review["scores"].(map[string]any)
+	if scores["quality"] != float64(5) || scores["overall"] != float64(5) {
+		t.Errorf("scores wrong: %v", scores)
+	}
+}
+
+func TestReview_MalformedID(t *testing.T) {
+	body := serveReview(t, &stubAlerts{}, "nonsense")
+	if code(body) != 404 {
+		t.Fatalf("code = %v, want 404", body["code"])
+	}
+}
 
 // #30/#32: a malformed job id is a dead link (404), and the store is never consulted.
 func TestDetail_MalformedID(t *testing.T) {

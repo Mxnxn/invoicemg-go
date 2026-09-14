@@ -261,6 +261,25 @@ type AlertCompany struct {
 	Gst     string
 }
 
+// ReviewScores is the five 1-5 ratings a customer leaves, from Model/JobReview.js. overall is
+// the customer's own summary, deliberately not the mean of the other four.
+type ReviewScores struct {
+	Quality       int
+	Speed         int
+	Communication int
+	Satisfaction  int
+	Overall       int
+}
+
+// AlertReview is a job's review as the page reads it on load - the projected fields
+// (_id/scores/comment/createdAt), no __v, matching Mongoose's inclusion projection.
+type AlertReview struct {
+	ID        ID
+	Scores    ReviewScores
+	Comment   string
+	CreatedAt time.Time
+}
+
 // Alerts serves the public customer link. Job returns ErrBadID for a non-id and ErrNotFound
 // for an unknown one; Client and Company return ErrNotFound (which the handler renders as
 // blank, matching Node's optional chaining) for an empty or unknown id, because a job's
@@ -269,6 +288,8 @@ type Alerts interface {
 	Job(ctx context.Context, id ID) (AlertJob, error)
 	Client(ctx context.Context, id ID) (AlertClient, error)
 	Company(ctx context.Context, id ID) (AlertCompany, error)
+	// Review returns the job's review, or ErrNotFound when it has none (the page's reviewed:false).
+	Review(ctx context.Context, jobID ID) (AlertReview, error)
 }
 
 // Store is everything together, so main wires one value rather than six.

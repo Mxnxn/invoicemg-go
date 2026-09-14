@@ -174,6 +174,7 @@ func routes(db store.Store) http.Handler {
 	// sent, so it is served as-is rather than under a REST alias nothing would call. The
 	// review GET/POST are not ported yet.
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
+	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 
 	mux.HandleFunc("GET /healthz", health(db))
 

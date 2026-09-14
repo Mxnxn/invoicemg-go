@@ -112,3 +112,11 @@ func (a *alerts) Company(ctx context.Context, id store.ID) (store.AlertCompany, 
 	}
 	return c, nil
 }
+
+func (a *alerts) Review(_ context.Context, _ store.ID) (store.AlertReview, error) {
+	// SCHEMA GAP: there is no job_reviews table in Postgres yet (see Company above). Every job
+	// reads as not-yet-reviewed here, so the page shows an empty form; the Mongo tenant answers
+	// truthfully. Migrating job_reviews is part of finishing the Alert domain on Postgres, and
+	// it is not a sideways-parity concern because the sideways tenant is Mongo.
+	return store.AlertReview{}, store.ErrNotFound
+}

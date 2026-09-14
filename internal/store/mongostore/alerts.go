@@ -14,7 +14,10 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-const colClients = "clients"
+const (
+	colClients    = "clients"
+	colJobReviews = "jobreviews"
+)
 
 type alerts struct{ db *mongo.Database }
 
@@ -161,4 +164,47 @@ func (a *alerts) Company(ctx context.Context, id store.ID) (store.AlertCompany, 
 		return store.AlertCompany{}, fmt.Errorf("looking up company: %w", err)
 	}
 	return store.AlertCompany{Name: doc.Name, Firm: doc.Firm, Phone: doc.Phone, URL: doc.URL, Address: doc.Address, Gst: doc.Gst}, nil
+}
+
+func (a *alerts) Review(ctx context.Context, jobID store.ID) (store.AlertReview, error) {
+	oid, err := objectID(jobID)
+	if err != nil {
+		// The handler has already guarded the id shape; anything unparseable here just has no
+		// review. Not-reviewed, not a fault.
+		return store.AlertReview{}, store.ErrNotFound
+	}
+	// Projection mirrors Node's .select(["scores","comment","createdAt"]): _id is kept, __v is
+	// dropped (inclusion projection), which is why the response carries no __v (#21).
+	var doc struct {
+		ID     primitive.ObjectID `bson:"_id"`
+		Scores struct {
+			Quality       int `bson:"quality"`
+			Speed         int `bson:"speed"`
+			Communication int `bson:"communication"`
+			Satisfaction  int `bson:"satisfaction"`
+			Overall       int `bson:"overall"`
+		} `bson:"scores"`
+		Comment   string    `bson:"comment"`
+		CreatedAt time.Time `bson:"createdAt"`
+	}
+	err = a.db.Collection(colJobReviews).FindOne(ctx, bson.M{"job_id": oid},
+		options.FindOne().SetProjection(bson.M{"scores": 1, "comment": 1, "createdAt": 1})).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.AlertReview{}, store.ErrNotFound
+	}
+	if err != nil {
+		return store.AlertReview{}, fmt.Errorf("looking up review: %w", err)
+	}
+	return store.AlertReview{
+		ID: idOf(doc.ID),
+		Scores: store.ReviewScores{
+			Quality:       doc.Scores.Quality,
+			Speed:         doc.Scores.Speed,
+			Communication: doc.Scores.Communication,
+			Satisfaction:  doc.Scores.Satisfaction,
+			Overall:       doc.Scores.Overall,
+		},
+		Comment:   doc.Comment,
+		CreatedAt: doc.CreatedAt,
+	}, nil
 }
