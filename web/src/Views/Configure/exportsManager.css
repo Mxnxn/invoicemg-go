@@ -1,0 +1,74 @@
+/* Configure > Exports - which fields print on a downloaded report's letterhead. */
+
+@media (prefers-reduced-motion: reduce) {
+    }
+
+/* The letterhead toggles. Buttons rather than checkboxes: each is a thing that either
+   appears on the exported header or does not, and a row of chips previews the result in a
+   way six ticked boxes never did.
+
+   Every colour is a semantic role token, so this reads in both themes. The "on" state uses
+   the blue accent pair the rest of the shell uses for a selected control. */
+.exports-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.exports-chip:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--bg-field-on-canvas);
+}
+
+.exports-chip:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+/* Dimmed and inert, with the reason in the title attribute - a logo toggle with no logo to
+   show. */
+.exports-chip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.exports-chip.is-on {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+    color: var(--text-primary);
+}
+
+.exports-chip-icon {
+    display: flex;
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+}
+
+.exports-chip.is-on .exports-chip-icon,
+.exports-chip.is-on .exports-chip-tick {
+    color: var(--xan-blue);
+}
+
+.exports-chip-label {
+    flex: 1 1 auto;
+}
+
+.exports-chip-tick {
+    flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .exports-chip {
+        transition: none;
+    }
+}

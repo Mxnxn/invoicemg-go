@@ -1,0 +1,200 @@
+/* The app's own toasts. Every colour is a semantic role token or a --toast-* token defined in
+   both theme blocks of tokens.css, so nothing here resolves to a near-black-on-near-black in
+   dark mode (docs/STYLE.md item 1). */
+
+.app-toast-stack {
+    position: fixed;
+    /* Top centre. Bottom-right is where a toast goes to be missed in this app: the tables put
+       their pagination and row counts there, the job panel its footer buttons, and a message
+       about what just happened landed on top of the controls you were reaching for. The centre
+       of the top edge is the one region no screen here puts anything in. */
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    /* The stack must not block what is behind it; each toast re-enables its own pointer
+       events so hover-to-hold and the dismiss button still work. */
+    pointer-events: none;
+    max-width: min(420px, calc(100vw - 40px));
+}
+
+.app-toast {
+    position: relative;
+    overflow: hidden;
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 12px 13px;
+    background: var(--toast-bg);
+    color: var(--toast-text);
+    border: 1px solid var(--toast-border);
+    border-left: 4px solid var(--toast-accent, var(--toast-info-accent));
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow-floating);
+    animation: app-toast-in var(--dur-slow) var(--ease-overshoot) both;
+}
+
+/* Drops in from above, overshoots its resting place by a hair, and settles - and squashes on
+   the way, the way the loader's blob keeps its volume while changing shape. A toast that simply
+   fades in reads as drawn; this one reads as having landed.
+   
+   It comes DOWN now rather than up, because it lives on the top edge: arriving from the edge it
+   is anchored to is what makes it read as having come from somewhere. */
+@keyframes app-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-14px) scale(0.96, 1.05);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(2px) scale(1.01, 0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* The motion is the whole point of the keyframes, so there is nothing to slow down - what is
+   left is the toast simply being present, which is what matters. */
+@media (prefers-reduced-motion: reduce) {
+    .app-toast {
+        animation: none;
+    }
+}
+
+.app-toast-success {
+    --toast-accent: var(--toast-success-accent);
+}
+.app-toast-error {
+    --toast-accent: var(--toast-error-accent);
+}
+.app-toast-warning {
+    --toast-accent: var(--toast-warning-accent);
+}
+.app-toast-info {
+    --toast-accent: var(--toast-info-accent);
+}
+
+.app-toast-icon {
+    flex: none;
+    margin-top: 1px;
+    color: var(--toast-accent, var(--toast-info-accent));
+}
+
+.app-toast-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.app-toast-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.app-toast-message {
+    flex: 1 1 auto;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    line-height: 1.4;
+    /* Long server messages wrap rather than being clipped - a truncated error is a message
+       you have to go and find in the console anyway. */
+    overflow-wrap: anywhere;
+}
+
+/* The status code, as a chip. This is the part that says whether to check what was sent or
+   whether the server is simply down, and it was missing entirely before. */
+.app-toast-code {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: var(--radius-chip);
+    background: var(--toast-accent, var(--toast-info-accent));
+    color: var(--toast-bg);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: calc(10.5px * var(--font-scale-body, 1));
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.app-toast-desc {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: calc(11px * var(--font-scale-body, 1));
+    color: var(--toast-text);
+    opacity: 0.65;
+    overflow-wrap: anywhere;
+}
+
+.app-toast-close {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-chip);
+    background: transparent;
+    color: var(--toast-text);
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity var(--motion-fast), background var(--motion-fast);
+}
+
+.app-toast-close:hover {
+    opacity: 1;
+    background: var(--toast-border);
+}
+
+.app-toast-close:focus-visible {
+    outline: 2px solid var(--toast-accent, var(--toast-info-accent));
+    outline-offset: 1px;
+    opacity: 1;
+}
+
+/* The remaining time, as a depleting track along the bottom edge - the same device the undo
+   bar uses (see .xan-undo-track), for the same reason: otherwise the toast simply disappears
+   and you cannot tell whether you had time to read it. Duration is set inline from the
+   toast's own timer, so the track cannot drift from the timeout that actually dismisses it. */
+.app-toast-track {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 100%;
+    background: var(--toast-accent, var(--toast-info-accent));
+    transform-origin: left center;
+    animation-name: app-toast-deplete;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+@keyframes app-toast-deplete {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/* Hold the full track and drop the entry motion when less motion is asked for. The dismiss
+   timer is unaffected - only the animation goes. */
+@media (prefers-reduced-motion: reduce) {
+    .app-toast {
+        animation: none;
+    }
+    .app-toast-track {
+        animation: none;
+    }
+    .app-toast-close {
+        transition: none;
+    }
+}

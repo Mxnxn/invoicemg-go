@@ -1,0 +1,98 @@
+/* The public purchase order. Colour is semantic tokens only, both themes - see docs/STYLE.md.
+   Every text element carries a .text-* class. Seen by visitors with no stored theme, so it
+   must read correctly under the default. */
+
+.po-public {
+	min-height: 100vh;
+	background: var(--bg-canvas);
+	padding: 24px 16px;
+	display: flex;
+	justify-content: center;
+}
+
+.po-public-card {
+	width: 100%;
+	max-width: 760px;
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	padding: 24px;
+}
+
+.po-public-state {
+	padding: 40px 24px;
+	text-align: center;
+	color: var(--text-secondary);
+}
+
+.po-public-closed {
+	margin: 8px 0 0;
+	color: var(--text-secondary);
+}
+
+.po-public-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 16px;
+	flex-wrap: wrap;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.po-public-head p {
+	margin: 0;
+	color: var(--text-primary);
+}
+
+.po-public-head .text-body-small {
+	color: var(--text-secondary);
+}
+
+.po-public-meta {
+	text-align: right;
+}
+
+.po-public-party {
+	margin: 16px 0;
+	color: var(--text-secondary);
+}
+
+.po-public-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+/* The shared xan-table carries its own scale roles; this one has to opt in explicitly or the
+   page ignores Account settings > Appearance > Text size. Same roles and base sizes. */
+.po-public-table th {
+	text-align: left;
+	padding: 8px;
+	color: var(--text-tertiary);
+	border-bottom: 1px solid var(--border-default);
+	font-weight: 500;
+	font-size: calc(11px * var(--font-scale-table-head, 1));
+}
+
+.po-public-table td {
+	padding: 10px 8px;
+	color: var(--text-primary);
+	border-bottom: 1px solid var(--border-default);
+	font-size: calc(13px * var(--font-scale-table-row, 1));
+}
+
+.po-public-total {
+	margin: 16px 0 0;
+	text-align: right;
+	color: var(--text-primary);
+}
+
+.po-public-foot {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 24px;
+	padding-top: 16px;
+	border-top: 1px solid var(--border-default);
+	flex-wrap: wrap;
+}

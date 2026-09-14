@@ -1,0 +1,910 @@
+/* The job board: a grid of job-ids, and the kanban each one expands into.
+
+   Motion here uses two eases and nothing else, so everything on this screen moves like one
+   thing rather than like six components that each chose their own feel:
+
+     --ease-liquid    arriving. Slow out of the gate, long glide, settles without a bump.
+     --ease-settle    leaving, and anything reversing. No overshoot - see the board's own note.
+
+   Both are defined at the bottom of this file rather than in tokens.css, because they are this
+   screen's dialect; tokens.css already carries the app-wide --ease-settle/--ease-overshoot and
+   a third global ease would just be a third thing to choose between. */
+
+.job-board-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+/* Hard right. The search beside it is capped at 480px, so justify-content would leave this
+   floating in the middle of a wide board instead of at the end of the row. */
+.job-board-create {
+	margin-left: auto;
+}
+
+@media (max-width: 560px) {
+	/* Wrapped onto its own line, the auto margin would push it off to the right on its own.
+	   Full width reads as the row's action rather than as something left over. */
+	.job-board-create {
+		margin-left: 0;
+		width: 100%;
+		justify-content: center;
+	}
+}
+
+/* Equal cards, deliberately. A bento of varied sizes implies some job-ids matter more than
+   others, which is a claim a grid sorted by date is in no position to make. */
+.job-board-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 12px;
+}
+
+/* The card and its selection box. The box is a sibling rather than a child, because the card
+   itself is a <button> - so this wrapper is what gives the box something to sit against. */
+.job-board-card-wrap {
+	position: relative;
+	display: flex;
+}
+
+.job-board-card-wrap > .job-board-card {
+	flex: 1;
+	min-width: 0;
+}
+
+.job-board-card-check {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	z-index: 1;
+	display: inline-flex;
+	/* Hidden until it is wanted: a grid of permanently ticked-looking boxes reads as a form to
+	   fill in. Shown on hover, on keyboard focus anywhere inside, and always once selected -
+	   otherwise ticking one and moving the mouse away would make it vanish. */
+	opacity: 0;
+	transition: opacity var(--dur-base) var(--ease-liquid);
+}
+
+.job-board-card-wrap:hover .job-board-card-check,
+.job-board-card-wrap:focus-within .job-board-card-check,
+.job-board-card-wrap.is-selected .job-board-card-check {
+	opacity: 1;
+}
+
+/* Ready to bill, said on the edge of the card. A grid is scanned by shape before it is read,
+   so the one thing you look for - "which of these can I invoice" - should be an edge rather
+   than a word inside twelve otherwise identical boxes. The badge stays: the border says which
+   cards, the badge says why. */
+.job-board-card-wrap.is-ready > .job-board-card {
+	border-color: var(--xan-blue);
+}
+
+/* Selected reads on the card itself, not only on the 16px box in its corner.
+   Listed after .is-ready so a ready card that is also selected gets the ring: both want the
+   accent border, and the ring is what still separates the two states. */
+.job-board-card-wrap.is-selected > .job-board-card {
+	border-color: var(--xan-blue);
+	box-shadow: 0 0 0 1px var(--xan-blue);
+}
+
+/* Hovering still lifts a ready card; it just has nowhere further to go on colour. */
+.job-board-card-wrap.is-ready > .job-board-card:hover {
+	box-shadow: var(--shadow-floating);
+}
+
+/* Room between the last row of cards and the pager. A table has a footer rule doing this
+   job; a grid ends on whitespace, so the pager would otherwise read as another row. */
+.job-board-pagination {
+	margin-top: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-board-card-check {
+		transition: none;
+	}
+}
+
+.job-board-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	/* Taller: the badge added a line, and a card that only just fits its contents reads as
+	   cramped the moment a job has a long product name. */
+	min-height: 156px;
+	padding: 14px;
+	text-align: left;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition: border-color var(--dur-base) var(--ease-liquid), transform var(--dur-base) var(--ease-liquid),
+		box-shadow var(--dur-base) var(--ease-liquid);
+}
+
+.job-board-card:hover {
+	border-color: var(--xan-blue);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-floating);
+}
+
+.job-board-card:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.job-board-card-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.job-board-card-lock {
+	flex-shrink: 0;
+	color: var(--text-tertiary);
+}
+
+.job-board-card-meta {
+	color: var(--text-secondary);
+}
+
+/* Pushed to the bottom so every card's products sit on the same line, whatever is above them -
+   which is most of what makes a grid of equal cards read as a grid rather than a pile. */
+.job-board-card-products {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: auto;
+}
+
+.job-board-product {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 2px 8px;
+	border-radius: var(--radius-chip);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-secondary);
+}
+
+.job-board-product.is-more {
+	background: transparent;
+	color: var(--text-tertiary);
+}
+
+.job-board-empty {
+	margin: 0;
+	padding: 28px 4px;
+	color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-board-card {
+		transition: none;
+	}
+
+	.job-board-card:hover {
+		transform: none;
+	}
+}
+
+/* The overlay grows out of the card that was clicked rather than fading in on the spot: it
+   arrives from the thing it belongs to, which is what makes it read as that card opening
+   rather than as a new screen. The rect is applied inline by the component; the transition
+   between rects is here. */
+/* The board sits at its final size ALWAYS, and travels by transform.
+   It used to animate top/left/width/height, which are layout properties: every frame re-laid
+   out the columns, so the contents reflowed the whole way instead of the panel moving as one
+   piece. A transform is composited - the board scales as a single object, which is what makes
+   it read as the card opening rather than as a panel being resized. */
+/* Everything behind the board stops being reachable while it is open. Without it the page
+   underneath still takes clicks - you could start editing an invoice through a board covering
+   it - and still reads as competing for attention. Blurred rather than merely dimmed, because
+   a dim page still shows enough detail to keep pulling the eye. */
+.job-board-scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 1039;
+	background: var(--bg-canvas);
+	opacity: 0;
+	backdrop-filter: blur(3px);
+	-webkit-backdrop-filter: blur(3px);
+	transition: opacity var(--dur-slow) var(--ease-liquid);
+}
+
+.job-board-scrim.is-open {
+	opacity: 0.55;
+}
+
+.job-board-overlay {
+	position: fixed;
+	/* BELOW the popup layer, deliberately.
+	   This is a page-level surface, the same kind of thing as SlideOverlay (1040) - not a
+	   popup. The dropdowns that open from inside it portal to <body> at 1100 and the date
+	   pickers at 1200, so a board sitting at 1200 painted itself over its own menus: the
+	   assignee picker opened, rendered underneath the board, and could not be clicked. It was
+	   reachable from a script, which calls the element directly and never consults paint
+	   order - which is exactly why the tests did not catch it. */
+	z-index: 1040;
+	top: 24px;
+	bottom: 24px;
+	/* Full height, but only as wide as four columns need. Stretched across a wide screen the
+	   four stages sat in the left third with a gulf of empty board beside them, which reads as
+	   a page that failed to load rather than as a board. Four is the width of the default
+	   pipeline; a fifth stage scrolls, which is the right trade - the common case is not
+	   squeezed to accommodate the rare one.
+	   260px per column + 12px gaps + 18px padding each side. */
+	left: 24px;
+	right: 24px;
+	/* As wide as its own columns need, never wider than the screen.
+	   This was pinned at 1112px - exactly four columns - which is right for the default
+	   pipeline and wrong for every job that has one more. A job-id whose card sits at a stage
+	   its pipeline does not contain gets a fifth, off-pipeline column, and at a fixed 1112 it
+	   was parked four pixels past the right edge: four empty columns on screen, the only card
+	   on the job invisible behind a horizontal scroll nothing advertises.
+	   Each column is 260px with a 12px gap and 18px of padding each side, so n columns need
+	   n * 272 + 24. --board-cols is set by the board from the columns it actually built. */
+	max-width: min(calc(var(--board-cols, 4) * 272px + 24px), calc(100vw - 48px));
+	/* Centred by auto margins rather than a translate: the FLIP owns transform, and a second
+	   transform here would fight it. */
+	margin-inline: auto;
+	height: auto;
+	display: flex;
+	flex-direction: column;
+	background: var(--bg-canvas);
+	/* The accent, matching the sizes inside it - the board is the one surface that covers the
+	   whole page, and the edge saying which colour it belongs to is what stops it reading as a
+	   second application that happens to have opened. */
+	border: 1px solid var(--xan-blue);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+	overflow: hidden;
+	/* Scaling happens from the corner the transform is measured against. */
+	transform-origin: top left;
+}
+
+/* A CONTAINER TRANSFORM, not a fade.
+ *
+ * The shape morphs the whole way - that part was always here - but the board is 1112x900 and
+ * the card it comes from is about 200x156, so the scale between them is nowhere near uniform.
+ * Everything inside was being squashed to a sixth of its width and a fifth of its height for
+ * the entire journey, which is illegible, and illegible-then-legible is read as a fade. The
+ * close then really was one: the panel dropped to opacity 0 on its way down.
+ *
+ * The fix is to not show the contents while they are distorted. The shell morphs at full
+ * opacity; what is inside it is staged:
+ *
+ *   shell     |========== transform 420ms ==========|
+ *   head      |  wait 90ms  |== fade+rise 170ms ==|
+ *   columns   |    wait 150ms   |== fade+rise 210ms ==|
+ *
+ * so the first third is an empty card-coloured shell growing, and the contents arrive into a
+ * shape that has already almost stopped moving. The head leads the columns by 60ms because the
+ * job-id is what was written on the card you pressed - it reading in first is the card's own
+ * text becoming the board's title.
+ */
+.job-board-overlay.is-opening {
+	transition: transform var(--dur-liquid) var(--ease-liquid);
+}
+
+/* Leaving: NO overshoot. --ease-overshoot passes its target and comes back, which on the way
+   in is a settle and on the way out is a bounce - the board shrank past the card and sprang
+   back up. Nothing is settling into anything here; it is going away.
+   No opacity on the shell either: it shrinks into the card it came from and is gone because it
+   is the size of nothing, which is a return rather than a dissolve. */
+.job-board-overlay.is-closing {
+	transition: transform var(--dur-liquid) var(--ease-settle);
+}
+
+/* Invisible until the shell has somewhere to put them. Applies through `measuring` and
+   `placed` as well as the first moments of `opening`. */
+.job-board-overlay-head,
+.job-board-columns {
+	opacity: 0;
+}
+
+.job-board-overlay.is-opening /* A card at a stage this job-id does not have. Amber, like the column it sits in. */
+.job-board-stray-note {
+	color: var(--xan-amber);
+}
+
+/* Why this board cannot be rearranged, and the control that changes what it can.
+   --xan-amber, not --status-amber-text: the latter is declared once, in :root, and never in
+   the dark block, so it would render a light-mode amber against a near-black page. */
+.job-board-lock {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 4px 4px 10px;
+	border: 1px solid var(--xan-amber);
+	border-radius: 999px;
+	background: var(--xan-amber-bg);
+	color: var(--xan-amber);
+}
+
+/* The button inside it keeps the shell's own colours - the pill is the warning, the button is
+   an action, and an amber-on-amber button would read as part of the message. */
+.job-board-lock .shell-btn {
+	flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+	/* The head wraps before this does; a pill that has to break across lines is worse than
+	   one that drops its sentence. */
+	.job-board-lock .text-body-small {
+		display: none;
+	}
+}
+
+.job-board-overlay-head {
+	opacity: 1;
+	transform: translateY(0);
+	transition: opacity 170ms var(--ease-liquid) 90ms, transform 170ms var(--ease-liquid) 90ms;
+}
+
+.job-board-overlay.is-opening .job-board-columns {
+	opacity: 1;
+	transform: translateY(0);
+	transition: opacity 210ms var(--ease-liquid) 150ms, transform 210ms var(--ease-liquid) 150ms;
+}
+
+/* The rise they arrive from. Small - this is the contents settling into a shell that has
+   stopped moving, not a second animation competing with the first. */
+.job-board-overlay.is-measuring .job-board-overlay-head,
+.job-board-overlay.is-placed .job-board-overlay-head,
+.job-board-overlay.is-measuring .job-board-columns,
+.job-board-overlay.is-placed .job-board-columns {
+	transform: translateY(8px);
+}
+
+/* Out faster than in, and with no stagger. Leaving is one movement: the contents go, then the
+   shell follows them down into the card. */
+.job-board-overlay.is-closing .job-board-overlay-head,
+.job-board-overlay.is-closing .job-board-columns {
+	opacity: 0;
+	transition: opacity 120ms linear;
+}
+
+.job-board-overlay-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-shrink: 0;
+	padding: 14px 18px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.job-board-columns {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	flex: 1;
+	min-height: 0;
+	padding: 16px 18px;
+	overflow-x: auto;
+}
+
+.job-board-column {
+	flex: 0 0 260px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 100%;
+	padding: 10px;
+	border-radius: var(--radius-control);
+	background: var(--bg-field-on-canvas);
+}
+
+/* A stray column is somewhere to drag out of, not into - so it is marked rather than dressed
+   to look like a stage of the pipeline. */
+.job-board-column.is-off-pipeline {
+	background: var(--status-amber-bg);
+}
+
+.job-board-column-note {
+	color: var(--status-amber-text);
+}
+
+.job-board-column {
+	transition: background var(--dur-base) var(--ease-liquid), outline-color var(--dur-base) var(--ease-liquid);
+}
+
+.job-board-column.is-over {
+	outline: 2px dashed var(--xan-blue);
+	outline-offset: -2px;
+	background: var(--xan-blue-bg);
+}
+
+/* Dashed, so a column head reads as a label over a space rather than as a filled bar - and so
+   the head that can be dragged and renamed looks like something you may take hold of. */
+.job-board-column-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	padding-bottom: 8px;
+	border-bottom: 1px dashed var(--border-strong);
+	color: var(--text-secondary);
+}
+
+.job-board-column-cards {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	overflow-y: auto;
+	/* An empty column still offers a card-sized place to drop into. Without it the only target
+	   was the column's own few pixels of padding, so an empty stage had to be hit almost
+	   exactly - you aimed at the heading and hoped. */
+	min-height: 76px;
+}
+
+.job-board-column-drop {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 68px;
+	border: 1px dashed var(--border-default);
+	border-radius: var(--radius-control);
+	color: var(--text-tertiary);
+}
+
+.job-board-column.is-over .job-board-column-drop {
+	border-color: var(--xan-blue);
+	color: var(--xan-blue);
+}
+
+.job-board-chip {
+	padding: 10px;
+	transition: transform var(--dur-base) var(--ease-liquid), opacity var(--dur-base) var(--ease-liquid),
+		box-shadow var(--dur-base) var(--ease-liquid), border-color var(--dur-base) var(--ease-liquid);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	cursor: grab;
+}
+
+.job-board-chip:active {
+	cursor: grabbing;
+}
+
+/* A chip on a part-invoiced job-id. The job is on the board so its remaining work can be
+   read; the API freezes stages for the whole job once any row is billed, so nothing here
+   moves. Grab cursors and hover lifts would all promise otherwise. */
+.job-board-chip.is-frozen {
+	cursor: default;
+}
+
+.job-board-chip.is-frozen:active {
+	cursor: default;
+}
+
+/* What is LEFT BEHIND, not what is in your hand.
+ *
+ * This used to tilt and lift: rotate(-2.5deg) scale(1.03) with a floating shadow, on the
+ * theory that it read as "picked up". It cannot. Native drag-and-drop snapshots its drag image
+ * synchronously at dragstart, before React has re-rendered - so the card following the cursor
+ * is the flat, untilted one, and this class lands on the element still sitting in the column.
+ * The result was two cards at once: a straight one under the mouse and a tilted, enlarged,
+ * accent-bordered one rotating in the list for no reason anybody could name.
+ *
+ * The browser already draws the card in your hand. This is the hole it came out of, so it is
+ * dressed as a hole: no transform, no shadow, dimmed, and outlined in the dash this board
+ * already uses for "something could go here" (.job-board-add). It also says where the card
+ * returns to if you drop it nowhere.
+ *
+ * Same treatment as .job-board-column.is-moving, which had it right all along. */
+.job-board-chip.is-dragging {
+	opacity: 0.4;
+	transform: none;
+	box-shadow: none;
+	background: transparent;
+	border-style: dashed;
+	border-color: var(--xan-blue);
+	/* The card is elsewhere; this is a space. Nothing in it should invite a click. */
+	cursor: grabbing;
+}
+
+.job-board-chip-sub {
+	display: block;
+	margin-top: 4px;
+	color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-board-overlay.is-opening,
+	.job-board-overlay.is-closing {
+		transition: none;
+	}
+
+	/* The staging is motion, so it goes - but the contents must still END UP visible. Only the
+	   transition is dropped; the opacity:1 in .is-opening still applies and simply arrives at
+	   once. Dropping the rule instead would leave the board permanently blank for anyone who
+	   has asked for less movement, which is the worst possible reading of the request. */
+	.job-board-overlay.is-opening .job-board-overlay-head,
+	.job-board-overlay.is-opening .job-board-columns,
+	.job-board-overlay.is-closing .job-board-overlay-head,
+	.job-board-overlay.is-closing .job-board-columns {
+		transition: none;
+	}
+
+	.job-board-overlay.is-measuring .job-board-overlay-head,
+	.job-board-overlay.is-placed .job-board-overlay-head,
+	.job-board-overlay.is-measuring .job-board-columns,
+	.job-board-overlay.is-placed .job-board-columns {
+		transform: none;
+	}
+}
+
+/* Quiet until wanted. A dashed outline says "there could be one more here" without competing
+   with the cards that are actually there. */
+.job-board-add,
+.job-board-add-stage {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 8px;
+	border: 1px dashed var(--border-default);
+	border-radius: var(--radius-control);
+	background: transparent;
+	color: var(--text-tertiary);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.job-board-column:hover .job-board-add,
+.job-board-columns:hover .job-board-add-stage,
+.job-board-add:focus-visible,
+.job-board-add-stage:focus-visible {
+	opacity: 1;
+}
+
+.job-board-add:hover,
+.job-board-add-stage:hover {
+	color: var(--text-primary);
+	border-color: var(--border-strong);
+}
+
+.job-board-add-stage {
+	flex: 0 0 180px;
+	align-self: flex-start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-board-add,
+	.job-board-add-stage {
+		/* Always visible rather than appearing on hover: a control that fades in is a control
+		   somebody has explicitly asked not to have fade in. */
+		opacity: 1;
+		transition: none;
+	}
+}
+
+/* The name is the editor's trigger, not the whole chip: a chip that is simultaneously a drag
+   handle, a click target and the container of a dropdown is three controls fighting over one
+   press, which is why clicking a card did nothing at all. */
+.job-board-chip-open {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	text-align: left;
+	color: var(--text-primary);
+	cursor: pointer;
+}
+
+.job-board-chip-open:hover:not(:disabled) {
+	color: var(--xan-blue);
+}
+
+.job-board-chip-open:disabled {
+	cursor: default;
+}
+
+.job-board-chip-open:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.job-board-chip-assign {
+	margin-top: 8px;
+	/* Not draggable: grabbing the picker to open it must not start dragging the card. */
+	cursor: auto;
+}
+
+/* The size beside the product, on a card and on a job-id badge alike.
+   In the accent, not in muted ink: on a board where every card is named after its material,
+   the size is the only thing that tells two of them apart, so it is the part worth finding
+   first. --xan-blue is what Appearance writes the chosen accent into, so this follows whatever
+   the account picked rather than pinning one hue. */
+.job-board-dims {
+	margin-left: 6px;
+	color: var(--xan-blue);
+	font-variant-numeric: tabular-nums;
+}
+
+.job-board-overlay-meta {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--text-secondary);
+}
+
+/* The column head is the handle, not the whole column - a draggable column swallows the drag
+   of every card inside it. */
+.job-board-column-head[draggable="true"] {
+	cursor: grab;
+}
+
+.job-board-column-head[draggable="true"]:active {
+	cursor: grabbing;
+}
+
+.job-board-column.is-moving {
+	opacity: 0.5;
+}
+
+.job-board-column-rename {
+	height: 26px;
+	padding: 0 6px;
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+/* A card, opened out of itself. Narrower and shorter than the board it sits over, so the board
+   stays visible around it - which is the point of growing out of a card rather than covering
+   everything with a modal. */
+.job-card-panel {
+	position: fixed;
+	/* Above the board, below the popup layer - for the same reason. */
+	z-index: 1050;
+	top: 50%;
+	left: 50%;
+	width: min(calc(100vw - 64px), 560px);
+	max-height: min(calc(100vh - 64px), 620px);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: var(--bg-raised);
+	/* The accent, the same edge the board itself wears. This panel opens ON TOP of the board,
+	   and a neutral hairline against the board's own neutral surface left the two reading as
+	   one sheet with a shadow - the border is what says a second thing opened. */
+	border: 1px solid var(--xan-blue);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+	/* Centred by its own offset rather than a translate, because the FLIP owns transform and a
+	   second one here would fight it.
+	   max(), not min(): these are negative, so min() picks the MORE negative of the two and
+	   throws the panel up and to the left of centre. The offset wanted is half of whichever
+	   size actually applies - the cap, or the viewport when it is the smaller. */
+	margin-top: max(-310px, calc((100vh - 64px) / -2));
+	margin-left: max(-280px, calc((100vw - 64px) / -2));
+	transform-origin: top left;
+}
+
+.job-card-panel.is-opening {
+	transition: transform var(--dur-liquid) var(--ease-liquid);
+}
+
+/* No overshoot on the way out - see the board's own note. And no opacity on the shell: it
+   shrinks back into the chip it came from, which is a return rather than a dissolve. */
+.job-card-panel.is-closing {
+	transition: transform var(--dur-liquid) var(--ease-settle);
+}
+
+.job-card-panel-body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 18px;
+	overflow-y: auto;
+}
+
+/* Two to a row, so the pairs that are read together - length and width, rate and discount -
+   sit together. */
+.job-card-panel-fields {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.job-card-panel-fields .is-wide {
+	grid-column: 1 / -1;
+}
+
+.job-card-panel-foot {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-top: 4px;
+}
+
+/* Pushes Cancel and Save to the right, leaving Remove alone on the left. The distance IS the
+   safeguard: the destructive control must not sit under the thumb that presses Save. */
+.job-card-panel-foot-spacer {
+	flex: 1;
+}
+
+/* Quiet until it is meant. A red button sitting in a form you opened to edit a rate reads as a
+   warning about the form rather than an action you can take. */
+.job-card-panel-remove {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--border-default);
+	background: transparent;
+	color: var(--text-tertiary);
+}
+
+/* --text-danger, not --status-red-text. tokens.css says why in as many words: the latter is
+   half of a chip pair, legible only on --status-red-bg, and 2.6:1 read directly on a dark
+   surface. --text-danger is defined per theme, which is the whole reason it exists. */
+.job-card-panel-remove:hover:not(:disabled),
+.job-card-panel-remove.is-confirming {
+	border-color: var(--text-danger);
+	background: var(--status-red-bg-subtle);
+	color: var(--text-danger);
+}
+
+/* The same container transform as the board. The origin here is a chip - smaller still than a
+   job-id card - so the squash was worse, not better. */
+.job-card-panel-body,
+.job-card-panel .job-board-overlay-head {
+	opacity: 0;
+}
+
+.job-card-panel.is-opening .job-board-overlay-head {
+	opacity: 1;
+	transition: opacity 170ms var(--ease-liquid) 80ms;
+}
+
+.job-card-panel.is-opening .job-card-panel-body {
+	opacity: 1;
+	transform: translateY(0);
+	transition: opacity 200ms var(--ease-liquid) 140ms, transform 200ms var(--ease-liquid) 140ms;
+}
+
+.job-card-panel.is-measuring .job-card-panel-body,
+.job-card-panel.is-placed .job-card-panel-body {
+	transform: translateY(8px);
+}
+
+.job-card-panel.is-closing .job-board-overlay-head,
+.job-card-panel.is-closing .job-card-panel-body {
+	opacity: 0;
+	transition: opacity 110ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-card-panel.is-opening,
+	.job-card-panel.is-closing {
+		transition: none;
+	}
+
+	.job-card-panel.is-opening .job-board-overlay-head,
+	.job-card-panel.is-opening .job-card-panel-body,
+	.job-card-panel.is-closing .job-board-overlay-head,
+	.job-card-panel.is-closing .job-card-panel-body {
+		transition: none;
+	}
+
+	.job-card-panel.is-measuring .job-card-panel-body,
+	.job-card-panel.is-placed .job-card-panel-body {
+		transform: none;
+	}
+}
+
+@media (max-width: 620px) {
+	.job-card-panel-fields {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Who the card is for, above what it is. It decides whether the card can move at all, so it is
+   not something to reach after eight commercial fields. */
+.job-card-panel-assign {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.job-card-panel-hint {
+	color: var(--text-tertiary);
+}
+
+/* How the card is measured - by its size or by the piece.
+   A segmented pair rather than a checkbox: the two are alternatives, and a checkbox labelled
+   "has dimensions" makes the by-quantity case the absence of something rather than a choice.
+   Semantic role tokens only, so it resolves in both themes. */
+.new-card-measure {
+	display: inline-flex;
+	align-self: flex-start;
+	padding: 3px;
+	gap: 3px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-chip);
+	background: var(--bg-field);
+}
+
+.new-card-measure-btn {
+	border: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	font: inherit;
+	font-size: 12.5px;
+	padding: 5px 12px;
+	border-radius: calc(var(--radius-chip) - 2px);
+	cursor: pointer;
+	transition: background 160ms ease, color 160ms ease;
+}
+
+.new-card-measure-btn:hover {
+	color: var(--text-primary);
+}
+
+.new-card-measure-btn.is-on {
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	box-shadow: var(--shadow-raised);
+}
+
+.new-card-igst {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.new-card-igst input {
+	accent-color: var(--xan-blue);
+	cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.new-card-measure-btn {
+		transition: none;
+	}
+}
+
+/* 1. What state the job is in, on its card - the question the board's grid could not answer
+   without opening something. */
+.job-board-card-badges {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+/* This screen's motion vocabulary. Two eases, so everything moves like one thing.
+   --ease-liquid is a long, slow-starting glide that settles without a bump: it is what makes
+   an expansion read as something unfolding rather than something snapping into place. */
+:root {
+	--ease-liquid: cubic-bezier(0.22, 1, 0.36, 1);
+	--dur-liquid: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-board-scrim,
+	.job-board-column,
+	.job-board-chip {
+		transition: none;
+	}
+
+	/* Nothing to neutralise any more - the dragged-from slot is a colour and an opacity, not
+	   a movement. Kept as a no-op guard so a transform reintroduced above cannot slip past
+	   the reduced-motion pass. */
+	.job-board-chip.is-dragging {
+		transform: none;
+	}
+}

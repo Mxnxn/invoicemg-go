@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- InvoiceMG. An invoice sheet with a folded corner: one silhouette, which is what
+       survives being shrunk into a 16px tab. Drawn on a 32px grid with even strokes and
+       whole-pixel coordinates so nothing lands on a half pixel and blurs.
+
+       The colour follows the tab bar's theme, matching the bg-primary role token in tokens.css: the
+       near-black reads on a light tab strip, the brand blue on a dark one. A single fixed
+       colour would disappear into one of the two. -->
+  <style>
+    .mark { fill: #17191f; }
+    .sheet { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #3b82f6; }
+      .sheet { fill: #0d0d0d; }
+    }
+  </style>
+
+  <!-- The sheet, with the top-right corner cut away for the fold. -->
+  <path class="mark" d="M6 3h13l7 7v19a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+  <!-- The fold itself, knocked out so it reads as a turned corner rather than a notch. -->
+  <path class="sheet" d="M19 3l7 7h-7V3z"/>
+  <!-- Two rule lines - the minimum that says "a document with figures on it" and still
+       resolves at 16px. A third line closes up into a smudge. -->
+  <rect class="sheet" x="10" y="17" width="12" height="2" rx="1"/>
+  <rect class="sheet" x="10" y="22" width="8" height="2" rx="1"/>
+</svg>

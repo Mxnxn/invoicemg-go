@@ -1,0 +1,537 @@
+/* The job-id card, and the decks it sits in.
+ *
+ * Shared by the sheet, the customer page and anywhere else a job-id is shown as an object
+ * rather than a table row. Semantic role tokens only - they are defined in both :root and
+ * html[data-theme="dark"], which the raw palette scales are not.
+ */
+
+.job-card-deck {
+	display: grid;
+	gap: 10px;
+	/* auto-fill, not auto-fit: one job-id on the last row should be a card, not a card
+	   stretched the width of the page. */
+	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+
+.job-card-wrap {
+	position: relative;
+	display: flex;
+}
+
+.job-card {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	text-align: left;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-canvas);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition: border-color var(--dur-base) var(--ease-liquid), transform var(--dur-base) var(--ease-liquid),
+		box-shadow var(--dur-base) var(--ease-liquid);
+}
+
+.job-card:hover {
+	border-color: var(--xan-blue);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-floating);
+}
+
+.job-card:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+.job-card:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.job-card-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+/* The identifier, in the accent - the treatment a document's own number gets on every list in
+   the app. It keeps its weight: an identifier is the NAME of the thing, and names are the one
+   kind of number on a card that earns bold. Every other figure here is a value, and a value is
+   read against the values beside it - size, colour and tabular alignment already separate it
+   from its label, so weight on top only makes four bold numbers with nothing to say which
+   matters. */
+.job-card-no {
+	color: var(--xan-blue);
+	font-family: var(--font-mono);
+	font-size: calc(12.5px * var(--font-scale-card-title, 1));
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.job-card-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+	color: var(--text-secondary);
+	font-size: calc(12.5px * var(--font-scale-card, 1));
+	font-variant-numeric: tabular-nums;
+}
+
+.job-card-products {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+}
+
+.job-card-product {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 5px;
+	padding: 2px 7px;
+	border-radius: var(--radius-chip);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-secondary);
+	font-size: calc(11.5px * var(--font-scale-card, 1));
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.job-card-product-size {
+	color: var(--xan-blue);
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.job-card-product.is-more {
+	color: var(--text-tertiary);
+	background: transparent;
+	border: 1px dashed var(--border-default);
+}
+
+/* --- selection --------------------------------------------------------------------------- */
+
+/* Hidden until wanted: a deck of permanently ticked-looking boxes reads as a form to fill in.
+   Shown on hover, on keyboard focus anywhere inside, and always once selected - otherwise
+   ticking one and moving the mouse away would make it vanish. */
+.job-card-check {
+	position: absolute;
+	top: 9px;
+	right: 9px;
+	z-index: 1;
+	display: inline-flex;
+	opacity: 0;
+	transition: opacity var(--dur-base) var(--ease-liquid);
+}
+
+.job-card-wrap:hover .job-card-check,
+.job-card-wrap:focus-within .job-card-check,
+.job-card-wrap.is-selected .job-card-check {
+	opacity: 1;
+}
+
+/* Selected reads on the card, not only on the 16px box in its corner. */
+.job-card-wrap.is-selected > .job-card {
+	border-color: var(--xan-blue);
+	box-shadow: 0 0 0 1px var(--xan-blue);
+}
+
+/* A card carrying a checkbox keeps its number clear of it. */
+.job-card-wrap:has(.job-card-check) .job-card-top {
+	padding-right: 26px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-card,
+	.job-card-check {
+		transition: none;
+	}
+
+	.job-card:hover {
+		transform: none;
+	}
+}
+
+/* --- a document -------------------------------------------------------------------------- */
+
+/* Wider than a job card: a document carries a party, a date and up to four figures where a
+   job-id carries a number and its work.
+   Sized for a deck of twenty or thirty rather than for three. At 260px with 10px between them
+   a full page read as one dense block - the eye had nothing to rest on between cards, and the
+   figures of one ran into the number of the next. The card is the unit being scanned, so it
+   needs to look like a unit. */
+.doc-card-deck {
+	display: grid;
+	gap: 14px;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.doc-card-wrap {
+	position: relative;
+	display: flex;
+}
+
+.doc-card {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	/* Taller than its contents strictly need. A card that only just fits what is in it reads
+	   as cramped the moment a firm name runs long, and thirty of those together is a wall. */
+	min-height: 150px;
+	padding: 18px;
+	text-align: left;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition: border-color var(--dur-base) var(--ease-liquid), transform var(--dur-base) var(--ease-liquid),
+		box-shadow var(--dur-base) var(--ease-liquid);
+}
+
+.doc-card:hover {
+	border-color: var(--xan-blue);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-floating);
+}
+
+.doc-card:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+.doc-card:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+/* The document's own number, in ink rather than in the accent.
+   The accent is right on a table row, where the number is one cell among nine and the colour
+   is what finds it. On a card it is already the first line, alone, in mono - it does not need
+   colour as well, and thirty accent-coloured numbers on one screen turned the accent into the
+   page's background noise instead of its emphasis. */
+.doc-card-no {
+	color: var(--text-primary);
+	font-family: var(--font-mono);
+	font-size: calc(13px * var(--font-scale-card-title, 1));
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.doc-card-wrap:has(.job-card-check) .doc-card-no {
+	padding-right: 26px;
+}
+
+.doc-card-names {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.doc-card-firm {
+	font-size: calc(13.5px * var(--font-scale-card, 1));
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.doc-card-sub {
+	color: var(--text-tertiary);
+	font-size: calc(11.5px * var(--font-scale-card, 1));
+	font-variant-numeric: tabular-nums;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The money, on one line, labelled. A row of bare figures is a row of numbers nobody can name. */
+/* Spread across the card rather than bunched at its left edge.
+   As a flex row with a fixed gap, three figures sat in the first third of a 377px card with
+   two thirds of empty space beside them - and the eye has to travel back and forth to compare
+   Received against Due because they are adjacent rather than aligned. An equal-width grid puts
+   each figure in its own column, so the same figure is in the same place on every card in the
+   deck and a column of them can be read straight down. */
+.doc-card-figures {
+	/* Pushed to the foot of the card. Cards carry different numbers of product chips, so
+	   without this the money sat at a different height on every card and a deck of them could
+	   not be read down a column. */
+	margin-top: auto;
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 1fr;
+	align-items: baseline;
+	gap: 12px;
+	padding-top: 10px;
+	border-top: 1px solid var(--border-default);
+}
+
+/* The last one hugs the right edge, so the card is bounded by its figures rather than
+   trailing off. */
+.doc-card-figures > .doc-card-figure:last-child {
+	text-align: right;
+}
+
+.doc-card-figure {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.doc-card-figure-label {
+	color: var(--text-tertiary);
+	font-size: calc(10.5px * var(--font-scale-card, 1));
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.doc-card-figure-value {
+	font-size: calc(14px * var(--font-scale-card, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Only the figure that is still owed carries a colour, and it is the danger red rather than
+   the amber - money outstanding is not a caution, it is the thing the page exists to chase.
+   --text-danger, not --status-red-text: the latter is half of a chip pair, legible only on
+   --status-red-bg and 2.6:1 read directly on a dark surface. */
+.doc-card-figure.is-due .doc-card-figure-value {
+	color: var(--text-danger);
+}
+
+.doc-card-figure.is-good .doc-card-figure-value {
+	color: var(--xan-emerald);
+}
+
+/* The top-right corner: the document's state, then its actions.
+   A purchase order's state is the second thing anybody wants after its number, and stacked
+   under the products it moved up and down the deck depending on how many things were ordered -
+   there was no line to read it along. Beside the number it is in the same place on every card.
+   The eye sits with it rather than in the opposite corner, because both answer "what do I do
+   with this one" and splitting them across the card makes you look twice. */
+.doc-card-corner {
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	flex-wrap: wrap;
+	max-width: 60%;
+}
+
+/* The number keeps clear of whatever is in that corner. */
+.doc-card-wrap:has(.doc-card-corner) .doc-card-no {
+	padding-right: 76px;
+}
+
+/* The selection box takes the opposite corner - three things in one corner is a queue. */
+.doc-card-wrap .job-card-check {
+	right: auto;
+	left: 12px;
+	top: auto;
+	bottom: 12px;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+	.doc-card {
+		transition: none;
+	}
+
+	.doc-card:hover {
+		transform: none;
+	}
+}
+
+/* A deck standing where a table used to, inside a shell-card: the card supplies the border and
+   the header, so the deck supplies only the inset the table's cells used to. */
+.doc-deck-padded {
+	padding: 16px 18px;
+}
+
+.doc-deck-note {
+	padding: 28px 18px;
+	text-align: center;
+	color: var(--text-tertiary);
+}
+
+/* A card's own action button - preview, download, whatever the list offers per document. */
+.doc-card-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-canvas);
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition: border-color var(--motion-fast), color var(--motion-fast), background var(--motion-fast);
+}
+
+.doc-card-action:hover {
+	border-color: var(--xan-blue);
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+}
+
+.doc-card-action:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.doc-card-action {
+		transition: none;
+	}
+}
+
+/* The one button on a list header that makes something new. Heavier than the controls beside
+   it, which only change what is already there. */
+.invoice-create-btn {
+	font-weight: 600;
+}
+
+/* --- /invoices header ------------------------------------------------------------------------
+   Two blocks, both two rows deep. On the left, the ways of narrowing the view: Table/Board,
+   and under it the ALL/GST/IGST split, which used to be a strip of its own beneath the header
+   and read as a second header because of it. On the right, the things that act on the list -
+   client filter, search and Create spaced apart on one line, with Demo beneath Create. Demo
+   is a sample, not a document; shoulder to shoulder with Create it looked like the same kind
+   of act. */
+
+.list-header-actions {
+	/* Takes the slack, so the bar ends on the card's right edge whatever is to its left. */
+	margin-left: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 8px;
+	min-width: 0;
+}
+
+/* Separated, not joined. The three are separate decisions - which customer, which words,
+   and make a new one - and running them together into one seamless bar said they were a
+   single control. */
+.list-header-group {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	min-width: 0;
+}
+
+/* The two ways of narrowing the view, stacked at the left of the header. */
+.invoice-header-views {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-width: 0;
+}
+
+/* The header is a two-row block now, so its halves align to the top rather than to each
+   other's middles - otherwise the right-hand column floats against the taller left one. */
+.shell-card-header.invoice-header {
+	align-items: flex-start;
+}
+
+.invoice-header-filter {
+	width: 190px;
+	flex: 0 0 auto;
+}
+
+/* One height across the row. The client filter borrows Argon's .form-control, which is taller
+   than the 36px everything else here uses, so controls side by side sat on three baselines.
+   The month picker on /purchase-invoices is built from DateFields, which already agree with
+   that height, so it is left alone. */
+.invoice-header-filter .form-control,
+.list-header-group .shell-search-field,
+.list-header-group .shell-btn,
+.list-header-group .invoice-create-btn {
+	height: 36px;
+}
+
+.invoice-header-filter .form-control {
+	padding: 0 10px;
+}
+
+.list-header-search {
+	width: 230px;
+	flex: 0 1 auto;
+}
+
+/* /lifecycle searches four fields at once and its placeholder says so, which does not fit in
+   230px. It is the widest thing on that row rather than a peer of the two beside it. */
+.list-header-search.is-wide {
+	width: 380px;
+	max-width: 100%;
+}
+
+.invoice-demo-btn {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+	/* Below this the row is wider than the card, so it stops hugging the right edge and each
+	   control takes the full width instead of three being squeezed to unusable. */
+	.list-header-actions {
+		margin-left: 0;
+		align-items: stretch;
+		width: 100%;
+	}
+
+	.invoice-header-filter,
+	.list-header-search,
+	.list-header-search.is-wide {
+		width: 100%;
+	}
+}
+
+/* A shell-card holding a DECK gives up its own edges.
+   Bordered cards inside a bordered card is a box in a box: the outer border adds nothing the
+   inner ones are not already saying, and on a full page of twenty it reads as a frame drawn
+   round a frame. The header keeps its rule, because that IS still a division - controls above,
+   content below. */
+.shell-card.is-deck {
+	border-color: transparent;
+	background: transparent;
+	overflow: visible;
+}
+
+.shell-card.is-deck > .shell-card-header {
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-raised);
+}
+
+/* The deck then supplies its own top margin rather than the padding it had inside the card. */
+.shell-card.is-deck > .doc-deck-padded {
+	padding: 16px 0 0;
+}
+
+.shell-card.is-deck > .doc-deck-note {
+	padding: 28px 0;
+}

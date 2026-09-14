@@ -1,0 +1,192 @@
+
+/* The totals bar above a customer's invoice table - see ClientInvoicesPanel. */
+.client-invoices-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.client-invoices-totals {
+    color: var(--text-primary);
+}
+
+/* Invoices and payments side by side - see ClientInvoicesPanel.
+   The payments panel is a column here, not an overlay: it used to portal to document.body,
+   which put it outside the modal it belonged to and covered the whole viewport. */
+.client-invoices-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+/* min-width:0 so the invoice table can shrink. Without it a flex child refuses to go below
+   its content width and the table pushes the payments panel off the dialog. */
+.client-invoices-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.received-history {
+    flex: 0 0 clamp(240px, 28%, 340px);
+    padding: 14px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+}
+
+.received-history-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.received-history-eyebrow {
+    margin: 0;
+    color: var(--text-tertiary);
+}
+
+.received-history-title {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.received-history-empty {
+    margin: 0;
+    color: var(--text-tertiary);
+}
+
+/* Stacked below the invoices on a narrow screen rather than squeezed beside them - at this
+   width the two columns leave neither readable. */
+@media (max-width: 900px) {
+    .client-invoices-body {
+        flex-direction: column;
+    }
+
+    .received-history {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+}
+
+/* ── Invoice detail modal (InvoiceDetailModal.jsx) ─────────────────────────────
+   One invoice, with its payments beside it. The tab replaces a bare hamburger
+   icon that gave no clue what it opened. */
+
+.invoice-detail-tabs {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-default);
+    padding-bottom: 10px;
+}
+
+.invoice-detail-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    color: var(--text-secondary);
+    font-size: var(--button-font-size, 13px);
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--motion-fast, 120ms) var(--ease-settle),
+        color var(--motion-fast, 120ms) var(--ease-settle),
+        border-color var(--motion-fast, 120ms) var(--ease-settle);
+}
+
+.invoice-detail-tab:hover {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.invoice-detail-tab:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.invoice-detail-tab.is-active {
+    background: var(--bg-primary);
+    border-color: var(--bg-primary);
+    color: var(--text-on-primary);
+}
+
+.invoice-detail-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill, 7px);
+    background: var(--bg-raised);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.invoice-detail-tab.is-active .invoice-detail-tab-count {
+    /* On the filled tab the count sits on the accent, so it takes the same
+       on-primary pair rather than the raised surface it uses at rest. */
+    background: color-mix(in srgb, var(--text-on-primary) 22%, transparent);
+    color: var(--text-on-primary);
+}
+
+.invoice-detail-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.invoice-detail-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+/* Payments on the left, invoice lines on the right. */
+.invoice-detail-receipts {
+    flex: 0 0 clamp(280px, 36%, 460px);
+    padding: 14px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+}
+
+.invoice-detail-receipts-title {
+    margin: 0 0 10px;
+    color: var(--text-primary);
+}
+
+/* min-width:0 so the line-item table can shrink instead of shoving the payments
+   panel off the dialog - same reason .client-invoices-main carries it. */
+.invoice-detail-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .invoice-detail-body {
+        flex-direction: column;
+    }
+
+    .invoice-detail-receipts {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .invoice-detail-tab {
+        transition: none;
+    }
+}

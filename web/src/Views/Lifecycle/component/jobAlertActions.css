@@ -1,0 +1,57 @@
+/* The job-id's own actions: what has already happened, and what you can do about it.
+ *
+ * Two groups rather than five siblings. They used to be flat children of one wrapping flex row
+ * alongside the "Rows" heading, so below the width where everything fit they scattered - a
+ * delivery-status chip could wrap underneath the button it reports on, and which control landed
+ * on which line depended on how long the last message's timestamp happened to be. Each group is
+ * its own flex container now, so they wrap as blocks and the reading order survives every width.
+ */
+.job-action-cluster {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	/* Pushed to the end of whatever row it sits in - the heading keeps the left. */
+	margin-left: auto;
+}
+
+.job-action-status,
+.job-action-buttons {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* Separates the passive half from the active half. A hairline rather than a gap: at a wide
+   width a gap alone reads as "these six things are a list", which is what made the row hard to
+   scan in the first place. */
+.job-action-divider {
+	width: 1px;
+	align-self: stretch;
+	min-height: 20px;
+	background: var(--border-default);
+}
+
+/* The divider is meaningless once the two halves are on separate lines. */
+@media (max-width: 720px) {
+	.job-action-divider {
+		display: none;
+	}
+
+	.job-action-cluster {
+		width: 100%;
+		margin-left: 0;
+	}
+}
+
+/* On the board the cluster sits in the overlay's head, beside the job-id and its total, where
+   there is less room than a modal has. The buttons keep their size; only the gaps tighten. */
+.job-action-cluster.is-board {
+	gap: 8px;
+}
+
+.job-action-cluster.is-board .job-action-status,
+.job-action-cluster.is-board .job-action-buttons {
+	gap: 6px;
+}

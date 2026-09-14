@@ -94,6 +94,32 @@ find, not when it looks right once.
 Delete the Node handler only once the route has been served from here long enough that you
 would have noticed.
 
+## The frontend copy (`web/`)
+
+`web/` is a copy of `InvoiceMG-Mxnxn/Invoice-mg`, taken so this repository can eventually be
+the whole application. Until cutover it is **not** the source of truth, and the risk is not
+staleness - it is that both copies get hand-edited and quietly diverge.
+
+> Edit the frontend in `InvoiceMG-Mxnxn/Invoice-mg`. Bring this copy forward with
+> `pwsh scripts/sync-web.ps1 -Apply`. Never hand-edit `web/`.
+
+At cutover that reverses: `web/` becomes the source of truth, the sync script is deleted, and
+the old repo is archived. The client needs no change either way - it talks to whatever nginx
+points it at.
+
+## Progress
+
+`ROUTES.md` is generated from the Node source by `Docs/routeInventory.js`, so it cannot drift
+from what the API actually exposes. A route is ticked only when `scripts/parity.js` says its
+answer is identical - implemented is not done.
+
+```sh
+node scripts/parity.js --token <SESSION-TOKEN>              # every ticked route
+node scripts/parity.js --token <TOKEN> --route "post /unit/list"
+```
+
+Mint a throwaway token against the dev database rather than using your own session.
+
 ## Not done yet
 
 - 207 of 209 routes.

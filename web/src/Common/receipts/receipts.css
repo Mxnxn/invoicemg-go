@@ -1,0 +1,71 @@
+/* Payment-destination chips - see ReceiptDestinations.jsx.
+   Every colour is a semantic role token so both themes resolve (docs/STYLE.md #1). */
+
+.receipt-dest-list {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.receipt-dest {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-chip, 6px);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    font-size: calc(12px * var(--font-scale-body, 1));
+    line-height: 18px;
+    white-space: nowrap;
+}
+
+.receipt-dest svg {
+    color: var(--icon-muted);
+    flex-shrink: 0;
+}
+
+.receipt-dest-label {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+
+.receipt-dest-amount {
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* Interactive variant. Kept visually identical at rest so a non-clickable chip and a
+   clickable one read as the same kind of thing - the difference shows on hover/focus. */
+.receipt-dest-btn {
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--motion-fast, 120ms) var(--ease-settle),
+        border-color var(--motion-fast, 120ms) var(--ease-settle);
+}
+
+.receipt-dest-btn:hover {
+    background: var(--bg-field-on-canvas);
+    border-color: var(--border-strong);
+}
+
+.receipt-dest-btn:hover .receipt-dest-label {
+    text-decoration: underline;
+}
+
+.receipt-dest-btn:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.receipt-dest-empty {
+    color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .receipt-dest-btn {
+        transition: none;
+    }
+}

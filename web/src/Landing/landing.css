@@ -1,0 +1,337 @@
+/*
+ * Landing-page stylesheet. Imported only from src/Landing/index.jsx, which is
+ * React.lazy'd, so Vite emits it as an async chunk that never loads on an admin
+ * route.
+ *
+ * Three independent guards keep this away from the Argon/Bootstrap admin panel:
+ *   1. prefix(tw)   - every utility is `tw:flex`, so it cannot collide with a
+ *                     Bootstrap class name (both define .p-3, .mt-4, .border,
+ *                     .shadow, .rounded, .text-primary with different values).
+ *   2. no preflight - the `base` layer is deliberately not imported, so
+ *                     Tailwind's global element reset never runs. The scoped
+ *                     reset further down replaces it for the landing subtree.
+ *   3. lazy chunk   - see above.
+ */
+/*
+ * Deliberately NOT wrapped in a cascade layer. Unlayered CSS always outranks
+ * layered CSS, and Argon/Bootstrap is entirely unlayered - putting these
+ * utilities in @layer would make every Argon rule beat them (Bootstrap's reboot
+ * sets `nav { display: block }`, which would defeat `tw:hidden`). The tw:
+ * prefix, not a layer, is what keeps the two stylesheets apart.
+ */
+@import "tailwindcss/theme.css" prefix(tw);
+@import "tailwindcss/utilities.css" source(none);
+
+/* Scan this directory only. Without source(none) above, Tailwind's automatic
+   detection walks the whole repo and generates utilities for any `tw:`-shaped
+   string it finds in docs or plans. */
+@source "./";
+
+/* The admin panel's theme switch writes html[data-theme]; follow it instead of
+   shadcn's .dark class. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme inline prefix(tw) {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-border: var(--border);
+    --color-ring: var(--ring);
+    --color-brand: var(--brand);
+    /* The app's status badge pair (tokens.css). Deliberately not theme-swapped:
+       a light chip with dark text reads on either surface, which is how the
+       admin's own StatusBadge behaves in dark mode. */
+    --color-chip: var(--status-amber-bg);
+    --color-chip-foreground: var(--status-amber-text);
+    /* Field errors, from the same status family. */
+    --color-danger: var(--status-red-text);
+    --color-danger-soft: var(--status-red-bg);
+    --color-brand-from: var(--brand-from);
+    --color-brand-via: var(--brand-via);
+    --color-brand-to: var(--brand-to);
+    --font-sans: var(--font-sans);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --animate-marquee: marquee var(--duration, 40s) linear infinite;
+    --animate-marquee-vertical: marquee-vertical var(--duration, 40s) linear infinite;
+    --animate-shimmer: shimmer 2.5s linear infinite;
+    --animate-gradient: gradient 6s ease infinite;
+    --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
+    --animate-aurora-1: aurora-1 14s ease-in-out infinite alternate;
+    --animate-aurora-2: aurora-2 18s ease-in-out infinite alternate;
+    --animate-aurora-3: aurora-3 22s ease-in-out infinite alternate;
+    --animate-meteor: meteor 5s linear infinite;
+    --animate-retro-grid: retro-grid 18s linear infinite;
+}
+
+/*
+ * Token bridge. Velora's shadcn palette is re-pointed at the admin panel's
+ * tokens (src/styles/tokens.css), so the landing page inherits the product's
+ * colours and needs no dark-mode rules of its own - html[data-theme="dark"]
+ * already redefines every variable on the right-hand side.
+ */
+.velora-root {
+    --background: var(--bg-canvas);
+    --foreground: var(--text-primary);
+    --card: var(--bg-raised);
+    --card-foreground: var(--text-primary);
+    --muted: var(--bg-field);
+    --muted-foreground: var(--text-secondary);
+    --primary: var(--bg-primary);
+    --primary-foreground: var(--text-on-primary);
+    --border: var(--border-default);
+    --ring: var(--border-strong);
+    --radius: var(--radius-surface);
+    --font-sans: var(--font-family);
+
+    --brand: var(--bg-primary);
+    --brand-from: var(--bg-primary);
+    --brand-via: var(--bg-primary-hover);
+    --brand-to: var(--bg-primary);
+    --grid-line: var(--border-default);
+
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+}
+
+/*
+ * Scoped stand-in for Tailwind's preflight: undo the Argon/Bootstrap element
+ * styling that would otherwise leak into the landing markup. Scoped to
+ * .velora-root so nothing here can reach an admin view.
+ *
+ * The scope is written :where(.velora-root) so it adds no specificity: each
+ * rule below weighs exactly one element selector (0,0,1). That is the same
+ * weight as Argon's own element rules - and this file loads after Argon, so it
+ * wins the tie - while still losing to every tw: utility (0,1,0). Writing it as
+ * `.velora-root h1` (0,0,2) would instead beat `tw:text-4xl` and flatten every
+ * heading on the page.
+ */
+:where(.velora-root) *,
+:where(.velora-root) *::before,
+:where(.velora-root) *::after {
+    box-sizing: border-box;
+}
+
+:where(.velora-root) h1,
+:where(.velora-root) h2,
+:where(.velora-root) h3,
+:where(.velora-root) h4,
+:where(.velora-root) h5,
+:where(.velora-root) h6,
+:where(.velora-root) p,
+:where(.velora-root) figure,
+:where(.velora-root) blockquote,
+:where(.velora-root) dl,
+:where(.velora-root) dd {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+:where(.velora-root) ul,
+:where(.velora-root) ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+:where(.velora-root) a,
+:where(.velora-root) a:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+/*
+ * tokens.css colours every link globally with `html[data-theme="dark"] a`,
+ * which weighs (0,1,2) and so outranks both the reset above and a plain tw:
+ * text-colour utility (0,1,0) - without this, landing links turn admin-blue in
+ * dark mode. Match that weight, scoped to the landing subtree. Deliberately no
+ * :hover here: `tw:hover:text-foreground` weighs (0,2,0) and must keep winning.
+ */
+html[data-theme] :where(.velora-root) a {
+    color: inherit;
+}
+
+/*
+ * Form controls. Without Tailwind's preflight the UA defaults survive - notably
+ * `border: 2px inset` on an input, which made the phone field 42px tall against every
+ * other field's 38px because it takes its border from a wrapper rather than a utility.
+ * Weighs one element selector, so any tw: border/background utility still wins.
+ */
+:where(.velora-root) input,
+:where(.velora-root) textarea,
+:where(.velora-root) select {
+    font: inherit;
+    color: inherit;
+    border: 0;
+    background: none;
+    margin: 0;
+}
+
+:where(.velora-root) button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+:where(.velora-root) nav,
+:where(.velora-root) header,
+:where(.velora-root) footer,
+:where(.velora-root) section,
+:where(.velora-root) main,
+:where(.velora-root) figure {
+    display: block;
+}
+
+:where(.velora-root) img,
+:where(.velora-root) svg,
+:where(.velora-root) canvas {
+    display: block;
+    max-width: 100%;
+}
+
+@keyframes marquee {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(calc(-100% - var(--gap)));
+    }
+}
+
+@keyframes marquee-vertical {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(calc(-100% - var(--gap)));
+    }
+}
+
+@keyframes shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes gradient {
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+@keyframes orbit {
+    0% {
+        transform: rotate(calc(var(--angle) * 1deg)) translateY(calc(var(--radius) * -1px))
+            rotate(calc(var(--angle) * -1deg));
+    }
+    100% {
+        transform: rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * -1px))
+            rotate(calc((var(--angle) * 1deg + 360deg) * -1));
+    }
+}
+
+@keyframes aurora-1 {
+    0% {
+        transform: translate(-10%, -12%) scale(1);
+    }
+    50% {
+        transform: translate(12%, 8%) scale(1.25);
+    }
+    100% {
+        transform: translate(-6%, 14%) scale(0.95);
+    }
+}
+
+@keyframes aurora-2 {
+    0% {
+        transform: translate(12%, 10%) scale(1.1);
+    }
+    50% {
+        transform: translate(-14%, -6%) scale(0.9);
+    }
+    100% {
+        transform: translate(8%, -12%) scale(1.2);
+    }
+}
+
+@keyframes aurora-3 {
+    0% {
+        transform: translate(0%, 16%) scale(0.95);
+    }
+    50% {
+        transform: translate(10%, -10%) scale(1.15);
+    }
+    100% {
+        transform: translate(-12%, 4%) scale(1);
+    }
+}
+
+@keyframes meteor {
+    0% {
+        transform: rotate(var(--meteor-angle, 215deg)) translateX(0);
+        opacity: 1;
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        transform: rotate(var(--meteor-angle, 215deg)) translateX(-600px);
+        opacity: 0;
+    }
+}
+
+@keyframes retro-grid {
+    from {
+        transform: translateY(-50%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* Utility class names carry the tw: prefix, so match on the substring. */
+@media (prefers-reduced-motion: reduce) {
+    .velora-root [class*="animate-"] {
+        animation: none !important;
+    }
+
+    /* Transitions too, not just keyframe animations. The hover nudges on the hero's text
+       link and the card lifts are transitions, so the rule above left them running for a
+       reader who asked for no motion. */
+    .velora-root *,
+    .velora-root *::before,
+    .velora-root *::after {
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* The header is fixed at h-16 (4rem), so a section scrolled to the very top of the
+   viewport has its heading hidden behind it. scroll-margin-top is what the scroll lands
+   against, so the heading clears the header instead of sitting under it.
+
+   Scoped to .velora-root: this file is only in the document on the landing route, but the
+   chunk stays loaded after a visitor moves on to /admin in the same session. */
+.velora-root section[id] {
+    scroll-margin-top: 5rem;
+}

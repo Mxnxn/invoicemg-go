@@ -1,0 +1,121 @@
+/* The app's loading indicator: a blob of liquid that never settles.
+ *
+ * WHY THE SHAPE NEVER REPEATS THE SAME WAY
+ *
+ * A single keyframe loop is recognisable within a few seconds - the eye learns
+ * the cycle and the loader starts reading as a stuck GIF rather than as work in
+ * progress. So three things run at once on deliberately COPRIME durations:
+ *
+ *   morph  7s   the corner radii
+ *   drift 11s   a slow squash and stretch
+ *   spin  13s   rotation
+ *
+ * 7, 11 and 13 share no factors, so the three only realign after 7x11x13 = 1001
+ * seconds. Every glance inside seventeen minutes lands on a shape the viewer has
+ * not seen before, from four keyframes and no JavaScript.
+ *
+ * Colour comes from currentColor so the caller sets it from a token and the blob
+ * follows the theme with everything else.
+ */
+
+.blob-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg-primary);
+}
+
+.blob-loader--page {
+    /* Fills whatever it is dropped into rather than a hardcoded 100vh: these render
+       inside a card as often as they do a whole page, and a viewport-height spinner
+       inside a panel pushes everything below it off the screen. */
+    min-height: 60vh;
+    width: 100%;
+}
+
+.blob-loader--inline {
+    min-height: 2.5rem;
+    width: 100%;
+}
+
+.blob-loader-shape {
+    background: currentColor;
+    animation:
+        blob-morph 7s ease-in-out infinite,
+        blob-drift 11s ease-in-out infinite,
+        blob-spin 13s linear infinite;
+}
+
+.blob-loader--page .blob-loader-shape {
+    width: 64px;
+    height: 64px;
+}
+
+.blob-loader--inline .blob-loader-shape {
+    width: 22px;
+    height: 22px;
+}
+
+/* Four asymmetric states rather than a there-and-back pair. An even number of
+   opposing shapes reads as a pulse; four unrelated ones read as a liquid. */
+@keyframes blob-morph {
+    0%,
+    100% {
+        border-radius: 58% 42% 47% 53% / 45% 52% 48% 55%;
+    }
+    25% {
+        border-radius: 38% 62% 63% 37% / 58% 34% 66% 42%;
+    }
+    50% {
+        border-radius: 52% 48% 33% 67% / 38% 61% 39% 62%;
+    }
+    75% {
+        border-radius: 64% 36% 55% 45% / 49% 67% 33% 51%;
+    }
+}
+
+/* Volume, not size: the blob squashes and stretches while keeping roughly the
+   same area, the way a body of liquid does. */
+@keyframes blob-drift {
+    0%,
+    100% {
+        transform: scale(1, 1);
+    }
+    33% {
+        transform: scale(1.08, 0.93);
+    }
+    66% {
+        transform: scale(0.94, 1.07);
+    }
+}
+
+@keyframes blob-spin {
+    to {
+        rotate: 360deg;
+    }
+}
+
+/* Stopped entirely, not slowed. What remains is a static organic shape, which
+   still reads as "something is happening here" beside the surrounding copy. */
+@media (prefers-reduced-motion: reduce) {
+    .blob-loader-shape {
+        animation: none;
+        border-radius: 58% 42% 47% 53% / 45% 52% 48% 55%;
+    }
+}
+
+/* Its own label class rather than Argon's .sr-only: these loaders render on the
+   pre-auth pages too (PreClientComponents, PreInvoiceComponents), and depending on the
+   admin stylesheet being present would make the announcement vanish exactly where
+   there is least other context to go on. */
+.blob-loader-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

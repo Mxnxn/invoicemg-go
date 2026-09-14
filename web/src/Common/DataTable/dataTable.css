@@ -1,0 +1,1037 @@
+/*
+ * Xan CRM table system — see /style3.md (light-mode variant) and /CLAUDE.md context.
+ * Global (not [data-shell]-scoped) so both the new shell and legacy reactstrap views can use it.
+ */
+
+.xan-panel {
+    background: var(--xan-bg-panel);
+    border: 1px solid var(--xan-border);
+    border-radius: var(--xan-radius-panel);
+    overflow: hidden;
+}
+
+.xan-table {
+    width: 100%;
+    min-width: max-content;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+}
+
+/* Compact borderless input for inline-editable table cells (e.g. Quotation row editor) -
+   fills the cell instead of the default reactstrap Input's larger padding/border. */
+.cell-input {
+    width: 100%;
+    min-width: 70px;
+    padding: 4px 6px !important;
+    font-size: calc(0.675rem * var(--font-scale-table-row, 1)) !important;
+    height: auto !important;
+    border: 1px solid var(--border-default, #d9d9df) !important;
+    border-radius: var(--radius-chip, 4px) !important;
+    background: var(--bg-field-on-canvas, transparent) !important;
+    color: var(--text-primary, inherit) !important;
+}
+
+/* Length and Width hold two or three characters, so they do not need the 70px floor every
+   other cell input gets - that floor is what stopped the column from actually narrowing.
+   Dropping it lets the <th> width decide, which is where the column width belongs. */
+.cell-input-narrow {
+    min-width: 0;
+}
+
+/* Row-opens-modal trigger (e.g. Lifecycle's Job Number). The purple/blue split per
+   theme now lives on --text-link in tokens.css, so this is one rule, not two. */
+.lifecycle-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-link);
+}
+
+.lifecycle-link:hover {
+    text-decoration: underline;
+}
+
+.xan-table thead th {
+    background: var(--xan-glass-overlay);
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: calc(11px * var(--font-scale-table-head, 1));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--xan-text-dim);
+    padding: 0 16px;
+    height: 40px;
+    white-space: nowrap;
+    border-bottom: none;
+}
+
+.xan-table tbody tr {
+    height: var(--xan-row-height);
+    border-bottom: 1px solid var(--xan-border);
+    transition: background 0.2s var(--xan-ease);
+}
+
+.xan-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.xan-table tbody tr:hover {
+    background: var(--xan-glass-overlay);
+}
+
+.xan-table tbody tr.selected {
+    background: var(--xan-blue-bg);
+}
+
+.xan-table td {
+    padding: 0 16px;
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+    color: var(--xan-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Totals row (Customer Dues, Purchase Report). The last data row deliberately drops its
+   border, so without this the total sits flush against the figures it sums and reads as one
+   more record. A rule above it, a tinted ground and real vertical padding separate the two. */
+.xan-table tfoot td {
+    padding: 16px;
+    background: var(--xan-glass-overlay);
+    border-top: 1px solid var(--xan-border);
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+    white-space: nowrap;
+}
+
+/* Breathing room between the last row and the total, without a spacer element in the markup. */
+.xan-table tfoot tr:first-child td {
+    border-top-width: 2px;
+}
+
+.xan-table td.xan-col-checkbox,
+.xan-table th.xan-col-checkbox {
+    width: 44px;
+    padding: 0 0 0 16px;
+}
+
+/* Keep utility text classes (e.g. text-body-medium) in sync with the compact row font size */
+.xan-table td.text-body-medium {
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+}
+
+/* ---------- Row action menu ---------- */
+
+.xan-row-menu-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.xan-row-menu-trigger {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--xan-text-dim);
+    cursor: pointer;
+    transition: background 0.15s var(--xan-ease), color 0.15s var(--xan-ease);
+}
+
+.xan-row-menu-trigger:hover,
+.xan-row-menu-trigger[aria-expanded="true"] {
+    background: var(--xan-glass-overlay);
+    color: var(--xan-text);
+}
+
+.xan-row-menu-trigger:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 1px;
+}
+
+.xan-row-menu {
+    position: fixed;
+    z-index: 1100;
+    min-width: 152px;
+    padding: 4px;
+    background: var(--xan-bg-panel);
+    border: 1px solid var(--xan-border);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.1);
+    font-family: var(--font-mono);
+}
+
+.xan-row-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--xan-text);
+    font-size: calc(12px * var(--font-scale-table-row, 1));
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s var(--xan-ease);
+}
+
+.xan-row-menu-item svg {
+    flex-shrink: 0;
+    color: var(--xan-text-dim);
+}
+
+.xan-row-menu-item:hover {
+    background: var(--xan-glass-overlay);
+}
+
+.xan-row-menu-item:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.xan-row-menu-item:disabled:hover {
+    background: transparent;
+}
+
+.xan-row-menu-item:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: -2px;
+    background: var(--xan-glass-overlay);
+}
+
+.xan-row-menu-item-danger {
+    color: var(--xan-rose);
+}
+.xan-row-menu-item-danger svg {
+    color: var(--xan-rose);
+}
+
+.xan-row-menu-item-warning {
+    color: var(--xan-amber);
+}
+.xan-row-menu-item-warning svg {
+    color: var(--xan-amber);
+}
+
+.xan-row-menu-item-success {
+    color: var(--xan-emerald);
+}
+.xan-row-menu-item-success svg {
+    color: var(--xan-emerald);
+}
+
+/* Numeric/date/ID cells — regular weight per project instruction (spec default is bold) */
+.cell-mono {
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--xan-text-dim);
+}
+
+/* ---------- Status badge ---------- */
+
+.xan-status-badge {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    font-family: var(--font-outfit);
+    font-size: calc(10px * var(--font-scale-table-row, 1));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.xan-status-badge.status-paid {
+    color: var(--xan-emerald);
+    background: var(--xan-emerald-bg);
+}
+
+.xan-status-badge.status-pending {
+    color: var(--xan-amber);
+    background: var(--xan-amber-bg);
+}
+
+.xan-status-badge.status-overdue {
+    color: var(--xan-rose);
+    background: var(--xan-rose-bg);
+}
+
+.xan-status-badge.status-neutral {
+    color: var(--xan-text-dim);
+    background: var(--xan-glass-overlay);
+}
+
+.xan-status-badge.status-open {
+    color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+}
+
+/* Colour-named variants. Five call sites already asked for these - the Invoiced column on the
+   job board (green / amber) and the account status column under /dev (red / amber / lime) -
+   and none of them existed, so those badges rendered with the base .xan-status-badge shape and
+   no colour at all: a pill with default text on no background, which reads as unstyled rather
+   than as a status.
+   They reuse the accent pairs the semantic variants above already use, so a green "Invoiced"
+   and a "Paid" badge are the same green rather than two greens that nearly match. */
+.xan-status-badge.status-green,
+.xan-status-badge.status-lime {
+    color: var(--xan-emerald);
+    background: var(--xan-emerald-bg);
+}
+
+.xan-status-badge.status-amber {
+    color: var(--xan-amber);
+    background: var(--xan-amber-bg);
+}
+
+.xan-status-badge.status-red {
+    color: var(--xan-rose);
+    background: var(--xan-rose-bg);
+}
+
+.xan-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: xan-pulse-dot-anim 2s infinite ease-in-out;
+    flex-shrink: 0;
+}
+
+@keyframes xan-pulse-dot-anim {
+    0%,
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* ---------- Checkbox ---------- */
+
+.xan-checkbox {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.xan-checkbox input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.xan-checkbox-box {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    /* A visible neutral gray in both themes - the previous var(--xan-glass-overlay) was a
+       4%-opacity tint that read as essentially invisible against most panel backgrounds.
+       Bumped again (0.35/0.6 -> 0.55/0.9) - still too washed out against panel backgrounds
+       like the Columns dropdown. */
+    background: rgba(148, 163, 184, 0.55);
+    border: 1.5px solid rgba(100, 110, 125, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    transition: background 0.2s var(--xan-ease), border-color 0.2s var(--xan-ease);
+    pointer-events: none;
+}
+
+.xan-checkbox input:checked ~ .xan-checkbox-box {
+    background: var(--xan-blue);
+    border-color: var(--xan-blue);
+}
+
+.xan-checkbox input:focus-visible ~ .xan-checkbox-box {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 2px;
+}
+
+/* ---------- Bulk actions bar ---------- */
+
+.xan-bulk-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 18px 28px;
+    background: rgba(59, 130, 246, 0.1);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--xan-blue);
+    border-radius: var(--xan-radius-button);
+    box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.22);
+    font-family: var(--font-outfit);
+}
+
+.xan-bulk-bar-count {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-right: 32px;
+    border-right: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.xan-bulk-bar-count .badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--xan-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+    font-weight: 700;
+}
+
+.xan-bulk-bar-count .label {
+    font-size: calc(15px * var(--font-scale-table-row, 1));
+    font-weight: 700;
+    color: var(--xan-text);
+}
+
+.xan-bulk-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.xan-bulk-bar-actions button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    /* Comfortable hit target - these fire Invoice/Download, not something you want mis-clicked. */
+    padding: 8px 4px;
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--xan-text);
+    transition: color 0.2s var(--xan-ease);
+}
+
+.xan-bulk-bar-actions button:hover {
+    color: var(--xan-blue);
+}
+
+/* ---------- Spotlight card ---------- */
+
+.xan-spotlight {
+    position: relative;
+    overflow: hidden;
+}
+
+.xan-spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), var(--spotlight-color, var(--xan-blue-bg)) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s var(--xan-ease);
+    pointer-events: none;
+}
+
+.xan-spotlight:hover::before {
+    opacity: 1;
+}
+
+
+/* --- Row selection appears on hover -------------------------------------------------------
+ * A checkbox on every row is chrome competing with the data. It fades in when you point at
+ * the row, and stays put once ticked so a selection is never invisible.
+ *
+ * The box fades, not the cell: the column keeps its 44px so the table does not shift
+ * sideways as the pointer moves down it. The input underneath is already transparent (it is
+ * the hit area) and is left alone, so the row stays clickable and keyboard-reachable
+ * whether or not the box is showing.
+ */
+@media (hover: hover) {
+	.xan-table tbody tr .xan-col-checkbox .xan-checkbox-box {
+		opacity: 0;
+		transition: opacity var(--motion-fast) ease;
+	}
+
+	.xan-table tbody tr:hover .xan-col-checkbox .xan-checkbox-box,
+	/* Keyboard users get the same reveal - tabbing to the input must not leave them
+	   ticking something they cannot see. */
+	.xan-table tbody tr .xan-col-checkbox:focus-within .xan-checkbox-box,
+	/* A ticked row keeps its box regardless of where the pointer is. */
+	.xan-table tbody tr .xan-col-checkbox input:checked ~ .xan-checkbox-box {
+		opacity: 1;
+	}
+}
+
+/* The header's select-all follows the same idea, but keyed off the whole table rather than
+ * the header row: you decide to select everything while looking at the rows, not while
+ * pointing at a 40px strip of column titles.
+ *
+ * It must also survive a PARTIAL selection. A header box showing the indeterminate dash is
+ * the only indication that something is selected further down a long table, and
+ * :indeterminate is not :checked - without the second selector it would fade out and take
+ * that signal with it.
+ */
+@media (hover: hover) {
+	.xan-table thead tr .xan-col-checkbox .xan-checkbox-box {
+		opacity: 0;
+		transition: opacity var(--motion-fast) ease;
+	}
+
+	.xan-table:hover thead tr .xan-col-checkbox .xan-checkbox-box,
+	.xan-table thead tr .xan-col-checkbox:focus-within .xan-checkbox-box,
+	.xan-table thead tr .xan-col-checkbox input:checked ~ .xan-checkbox-box,
+	.xan-table thead tr .xan-col-checkbox input:indeterminate ~ .xan-checkbox-box {
+		opacity: 1;
+	}
+}
+
+/* Touch has no hover, so a fade-in would mean a checkbox that never appears. Everything
+   above is inside @media (hover: hover) for exactly that reason - phones keep them visible. */
+
+@media (prefers-reduced-motion: reduce) {
+	.xan-table tbody tr .xan-col-checkbox .xan-checkbox-box,
+	.xan-table thead tr .xan-col-checkbox .xan-checkbox-box {
+		transition: none;
+	}
+}
+
+/* --- Row letter-spacing -------------------------------------------------------------------
+ * A touch of tracking on table body text. Rows are dense and mostly codes and figures -
+ * job-ids, GST numbers, amounts - which read as a run of characters without it.
+ *
+ * Body cells only: headers already carry their own wider uppercase tracking, and overriding
+ * that here would flatten the distinction between a header and a row.
+ *
+ * Driven from Account settings > Appearance; the fallback is the value it shipped with, so a
+ * browser that never stored a preference looks the same as before.
+ */
+.xan-table tbody td {
+	letter-spacing: var(--letter-spacing-table, 0.1px);
+}
+
+/* ---------- Undo countdown ---------- */
+
+/* The undo window is invisible otherwise: the bar appears, then vanishes with no warning
+   that the moment to act has passed. A track depletes left-to-right over exactly the window
+   duration (set inline from UNDO_WINDOW_MS, so the animation cannot drift from the timer
+   that actually commits the delete). */
+/* .xan-bulk-bar is already position:fixed, so it is the positioning context the track
+   needs - this only clips the track to the bar's rounded corners. */
+.xan-undo-bar {
+    overflow: hidden;
+}
+
+.xan-undo-track {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 100%;
+    background: var(--xan-blue);
+    transform-origin: left center;
+    animation-name: xan-undo-deplete;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+@keyframes xan-undo-deplete {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/* Respect a reduced-motion preference: hold the full track rather than animating it. The
+   delete still commits on the same timer - only the motion is dropped. */
+@media (prefers-reduced-motion: reduce) {
+    .xan-undo-track {
+        animation: none;
+    }
+}
+
+/* A read-only log, not a list of things to act on. The default row hover reads as "click
+   me", so a table that only reports what already happened opts out of it - the rows stay
+   legible, they just stop pretending to be interactive. */
+.xan-table-static .xan-table tbody tr:hover {
+    background: transparent;
+}
+
+.xan-table-static .xan-table tbody tr {
+    cursor: default;
+}
+
+/* A row that navigates. The pointer is the affordance - the existing hover tint already
+   marks the row under the cursor, so nothing else is needed to say it can be clicked. */
+.xan-table tbody tr.xan-row-link {
+    cursor: pointer;
+}
+
+/* --- Add row, with the row's pricing kind chosen up front ------------------------------- */
+/* Every colour here is a semantic role token, so both themes resolve: the raw palette scale
+   (--color-ink-*, --color-neutral-*) is not overridden in the dark block and would render
+   near-black text on a near-black surface. See docs/STYLE.md item 1. */
+.xan-addrow {
+    position: relative;
+    display: inline-flex;
+}
+
+.xan-addrow-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* The plus/cross on the Add Row trigger - see AddRowIcon.jsx for the geometry.
+
+   The root svg and the strokes inside it would need DIFFERENT transform origins if both were
+   animated, and combining them is what once made the cross sit flush against the "A" of
+   "Add Row": transform-box has no effect on an outermost <svg>, which is a replaced element,
+   so a CSS transform on it resolves transform-origin against the 13px border box rather than
+   the 24-unit viewBox. "12px 12px" landed near the bottom-right CORNER, and rotating about a
+   corner swings the glyph sideways into the label.
+
+   Only the root rotates now, and percentages resolve correctly against whichever box a
+   browser picks. */
+.addrow-icon {
+    transform-origin: 50% 50%;
+    /* Overshoot rather than settle: the cross passes 45 degrees and comes back, so it snaps
+       into place instead of easing there. On a shape this small that is the difference
+       between a rotation you notice and one you do not. */
+    transition: transform var(--dur-base) var(--ease-overshoot);
+}
+
+.addrow-icon.is-x {
+    transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .addrow-icon {
+        transition: none;
+    }
+}
+
+.xan-addrow-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    min-width: 236px;
+    padding: 4px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow-floating);
+    animation: xan-addrow-in var(--motion-fast) both;
+}
+
+@keyframes xan-addrow-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.xan-addrow-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: var(--radius-chip);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* The row is the hit target, so it is the thing that answers the pointer. Colour and the
+       nudge run on the settle curve; the press uses the overshoot curve like every other
+       button in the app. */
+    transition: background var(--motion-fast), color var(--motion-fast),
+        transform var(--dur-fast) var(--ease-overshoot);
+}
+
+/* A menu row is a choice, not a surface, so it leans toward the pointer rather than only
+   changing shade. 2px is enough to feel and small enough not to disturb the row below it -
+   the two options sit 1px apart and anything larger reads as the menu shifting. */
+.xan-addrow-option:hover {
+    background: var(--bg-sidebar);
+    transform: translateX(2px);
+}
+
+/* The icon picks up the accent on hover, so the row's meaning - by dimension, by quantity -
+   is what is highlighted rather than just the strip under the cursor. */
+.xan-addrow-option:hover .xan-addrow-icon {
+    color: var(--xan-blue);
+}
+
+/* Keyboard focus gets the same treatment as hover, not less: arrowing through this menu
+   should show the same thing the pointer does, plus a ring. */
+.xan-addrow-option:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: -2px;
+    background: var(--bg-sidebar);
+    transform: translateX(2px);
+}
+
+.xan-addrow-option:focus-visible .xan-addrow-icon {
+    color: var(--xan-blue);
+}
+
+/* Squash on press, the same 3%/6% every button in the app uses - and it overrides the hover
+   nudge, so a click does not translate and scale at once. */
+.xan-addrow-option:active {
+    transform: scale(0.97, 0.94);
+    background: var(--bg-field-on-canvas);
+}
+
+.xan-addrow-icon {
+    flex: none;
+    margin-top: 1px;
+    color: var(--icon-default);
+    transition: color var(--motion-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .xan-addrow-option {
+        transition: background var(--motion-fast), color var(--motion-fast);
+    }
+
+    .xan-addrow-option:hover,
+    .xan-addrow-option:focus-visible,
+    .xan-addrow-option:active {
+        transform: none;
+    }
+}
+
+.xan-addrow-option-title {
+    display: block;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.xan-addrow-option-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: calc(11.5px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* A by-quantity row has no size, so its Length/Width cells hold a dash rather than a disabled
+   input. An empty input reads as a field someone forgot to fill; a dash reads as a field that
+   does not apply to this row. */
+.xan-cell-na {
+    display: block;
+    text-align: center;
+    /* --text-secondary rather than tertiary: this dash is the only thing saying the row has no
+       size, so it has to be legible rather than decorative. Tertiary is 2.63:1 on the light
+       row - see docs/STYLE.md item 5. */
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .xan-addrow-menu {
+        animation: none;
+    }
+    .xan-addrow-option {
+        transition: none;
+    }
+}
+
+/* --- Switching one row between priced-by-size and priced-by-quantity -------------------- */
+/* Lives inside the 70px Length/Width columns, so both controls are sized to fit there rather
+   than widening the columns back out. */
+
+/* "+ Size" - matches OptionalRowField's dashed chip and .igst-promote, so it reads as one of
+   the same family of things a row can opt into.
+   --text-secondary, NOT the --text-tertiary those two use: tertiary measures 2.63:1 on the
+   light row, and this is an interactive control carrying a word, so it has to clear 4.5:1
+   (docs/STYLE.md item 5). The older chips have the same problem; they are not touched here
+   because a sweep is churn, but they should move when someone is next in that code. */
+.xan-size-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    justify-content: center;
+    padding: 3px 4px;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-chip);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: calc(11px * var(--font-scale-table-row, 1));
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.xan-size-add:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.xan-size-add:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 1px;
+}
+
+.xan-size-add:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+/* An input plus a fixed gutter. min-width:0 on the input is what lets flex actually shrink
+   it - without it the input keeps its intrinsic width and pushes the gutter out of the cell.
+   Length and Width both use this, so both inputs measure the same; only Width's gutter holds
+   a button. */
+.xan-size-cell {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.xan-size-cell .cell-input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* The reserved column for the clear button, and the empty stand-in beside Length. One width
+   in one place, so the two inputs cannot drift apart. */
+.xan-size-gutter {
+    flex: none;
+    width: 17px;
+    height: 17px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .xan-size-add,
+    .xan-size-drop {
+        transition: none;
+    }
+}
+
+/* Spinner arrows are removed from every number field app-wide - see the input[type="number"]
+   rule in styles/tokens.css. Nothing needed here. */
+
+/* --- The clear/cancel "x" on a selection ------------------------------------------------ */
+/* One treatment, everywhere it appears: the IGST column's switch-back, a dropdown's clear,
+   and an optional row field's reset are all "undo this choice" and should not look like three
+   different controls.
+   --text-danger, not --xan-rose: rose is a single fixed hue the dark block never overrides,
+   which read at roughly 2.6:1 on the light row. This token carries a real red per theme.
+   The hover tint is the part these buttons were missing - without it there was no feedback
+   that the x was a target at all. */
+.xan-clear-btn,
+.igst-col-close,
+.xan-size-drop {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: none;
+    border-radius: var(--radius-chip);
+    background: transparent;
+    color: var(--text-danger);
+    cursor: pointer;
+    transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.xan-clear-btn:hover:not(:disabled),
+.igst-col-close:hover:not(:disabled),
+.xan-size-drop:hover:not(:disabled) {
+    background: var(--status-red-bg-subtle);
+}
+
+.xan-clear-btn:focus-visible,
+.igst-col-close:focus-visible,
+.xan-size-drop:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 1px;
+}
+
+.xan-clear-btn:disabled,
+.igst-col-close:disabled,
+.xan-size-drop:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .xan-clear-btn,
+    .igst-col-close,
+    .xan-size-drop {
+        transition: none;
+    }
+}
+
+/* Loading placeholder.
+   One implementation for every table in the app - the animation, its timing and the
+   reduced-motion opt-out live here rather than being re-invented per view. */
+
+.xan-shimmer-row td {
+	/* Matches a real row's height so the swap from placeholder to data does not jump. */
+	padding: 10px 12px;
+}
+
+.xan-shimmer-cell {
+	display: block;
+	height: 12px;
+	border-radius: var(--radius-chip);
+	/* A placeholder block with a lighter sheen travelling over it. Both come from tokens
+	   defined per theme (tokens.css), not from the page's own surfaces: those are not a
+	   gradient - in light mode the two it used to use are literally the same colour, so this
+	   was a flat block whose animation moved nothing. */
+	background: linear-gradient(
+		90deg,
+		var(--shimmer-base) 0%,
+		var(--shimmer-sheen) 50%,
+		var(--shimmer-base) 100%
+	);
+	background-size: 200% 100%;
+	animation: xan-shimmer 1.2s ease-in-out infinite;
+}
+
+/* Varying the widths stops five identical rows reading as a rendering fault. */
+.xan-shimmer-row:nth-child(odd) td:last-child .xan-shimmer-cell {
+	width: 60%;
+}
+
+.xan-shimmer-row:nth-child(even) td:first-child .xan-shimmer-cell {
+	width: 80%;
+}
+
+@keyframes xan-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+
+	to {
+		background-position: -200% 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.xan-shimmer-cell {
+		/* Still a placeholder, just a still one - the sweep is what some people cannot
+		   tolerate, not the block itself. */
+		animation: none;
+		background: var(--bg-field-on-canvas);
+	}
+}
+
+/* An absent value. Receding ink so a column of them reads as empty rather than as data -
+   see Common/DataTable/Blank.jsx. */
+.xan-blank {
+	color: var(--text-tertiary);
+}
+
+/* A document's number, as a badge. See NumberBadge.jsx for why this is not StatusBadge:
+   a number has no state, so it carries no colour that means anything - just enough outline to
+   separate the identifier from the data beside it. */
+.xan-number-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-chip);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+	font-family: var(--font-mono);
+	font-size: calc(12px * var(--font-scale-table-row, 1));
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+}
+
+/* Pressable only when it opens something. */
+.xan-number-badge.is-action {
+	cursor: pointer;
+	transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
+}
+
+.xan-number-badge.is-action:hover {
+	border-color: var(--xan-blue);
+	color: var(--xan-blue);
+	background: var(--xan-blue-bg);
+}
+
+.xan-number-badge.is-action:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.xan-number-badge.is-action {
+		transition: none;
+	}
+}
+
+/* The number that identifies the row's own document, in the accent.
+ *
+ * The rule is "this row IS that document", not "this document type is special": a purchase
+ * order on the PO list, a supplier's bill on the Purchase Invoices list, an invoice on the
+ * Invoices list. A number that merely REFERS to another document stays neutral, so a row's own
+ * identity and its links to elsewhere never look alike.
+ *
+ * This began life as "purchase orders are accent, so they do not look like invoice numbers
+ * beside them". No screen actually puts the two in one table - the PO list reports a billed
+ * order with the word "Invoiced", not with a number - so that distinction was protecting
+ * nothing, while leaving the app's two busiest tables with their identifier dressed as body
+ * text. */
+.xan-number-badge.is-accent {
+	border-color: var(--xan-blue);
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+}
+
+/* An accent badge that opens something needs somewhere to go on hover. The plain .is-action
+   hover moves a neutral badge TO the accent, which on a badge already wearing it is no change
+   at all - the number would look pressable and then do nothing when pointed at. Filling it
+   inverts the same two colours rather than introducing a third. */
+.xan-number-badge.is-accent.is-action:hover {
+	background: var(--xan-blue);
+	border-color: var(--xan-blue);
+	color: var(--text-on-primary);
+}

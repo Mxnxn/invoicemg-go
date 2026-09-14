@@ -1,0 +1,232 @@
+/* The approval bell. Colour is semantic tokens only, both themes - see docs/STYLE.md.
+   Every text element carries a .text-* class, which is what delivers the Appearance size
+   preference; sizing is never set here. */
+
+.bell-wrap {
+	position: relative;
+	display: inline-flex;
+}
+
+.bell-btn {
+	position: relative;
+}
+
+.bell-badge {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	/* Sized from its content, not fixed: the digits carry .text-label-caps, which scales with
+	   Appearance > Text size, so a fixed height would clip them at the larger steps. */
+	min-width: 16px;
+	min-height: 16px;
+	padding: 1px 4px;
+	border-radius: 999px;
+	line-height: 1;
+	background: var(--bg-primary);
+	color: var(--text-on-primary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* Separates the dot from the icon beneath it on any background. */
+	box-shadow: 0 0 0 2px var(--bg-sidebar);
+}
+
+.bell-panel {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	z-index: 20;
+	/* Wider and taller than it was. Three columns of text - order number, supplier and age,
+	   and a total - were being squeezed into 320px, which put the supplier on the edge of
+	   truncating on perfectly ordinary names. */
+	width: 380px;
+	max-height: 520px;
+	overflow-y: auto;
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+	/* Grows out of the bell it belongs to, rather than fading in on the spot. The origin is
+	   the top-right corner because that is where the button is, so the panel reads as coming
+	   FROM the thing that was pressed - the same idea the modal uses (shell.css modal-land),
+	   and the same overshoot ease, so opening a panel feels like the rest of the app.
+	   --dur-base rather than --dur-fast: an overshoot needs long enough to be seen settling,
+	   or it just looks like a jump. */
+	transform-origin: top right;
+	animation: bell-in var(--dur-base) var(--ease-overshoot) both;
+}
+
+@keyframes bell-in {
+	from {
+		opacity: 0;
+		transform: scale(0.92) translateY(-6px);
+	}
+
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+.bell-panel-head {
+	padding: 14px 18px;
+	color: var(--text-tertiary);
+	border-bottom: 1px solid var(--border-default);
+}
+
+.bell-empty {
+	margin: 0;
+	padding: 22px 18px;
+	color: var(--text-secondary);
+}
+
+.bell-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* The row is the order button plus its dismiss button, side by side. The dismiss cannot live
+   inside the order button - a button within a button is invalid markup, and the click would
+   open the order as well as marking it read. */
+.bell-row {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.bell-item {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 6px 14px 18px;
+	background: none;
+	border: 0;
+	text-align: left;
+	cursor: pointer;
+	color: var(--text-primary);
+	transition: background var(--motion-fast);
+}
+
+/* Hovering anywhere on the row lights the whole row, including under the dismiss button -
+   otherwise the row appears to end where the X begins. */
+.bell-row:hover .bell-item,
+.bell-item:hover {
+	background: var(--bg-sidebar);
+}
+
+.bell-dismiss {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	padding: 0 14px;
+	background: none;
+	border: 0;
+	color: var(--icon-muted);
+	cursor: pointer;
+	transition: color var(--motion-fast), background var(--motion-fast);
+}
+
+.bell-row:hover .bell-dismiss {
+	background: var(--bg-sidebar);
+}
+
+.bell-dismiss:hover {
+	color: var(--text-primary);
+}
+
+.bell-dismiss:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: -2px;
+}
+
+.bell-panel-foot {
+	padding: 10px 18px 12px;
+	/* Sticks to the bottom of a scrolled list: with eight orders the panel scrolls, and a
+	   "mark all" you have to scroll to find is one you will not find. */
+	position: sticky;
+	bottom: 0;
+	background: var(--bg-raised);
+	border-top: 1px solid var(--border-default);
+}
+
+.bell-markall {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 0;
+	background: none;
+	border: 0;
+	color: var(--xan-blue);
+	cursor: pointer;
+	font-size: calc(13px * var(--font-scale-body, 1));
+}
+
+.bell-markall:hover {
+	color: var(--text-primary);
+}
+
+.bell-markall:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: 2px;
+}
+
+/* The second line of the "nothing new" state - what is still waiting, and where it is. */
+.bell-empty-sub {
+	display: block;
+	margin-top: 6px;
+	color: var(--text-tertiary);
+}
+
+.bell-empty-link {
+	padding: 0;
+	background: none;
+	border: 0;
+	color: var(--xan-blue);
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.bell-empty-link:hover {
+	color: var(--text-primary);
+}
+
+.bell-item:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: -2px;
+}
+
+.bell-item-icon {
+	color: var(--icon-muted);
+	flex-shrink: 0;
+}
+
+.bell-item-text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1;
+	min-width: 0;
+}
+
+.bell-item-sub {
+	color: var(--text-secondary);
+}
+
+.bell-item-total {
+	white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bell-panel {
+		animation: none;
+	}
+
+	.bell-item,
+	.bell-dismiss,
+	.bell-markall {
+		transition: none;
+	}
+}

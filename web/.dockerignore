@@ -1,0 +1,21 @@
+.env
+.env.*
+node_modules
+build
+coverage
+*.log
+
+.git
+.gitignore
+.claude
+.vercel
+docs
+Dockerfile
+Dockerfile.prod
+
+# Tests never run inside the image - CI runs them from the repository before the image is
+# built. Keeping them out of the layer keeps the shipped artifact to just what serves
+# traffic. They stay tracked in git so CI still has something to run.
+*.test.js
+*.test.jsx
+__tests__

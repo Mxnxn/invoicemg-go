@@ -1,0 +1,293 @@
+/* Configure > Templates: the document font bar, the design list and its preview.
+   Every colour is a semantic role token so both themes resolve - see docs/STYLE.md. */
+
+/* ---------- Document font bar ---------- */
+
+/* Above the tab strip, because one font covers invoices, quotations and ledgers alike. */
+.doc-font-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+}
+
+.doc-font-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--icon-default);
+}
+
+.doc-font-label {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin: 0;
+}
+
+.doc-font-select {
+    width: auto;
+    min-width: 190px;
+    flex: 0 0 auto;
+}
+
+.doc-font-hint {
+    color: var(--text-tertiary);
+}
+
+/* react-pdf has no font fallback, so a family without the rupee glyph changes what the
+   customer's document says. Amber rather than red: it is a consequence to know about, not a
+   mistake to correct. */
+.doc-font-warn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 4px 9px;
+    border-radius: var(--radius-chip);
+    background: var(--xan-amber-bg);
+    color: var(--xan-amber);
+}
+
+/* ---------- Design list and preview ---------- */
+
+.design-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+@media (max-width: 860px) {
+    .design-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.design-list {
+    display: grid;
+    gap: 8px;
+}
+
+.design-card {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
+}
+
+.design-card:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--bg-field-on-canvas);
+}
+
+.design-card:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 2px;
+}
+
+/* The selected design carries the accent on its own text, so the tick can use currentColor
+   and stay legible in either theme. */
+.design-card.is-active {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+}
+
+.design-card.is-active .design-card-name {
+    color: var(--xan-blue);
+}
+
+.design-card.is-saving,
+.design-card:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.design-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.design-card-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* What actually separates one design from another, so the list can be read without clicking
+   through six previews. */
+.design-card-blurb {
+    color: var(--text-tertiary);
+    line-height: 1.35;
+}
+
+.design-preview {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* ---------- Use for all three ---------- */
+
+.design-apply-all {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+}
+
+.design-apply-all-text {
+    color: var(--text-secondary);
+    margin-right: auto;
+}
+
+.design-apply-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.design-apply-all-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .design-card {
+        transition: none;
+    }
+}
+
+/* ---------- Settings tabs (Numbering, Export configs) ---------- */
+
+/* These two tabs reuse .design-layout / .design-list / .design-preview so all five tabs in
+   Configure > Templates share one shape: a list on the left, the thing it describes on the
+   right. */
+
+.settings-pane {
+    display: grid;
+    gap: 16px;
+    padding: 20px;
+}
+
+.settings-intro {
+    color: var(--text-tertiary);
+    margin: 0;
+}
+
+/* An edited-but-unsaved marker on a list row. A dot rather than a word: several of these in
+   a column need to be countable at a glance. */
+.settings-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--xan-amber);
+    flex: 0 0 auto;
+}
+
+.settings-sample {
+    justify-self: start;
+    margin-top: 2px;
+}
+
+/* The result of the settings on the panel, stated at a size that makes it the point of the
+   screen rather than a footnote under the fields. */
+.settings-preview-block {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+}
+
+.settings-preview-label {
+    color: var(--text-tertiary);
+}
+
+.settings-preview-value {
+    font-size: calc(20px * var(--font-scale-body, 1));
+    font-weight: 700;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+/* A sketch of the sheet's first rows, not a rendering of it - enough to show which lines the
+   switches put there and in what order. */
+.exports-sheet {
+    gap: 3px;
+}
+
+.exports-sheet-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 30px;
+    margin-bottom: 5px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-chip);
+    color: var(--text-tertiary);
+    font-size: calc(11px * var(--font-scale-body, 1));
+}
+
+.exports-sheet-firm {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: calc(15px * var(--font-scale-body, 1));
+}
+
+.exports-sheet-line {
+    color: var(--text-secondary);
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+}
+
+/* ---------- Save bar ---------- */
+
+/* Only rendered once something has changed, so the resting state of a settings tab is not a
+   row of buttons that do nothing. */
+.save-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border: 1px solid var(--xan-amber);
+    border-radius: var(--radius-control);
+    background: var(--xan-amber-bg);
+}
+
+.save-bar-label {
+    margin-right: auto;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.save-bar .shell-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.save-bar-note {
+    margin: 0;
+    padding: 10px 14px;
+    color: var(--text-tertiary);
+}

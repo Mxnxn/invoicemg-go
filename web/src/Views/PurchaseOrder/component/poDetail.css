@@ -1,0 +1,563 @@
+/* Purchase orders. Colour is semantic tokens only, both themes - see docs/STYLE.md.
+   Spacing is px on the 8px grid, matching analytics.css beside it; there is no --space-*
+   scale in tokens.css to use.
+
+   The LIST uses the shared DataTable (xan-panel + xan-table). `.po-table` below styles only
+   the small rows table inside the detail slide-over, where DataTable's panel chrome would be
+   a card nested in a 480px drawer. */
+
+/* Sits inside .shell-card, which has no padding of its own, so the message would otherwise
+   hug the border. Matches .shell-card-header's 16px 20px rhythm, with extra below so an
+   empty card is not a thin strip. Sizing comes from the .text-body-regular class on the
+   element, which is what carries --font-scale-body. */
+.po-state {
+	margin: 0;
+	padding: 20px;
+	color: var(--text-secondary);
+}
+
+.po-table {
+	width: 100%;
+	margin-top: 16px;
+	border-collapse: collapse;
+}
+
+/* The shared xan-table carries its own scale roles; this hand-rolled one has to opt in
+   explicitly or the detail panel ignores Account settings > Appearance > Text size while
+   the list beside it honours it. Same roles and same base sizes the shared table uses. */
+.po-table th {
+	text-align: left;
+	padding: 8px 12px;
+	color: var(--text-tertiary);
+	border-bottom: 1px solid var(--border-default);
+	font-weight: 500;
+	font-size: calc(11px * var(--font-scale-table-head, 1));
+}
+
+.po-table td {
+	padding: 12px;
+	color: var(--text-primary);
+	border-bottom: 1px solid var(--border-default);
+	font-size: calc(13px * var(--font-scale-table-row, 1));
+}
+
+.po-row {
+	cursor: pointer;
+	transition: background var(--motion-fast);
+}
+
+.po-row:hover {
+	background: var(--bg-sidebar);
+}
+
+.po-row:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.po-row {
+		transition: none;
+	}
+}
+
+.po-detail {
+	padding: 16px;
+	/* Everything in the panel inherits the reader's chosen size from here.
+	   [data-shell] carries the chosen FAMILY but sets no font-size, so any element without a
+	   .text-* class fell through to Argon's fixed base and ignored Appearance > Text size
+	   entirely - which was most of this panel: the header, the section bodies, the history and
+	   the notes. Set once on the container so a new row added later inherits it too, rather
+	   than depending on whoever writes it remembering a class. */
+	font-size: calc(14px * var(--font-scale-body, 1));
+	line-height: calc(20px * var(--font-scale-body, 1));
+}
+
+/* The panel's masthead. The number IS the title here - not a chip pinned above a caption -
+   so it gets the size, and the word "Purchase order" sits above it at label weight to say
+   what kind of number it is. */
+.po-detail-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+/* A tinted square, not an avatar: every order gets the same mark, because it says what this
+   panel is, not which order. It gives the left edge something to start on so the eyebrow and
+   the number read as one block. */
+.po-detail-mark {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--radius-control);
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+}
+
+.po-detail-ident {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+	flex: 1;
+}
+
+.po-detail-eyebrow {
+	color: var(--text-tertiary);
+	font-size: calc(10.5px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	line-height: 1.3;
+}
+
+/* --font-code, not --font-mono: applyAppearance overwrites --font-mono with whatever face the
+   user picked for the app, which can be proportional - and a document number set in a
+   proportional face stops lining up digit for digit with the same number anywhere else. */
+.po-detail-no {
+	font-family: var(--font-code);
+	font-size: calc(17px * var(--font-scale-heading, 1));
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	color: var(--text-primary);
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+
+.po-detail-meta {
+	color: var(--text-secondary);
+	margin-top: 2px;
+}
+
+/* The badge keeps its own size whatever the supplier name does to the row. */
+.po-detail-head > .xan-status-badge {
+	flex-shrink: 0;
+	align-self: flex-start;
+}
+
+/* Status pair used together, per docs/STYLE.md - the -text shade is chosen to meet
+   contrast against its own -bg, in both themes. */
+.po-lapse {
+	margin-top: 16px;
+	padding: 12px;
+	border-radius: var(--radius-surface);
+	background: var(--status-amber-bg);
+	color: var(--status-amber-text);
+}
+
+.po-lapse ul {
+	margin: 8px 0 0;
+	padding-left: 20px;
+}
+
+.po-section {
+	margin-top: 24px;
+}
+
+.po-section h3 {
+	color: var(--text-primary);
+	margin-bottom: 8px;
+}
+
+.po-total {
+	margin-top: 8px;
+	text-align: right;
+	color: var(--text-primary);
+}
+
+.po-history,
+.po-notes {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.po-history li,
+.po-notes li {
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border-default);
+	color: var(--text-primary);
+}
+
+.po-change {
+	color: var(--text-secondary);
+}
+
+/* The footer wraps, and its lesser action keeps the left.
+ *
+ * It was a single non-wrapping row pinned to the right. That is fine for the two buttons an
+ * unapproved order has and wrong for the three an approved one grows - Edit, Withdraw
+ * approval, and "Generate purchase invoice" together are wider than this panel, and a
+ * flex-end row that cannot wrap overflows towards its START. So the first child went off the
+ * left edge of the sidebar: Edit, gone, exactly when approving the order is what made it
+ * appear.
+ *
+ * Wrapping stops it disappearing. Edit taking the left does something better - it separates
+ * "change this order" from the two buttons that decide the order's fate, so the destructive
+ * and the final one are not sitting where an edit used to be. */
+.po-detail-foot {
+	margin-top: 24px;
+	padding-top: 16px;
+	border-top: 1px solid var(--border-default);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.po-detail-foot .po-foot-edit {
+	margin-right: auto;
+}
+
+/* Once they are on separate lines the auto margin means nothing, and a lone left-aligned
+   button under two right-aligned ones reads as a mistake. */
+@media (max-width: 520px) {
+	.po-detail-foot {
+		justify-content: stretch;
+	}
+
+	.po-detail-foot .shell-btn {
+		flex: 1 1 auto;
+		justify-content: center;
+	}
+
+	.po-detail-foot .po-foot-edit {
+		margin-right: 0;
+	}
+}
+
+.po-number-readonly {
+	margin: 0;
+	padding: 8px 0;
+	color: var(--text-secondary);
+}
+
+/* Warned before the save, not discovered after it. Status pair used together so the text
+   shade meets contrast on its own background, in both themes. */
+.po-revoke-warning {
+	margin: 12px 0 0;
+	padding: 10px 12px;
+	border-radius: var(--radius-control);
+	background: var(--status-amber-bg);
+	color: var(--status-amber-text);
+}
+
+.po-link-hint {
+	margin: 0 0 8px;
+	color: var(--text-secondary);
+}
+
+.po-link-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* Mono, stated rather than assumed.
+   It is a <code> element, so it USED to come out monospace - but only because the panel was
+   portalled outside [data-shell] and rendering in the mono fallback wholesale. Fixing that
+   gave this element the shell's own face, which is the wrong one for a URL: a link is read
+   character by character when somebody checks it, and a proportional face makes l/1/I and 0/O
+   the same shape.
+   --font-code, NOT --font-mono: Appearance deliberately overwrites --font-mono with whichever
+   face the user picked, so asking for it here returned Geist. --font-code is the one nothing
+   repaints. */
+.po-link {
+	flex: 1;
+	min-width: 0;
+	overflow-x: auto;
+	white-space: nowrap;
+	padding: 8px;
+	border-radius: var(--radius-control);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+	font-family: var(--font-code);
+	font-size: calc(12px * var(--font-scale-body, 1));
+	letter-spacing: 0.01em;
+}
+
+/* History, made scannable.
+   The hierarchy comes from the text role tokens rather than raw opacity: STYLE.md wants 4.5:1
+   on text, and opacity multiplies against whatever is behind it, so a value that reads
+   comfortably on white can fall under the floor on #0d0d0d. The tokens are contrast-checked
+   per theme. Opacity is used only on the separator rules, where it cannot affect legibility. */
+
+.po-history li {
+	padding: 12px 0;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.po-history li:last-child {
+	border-bottom: 0;
+}
+
+.po-history-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.po-history-meta {
+	color: var(--text-tertiary);
+	white-space: nowrap;
+}
+
+.po-history-detail {
+	margin: 4px 0 0;
+	color: var(--text-secondary);
+}
+
+/* Indented and ruled so a run of changes reads as belonging to the entry above it rather
+   than as more entries. */
+.po-changes {
+	list-style: none;
+	margin: 6px 0 0;
+	padding: 0 0 0 12px;
+	border-left: 2px solid var(--border-default);
+	opacity: 0.92;
+}
+
+.po-changes li {
+	padding: 2px 0;
+	border-bottom: 0;
+	color: var(--text-secondary);
+}
+
+/* Notes */
+
+.po-notes li {
+	padding: 10px 0;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.po-note-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.po-note-text {
+	flex: 1;
+	min-width: 0;
+	color: var(--text-primary);
+}
+
+.po-note-by {
+	color: var(--text-tertiary);
+	white-space: nowrap;
+}
+
+.po-note-compose,
+.po-note-edit {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.po-note-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.po-note-input {
+	width: 100%;
+	resize: vertical;
+	padding: 8px 10px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--border-default);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+	font-family: inherit;
+	transition: border-color var(--motion-fast);
+}
+
+.po-note-input::placeholder {
+	color: var(--text-tertiary);
+}
+
+.po-note-input:hover {
+	border-color: var(--border-strong);
+}
+
+.po-note-input:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: -2px;
+	border-color: var(--border-strong);
+}
+
+.po-note-compose button {
+	align-self: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.po-note-input {
+		transition: none;
+	}
+}
+
+.po-send-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.po-send-meta {
+	margin: 0 0 4px;
+	color: var(--text-secondary);
+}
+
+.po-send-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 12px;
+	flex-wrap: wrap;
+}
+
+/* Two badges can share the State cell once an order has been sent. */
+/* Two badges in one cell - the approval state, and the send state when there is one.
+   Qualified with td so it outranks `.xan-table td`, which sets `padding: 0 16px`: with no
+   vertical padding the 24px badges sit flush against the row's edges, and the moment the
+   second one wraps onto its own line they touch the rows above and below. The row is a fixed
+   --xan-row-height until the content is taller, so this only adds height where it wrapped. */
+.xan-table td.po-state-cell {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	padding: 8px 16px;
+}
+
+.po-lapse-more {
+	margin: 6px 0 0;
+	opacity: 0.85;
+}
+
+/* History reads smaller than the order it belongs to. It is a record, not the subject - two
+   points down is enough to say so without making it hard to read, and it fits a month of edits
+   in the space a fortnight used to take. Scaled from the panel's own base so it still follows
+   Appearance > Text size. */
+.po-history,
+.po-history-head,
+.po-history-detail,
+.po-changes {
+	font-size: calc(12px * var(--font-scale-body, 1));
+	line-height: calc(17px * var(--font-scale-body, 1));
+}
+
+/* Separated from the controls above it, so the record does not read as one more thing to act
+   on. */
+.po-section.po-history-section {
+	margin-top: 28px;
+	padding-top: 16px;
+	border-top: 1px solid var(--border-default);
+}
+
+/* --- the panel, grown out of the card ------------------------------------------------------ */
+
+/* It was a SlideOverlay: an order arriving from the edge of the screen, covering the deck it
+   came from. Expanding out of the pressed card keeps the connection between the thing you
+   pressed and the thing you are reading - the same motion the job board's card panel makes,
+   which is the point. One idea, not two.
+   The geometry mirrors .job-card-panel deliberately; the two should not drift. */
+.po-scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 1039;
+	background: var(--bg-canvas);
+	opacity: 0;
+	backdrop-filter: blur(3px);
+	-webkit-backdrop-filter: blur(3px);
+	transition: opacity var(--dur-slow) var(--ease-liquid);
+}
+
+.po-scrim.is-open {
+	opacity: 0.55;
+}
+
+.po-flip-panel {
+	position: fixed;
+	/* Above the scrim, below the popup layer at 1100 - a dropdown opening from inside this
+	   panel must paint over it, not under. */
+	z-index: 1050;
+	top: 50%;
+	left: 50%;
+	width: min(calc(100vw - 64px), 620px);
+	/* A FIXED height, not a max.
+	   The FLIP measures this panel the moment it mounts, and at that moment its content is the
+	   word "Loading..." - about 79px of it. Against a 180px card that gave scaleY 2.28: a
+	   transform that STRETCHED the panel instead of shrinking it, so the open played from a
+	   geometry the panel never actually had and squashed down into place. A height that does not
+	   depend on what has arrived is measured correctly the first time; the content scrolls inside
+	   it, which it did anyway. */
+	height: min(calc(100vh - 64px), 760px);
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+	padding: 18px;
+	background: var(--bg-raised);
+	border: 1px solid var(--xan-blue);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+	/* max(), not min(): these are negative, so min() picks the MORE negative of the two and
+	   throws the panel up and to the left of centre. The offset wanted is half of whichever
+	   size actually applies - the cap, or the viewport when it is the smaller. */
+	margin-top: max(-380px, calc((100vh - 64px) / -2));
+	margin-left: max(-310px, calc((100vw - 64px) / -2));
+	/* Scaling happens from the corner the transform is measured against. */
+	transform-origin: top left;
+}
+
+.po-flip-panel.is-opening {
+	transition: transform var(--dur-liquid) var(--ease-liquid);
+}
+
+/* No overshoot on the way out, and no opacity: it shrinks back into the card it came from,
+   which is a return rather than a dissolve. */
+.po-flip-panel.is-closing {
+	transition: transform var(--dur-liquid) var(--ease-settle);
+}
+
+/* Invisible until the shell has somewhere to put them - the contents are illegible while the
+   panel is still the size of a card, and illegible-then-legible reads as a fade. */
+.po-flip-panel .po-detail {
+	opacity: 0;
+}
+
+.po-flip-panel.is-opening .po-detail {
+	opacity: 1;
+	transition: opacity 190ms var(--ease-liquid) 130ms;
+}
+
+.po-flip-panel.is-closing .po-detail {
+	opacity: 0;
+	transition: opacity 110ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.po-scrim,
+	.po-flip-panel.is-opening,
+	.po-flip-panel.is-closing {
+		transition: none;
+	}
+
+	/* The staging goes, but the contents must still END UP visible - only the transition is
+	   dropped, so the opacity:1 above still applies and simply arrives at once. */
+	.po-flip-panel.is-opening .po-detail,
+	.po-flip-panel.is-closing .po-detail {
+		transition: none;
+	}
+}

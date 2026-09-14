@@ -1,0 +1,42 @@
+# Production image for the SPA: build with bun, serve the static output with nginx.
+# The existing Dockerfile runs the Vite dev server and is development-only.
+
+FROM oven/bun:1-alpine AS build
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile
+COPY . .
+
+# Baked into the bundle at build time. "/api" is deliberately relative: nginx in this same
+# image proxies /api to the API container, so the bundle carries no hostname and does not
+# need rebuilding when the IP changes or a domain is added later.
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
+# The landing form's WhatsApp handoff. Baked in at build time like everything VITE_, so it
+# has to travel as a build arg - setting it on the running container does nothing. Not a
+# secret: it is the number the wa.me link points at, visible to anyone using the form.
+ARG VITE_ENQUIRY_WHATSAPP=
+ENV VITE_ENQUIRY_WHATSAPP=$VITE_ENQUIRY_WHATSAPP
+
+# Optional speed bump on POST /enquiry. Blank means no barrier, which is the API's default
+# too - see routes/Enquiry.js for why this is not security.
+ARG VITE_ENQUIRY_TOKEN=
+ENV VITE_ENQUIRY_TOKEN=$VITE_ENQUIRY_TOKEN
+RUN bun run build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/build /usr/share/nginx/html
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# The two alternative server blocks, plus the script that chooses between them at start.
+# Kept OUT of conf.d so nginx does not load them on its own - see docker/enable-ssl.sh for
+# why the 443 block cannot ship enabled.
+COPY docker/http-serve.conf.disabled /etc/nginx/http-serve.conf.disabled
+COPY docker/http-redirect.conf.disabled /etc/nginx/http-redirect.conf.disabled
+COPY docker/ssl.conf.disabled /etc/nginx/ssl.conf.disabled
+# nginx:alpine executes /docker-entrypoint.d/*.sh before starting nginx.
+COPY docker/enable-ssl.sh /docker-entrypoint.d/40-enable-ssl.sh
+RUN chmod +x /docker-entrypoint.d/40-enable-ssl.sh
+
+EXPOSE 80 443

@@ -1,0 +1,127 @@
+/* Remembered "tell this customer?" answers - see NotifyPreferences.jsx.
+   Every colour is a semantic role token or a status PAIR used whole (bg with its own text),
+   which is what keeps this readable under both :root and html[data-theme="dark"]. No raw
+   --color-ink-* / --color-neutral-* appears here: those are the palette scale, not roles, and
+   the dark block does not override them. */
+
+/* Its own card now, so the divider that separated it from the template picker is gone -
+   the card border does that job. */
+.notify-prefs {
+    margin-top: 16px;
+}
+
+.notify-prefs-body {
+    padding: 20px;
+}
+
+/* Stacked rather than side by side: this card sits in a half-width column beside Templates,
+   where an intro paragraph and a search field competing for one row leaves the field too
+   narrow to read what was typed into it. */
+.notify-prefs-head {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.notify-prefs-head .shell-search-field {
+    width: 100%;
+}
+
+.notify-prefs-intro {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--text-tertiary);
+}
+
+.notify-prefs-empty {
+    padding: 16px;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-control);
+    color: var(--text-tertiary);
+    background: var(--bg-field-on-canvas);
+}
+
+/* Both halves of each chip come from one status pair, so contrast holds wherever the chip
+   lands. Mixing --status-green-bg with --text-primary is the bug this avoids. */
+.notify-prefs-chip {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+}
+
+.notify-prefs-chip.is-on {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+
+.notify-prefs-chip.is-off {
+    background: var(--status-red-bg);
+    color: var(--status-red-text);
+}
+
+.notify-prefs-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.notify-prefs-reset {
+    padding: 5px 10px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-chip);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.notify-prefs-reset:hover:not(:disabled) {
+    background: var(--bg-field);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.notify-prefs-reset:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.notify-prefs-reset:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* Count on the left, pager on the right - the same footer shape LifecycleIndex uses, so the
+   two tables do not disagree about where to look. */
+.notify-prefs-count {
+    color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .notify-prefs-reset {
+        transition: none;
+    }
+}
+
+/* "Never answered" - the prompt still asks. Neutral rather than green or red: it is not a
+   choice the customer has made, so colouring it as one would be a claim. */
+.notify-prefs-chip.is-ask {
+    background: var(--bg-field);
+    color: var(--text-secondary);
+}
+
+/* The two company-wide defaults, above the table of per-customer exceptions to them. */
+.notify-prefs-defaults {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.notify-prefs-savehint {
+    margin: 0;
+    color: var(--text-tertiary);
+}

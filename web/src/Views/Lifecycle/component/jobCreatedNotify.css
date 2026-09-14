@@ -1,0 +1,208 @@
+/* The "tell the customer?" card shown after a job-id is raised.
+ *
+ * Anchored bottom-right rather than dropped into the page flow: the board behind it has just
+ * gained a row, and pushing that row down to make space would move the very thing the user
+ * is looking for. It sits above the content and leaves on its own once answered. */
+.job-created-notify {
+	position: fixed;
+	right: 20px;
+	bottom: 20px;
+	z-index: 1060;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	max-width: 420px;
+	padding: 14px 40px 14px 14px;
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+	animation: job-created-notify-in var(--motion-base) var(--ease-settle);
+}
+
+/* Rises rather than fades: it arrives from the direction of the action that caused it, so the
+ * eye follows it instead of hunting for what changed. */
+@keyframes job-created-notify-in {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.job-created-notify-icon {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-control);
+	background: var(--status-green-bg);
+	color: var(--status-green-text);
+}
+
+.job-created-notify-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.job-created-notify-title {
+	margin: 0;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.job-created-notify-text {
+	margin: 0;
+	font-size: calc(12.5px * var(--font-scale-body, 1));
+	color: var(--text-secondary);
+}
+
+.job-created-notify-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+	padding-left: 4px;
+}
+
+.job-created-notify-close {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	display: inline-flex;
+	padding: 4px;
+	border: none;
+	background: transparent;
+	border-radius: var(--radius-chip);
+	color: var(--icon-muted);
+	cursor: pointer;
+	transition: color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+
+.job-created-notify-close:hover:not(:disabled) {
+	background: var(--bg-field-on-canvas);
+	color: var(--icon-default);
+}
+
+.job-created-notify-close:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.job-created-notify-close:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+.job-created-notify-spin {
+	margin-right: 6px;
+	animation: job-created-notify-spin 1s linear infinite;
+}
+
+@keyframes job-created-notify-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* On a phone the card spans the width rather than floating in a corner, and its buttons drop
+ * below the text - three controls beside two lines of copy do not fit 390px. */
+@media (max-width: 600px) {
+	.job-created-notify {
+		right: 12px;
+		left: 12px;
+		bottom: 12px;
+		max-width: none;
+		flex-wrap: wrap;
+	}
+
+	.job-created-notify-actions {
+		width: 100%;
+		margin-left: 0;
+		padding-left: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-created-notify {
+		animation: none;
+	}
+
+	.job-created-notify-spin {
+		animation: none;
+	}
+}
+
+/* "Remember choice for this customer" — a checkbox row, not a switch: it qualifies the button
+ * beside it rather than acting on its own, and it disappears once an answer is remembered. */
+.job-created-notify-remember {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 6px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: calc(11.5px * var(--font-scale-body, 1));
+	text-align: left;
+	cursor: pointer;
+	transition: color var(--motion-fast) ease;
+}
+
+.job-created-notify-remember:hover {
+	color: var(--text-primary);
+}
+
+.job-created-notify-remember:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+	border-radius: var(--radius-chip);
+}
+
+.job-created-notify-box {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 15px;
+	height: 15px;
+	flex-shrink: 0;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-checkbox);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-on-primary);
+	transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+
+.job-created-notify-box.is-on {
+	background: var(--xan-blue);
+	border-color: var(--xan-blue);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-created-notify-remember,
+	.job-created-notify-box {
+		transition: none;
+	}
+}
+
+/* The purchase-order prompt sits on the left: the detail panel it belongs to occupies the
+   right, and a prompt about the order would otherwise land on top of the order. */
+.job-created-notify.is-left {
+	right: auto;
+	left: 20px;
+}
+
+@media (max-width: 767px) {
+	.job-created-notify.is-left {
+		left: 12px;
+		right: 12px;
+	}
+}

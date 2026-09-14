@@ -1,0 +1,156 @@
+/* The document families, made available to the app's own interface.
+ *
+ * These nine were added so a company could set its invoices in something other than Open Sans.
+ * They are already in the bundle - src/Common/pdf/fonts.js imports the same .ttf files for
+ * react-pdf - so offering them in Appearance costs no new asset, only these declarations.
+ *
+ * Declared here rather than loaded from Google Fonts in index.html, for three reasons:
+ *   - Pliant is not on Google Fonts at all. It would be the one face in the list that silently
+ *     fell back to something else.
+ *   - The interface and the document then draw from the same file. A UI preview of "Poppins"
+ *     that came from Google and a PDF that came from the .ttf could differ in version, and the
+ *     preview is the whole point of choosing.
+ *   - No third-party request on first paint.
+ *
+ * Declaring a family costs nothing until something renders in it: a browser fetches a
+ * @font-face's src only when a laid-out element actually uses it. Nine families here means one
+ * family downloaded - whichever the person picked.
+ *
+ * font-display: swap throughout, so text is readable in the fallback while the face loads
+ * rather than invisible. The fallback stacks live in appearance.js beside each option.
+ */
+
+@font-face {
+	font-family: "Poppins";
+	src: url("../Common/pdf/fonts/Poppins-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Poppins";
+	src: url("../Common/pdf/fonts/Poppins-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Roboto";
+	src: url("../Common/pdf/fonts/Roboto-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Roboto";
+	src: url("../Common/pdf/fonts/Roboto-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Sora";
+	src: url("../Common/pdf/fonts/Sora-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Sora";
+	src: url("../Common/pdf/fonts/Sora-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Josefin Sans";
+	src: url("../Common/pdf/fonts/JosefinSans-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Josefin Sans";
+	src: url("../Common/pdf/fonts/JosefinSans-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Pliant";
+	src: url("../Common/pdf/fonts/Pliant-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Pliant";
+	src: url("../Common/pdf/fonts/Pliant-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Geist";
+	src: url("../Common/pdf/fonts/Geist-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Geist";
+	src: url("../Common/pdf/fonts/Geist-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "DM Mono";
+	src: url("../Common/pdf/fonts/DMMono-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "DM Mono";
+	src: url("../Common/pdf/fonts/DMMono-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Archivo";
+	src: url("../Common/pdf/fonts/Archivo-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Archivo";
+	src: url("../Common/pdf/fonts/Archivo-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Fira Sans";
+	src: url("../Common/pdf/fonts/FiraSans-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Fira Sans";
+	src: url("../Common/pdf/fonts/FiraSans-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}

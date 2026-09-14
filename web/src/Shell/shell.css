@@ -1,0 +1,2459 @@
+.shell-root {
+    display: flex;
+    height: 100vh;
+    background: var(--bg-canvas);
+}
+
+/* ---------- Sidebar ---------- */
+
+.shell-sidebar {
+    width: 244px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    padding: 19px 18px;
+    transition: width 0.32s var(--ease-settle), padding 0.32s var(--ease-settle);
+}
+
+.shell-sidebar.collapsed {
+    width: 76px;
+    padding: 19px 12px;
+}
+
+/* Hovering a collapsed sidebar slides it back open (see shell-brand-text/shell-nav-item
+   span/shell-user below for how the labels fade+widen back in alongside it) without
+   touching the `collapsed` toggle itself - moving the mouse away shrinks it right back. */
+.shell-sidebar.collapsed:hover {
+    width: 244px;
+    padding: 19px 18px;
+    transition: width 0.32s var(--ease-settle), padding 0.32s var(--ease-settle);
+    box-shadow: 16px 0 40px -12px rgba(15, 23, 42, 0.28);
+    z-index: 40;
+}
+
+.shell-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+}
+
+.shell-brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-surface);
+    background: var(--color-neutral-1000);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.shell-brand-mark img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.shell-brand-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.2s ease, width 0.32s var(--ease-settle);
+}
+
+.shell-sidebar.collapsed .shell-brand-text {
+    width: 0;
+    opacity: 0;
+}
+
+.shell-sidebar.collapsed:hover .shell-brand-text {
+    width: 140px;
+    opacity: 1;
+    transition-delay: 0.05s;
+}
+
+.shell-brand-text .name {
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.shell-brand-text .plan {
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.shell-sidebar.collapsed .shell-brand-mark {
+    display: none;
+}
+
+.shell-sidebar.collapsed .shell-brand {
+    justify-content: center;
+}
+
+.shell-sidebar.collapsed:hover .shell-brand {
+    justify-content: space-between;
+}
+
+.shell-sidebar.collapsed:hover .shell-collapse-btn {
+    margin-left: auto;
+}
+
+.shell-sidebar.collapsed .shell-collapse-btn {
+    margin-left: 0;
+}
+
+.shell-collapse-btn {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--icon-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-chip);
+    transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.shell-collapse-btn:hover {
+    background: var(--bg-field);
+    color: var(--icon-strong);
+}
+
+.shell-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 21px;
+}
+
+.shell-nav-items {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Liquid active-tab indicator - one shared pill per nav section that slides/squishes to
+   whichever item is active, instead of each item just toggling its own static highlight. */
+.shell-nav-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 38px;
+    border-radius: var(--radius-control);
+    background: var(--xan-glass-overlay);
+    box-shadow: inset 0 0 0 1px var(--xan-glass-border);
+    pointer-events: none;
+    z-index: 0;
+    transition: transform 0.45s var(--ease-overshoot), height 0.25s var(--ease-overshoot);
+}
+
+.shell-nav-item {
+    position: relative;
+    z-index: 1;
+}
+
+.shell-nav-group-label {
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    margin: 16px 12px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 1;
+    max-height: 20px;
+    transition: opacity 0.2s ease, max-height 0.32s var(--ease-settle), margin 0.32s var(--ease-settle);
+}
+
+/* Stays hidden through the hover-preview too (no :hover override) - unlike the nav item
+   labels, this doesn't reappear until the sidebar is actually pinned open via the collapse
+   toggle. Growing its height back in on hover pushed every nav item below it downward for
+   the length of that transition, which read as the whole list "jumping" on every hover. */
+.shell-sidebar.collapsed .shell-nav-group-label {
+    opacity: 0;
+    max-height: 0;
+    margin: 8px 12px 0;
+}
+
+.shell-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: var(--radius-control);
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: background-color var(--motion-fast), color var(--motion-fast);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.shell-sidebar.collapsed .shell-nav-item {
+    justify-content: center;
+    padding: 0;
+}
+
+.shell-nav-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.2s ease, max-width 0.32s var(--ease-settle);
+    max-width: 160px;
+}
+
+.shell-sidebar.collapsed .shell-nav-item span {
+    opacity: 0;
+    max-width: 0;
+}
+
+.shell-sidebar.collapsed:hover .shell-nav-item {
+    justify-content: flex-start;
+    padding: 0 12px;
+}
+
+.shell-sidebar.collapsed:hover .shell-nav-item span {
+    opacity: 1;
+    max-width: 160px;
+    transition-delay: 0.05s;
+}
+
+.shell-nav-item svg {
+    color: var(--icon-default);
+    flex-shrink: 0;
+}
+
+.shell-nav-item:hover {
+    background: var(--xan-glass-overlay);
+    color: var(--xan-blue);
+}
+
+.shell-nav-item:hover svg {
+    color: var(--xan-blue);
+}
+
+/* Active was a text-colour change and nothing else, so on /configure/* - where the sidebar
+ * item stays put while the sub-page changes - there was almost no signal you were still in
+ * Configure. It now gets a tinted pill and a bar that grows in from the left edge, so
+ * arriving on a section is visible rather than inferred. */
+.shell-nav-item.active {
+    color: var(--text-primary);
+    background: var(--xan-glass-overlay);
+    position: relative;
+}
+
+.shell-nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 60%;
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+    background: var(--xan-blue);
+    transform: translateY(-50%);
+    animation: nav-active-in var(--motion-base, 220ms) var(--ease-settle) both;
+}
+
+@keyframes nav-active-in {
+    from {
+        height: 0;
+        opacity: 0;
+    }
+    to {
+        height: 60%;
+        opacity: 1;
+    }
+}
+
+/* The bar is decoration; the tint and the colour still say which item is active. */
+@media (prefers-reduced-motion: reduce) {
+    .shell-nav-item.active::before {
+        animation: none;
+    }
+}
+
+.shell-nav-item.active svg {
+    color: var(--xan-blue);
+}
+
+html[data-theme="dark"] .shell-nav-item {
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .shell-nav-item svg {
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .shell-nav-item.active,
+html[data-theme="dark"] .shell-nav-item.active svg {
+    color: var(--xan-blue);
+}
+
+/* The plain html[data-theme="dark"] .shell-nav-item rule above outranks the base
+   .shell-nav-item:hover rule (more specific: attribute + class beats class + pseudo-class),
+   which silently cancelled the hover color in dark mode. Re-assert it here at matching
+   specificity so hover still wins. */
+html[data-theme="dark"] .shell-nav-item:hover,
+html[data-theme="dark"] .shell-nav-item:hover svg {
+    color: var(--xan-blue);
+}
+
+.shell-bottom-group {
+    margin-top: auto;
+}
+
+/* Fixed height at all times (icon-only in collapsed state, see shell-company-avatar) - only
+   the label text beside the icon fades/widens on hover-expand (shell-company-labels below),
+   same treatment as shell-brand-text and shell-nav-item span. The old version collapsed this
+   whole block's max-height to 0 and grew it back on hover, which combined with the sidebar's
+   own width transition read as the account row "jumping" both vertically and horizontally at
+   once instead of one smooth motion. */
+.shell-user {
+    text-align: center;
+    padding: 12px 4px 0;
+    border-top: 1px solid var(--border-default);
+}
+
+.shell-user-email {
+    color: var(--text-tertiary);
+    font-size: calc(10.5px * var(--font-scale-body, 1));
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.shell-user-company {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: calc(12px * var(--font-scale-body, 1));
+    line-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------- Company switcher (sidebar footer drop-up) ---------- */
+
+.shell-company-switcher {
+    position: relative;
+    width: 100%;
+}
+
+.shell-company-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    text-align: left;
+    transition: background var(--motion-fast);
+}
+
+.shell-company-trigger:hover {
+    background: var(--xan-glass-overlay);
+}
+
+.shell-sidebar.collapsed .shell-company-trigger {
+    justify-content: center;
+    padding: 6px;
+}
+
+.shell-sidebar.collapsed:hover .shell-company-trigger {
+    justify-content: space-between;
+    padding: 6px 8px;
+}
+
+/* Steady anchor icon (User) - always the same size/position whether the sidebar is
+   collapsed or not, so nothing has to grow from zero height on hover. */
+.shell-company-avatar {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--xan-glass-overlay);
+    color: var(--text-secondary);
+}
+
+.shell-company-labels {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    opacity: 1;
+    transition: opacity 0.2s ease, width 0.32s var(--ease-settle);
+}
+
+.shell-sidebar.collapsed .shell-company-labels {
+    width: 0;
+    flex: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.shell-sidebar.collapsed:hover .shell-company-labels {
+    width: auto;
+    flex: 1;
+    opacity: 1;
+    transition-delay: 0.05s;
+}
+
+.shell-company-chevron {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: transform var(--motion-fast), opacity 0.2s ease, width 0.2s ease;
+}
+
+.shell-sidebar.collapsed .shell-company-chevron {
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.shell-sidebar.collapsed:hover .shell-company-chevron {
+    width: 14px;
+    opacity: 1;
+    transition-delay: 0.05s;
+}
+
+.shell-company-chevron.open {
+    transform: rotate(180deg);
+}
+
+/* Drops UP - it lives at the bottom of the sidebar. */
+.shell-company-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 1100;
+    padding: 4px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    box-shadow: var(--shadow-floating);
+    max-height: 320px;
+    overflow-y: auto;
+    animation: shell-company-menu-in 0.18s ease-out;
+}
+
+@keyframes shell-company-menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shell-company-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--motion-fast);
+}
+
+/* :not(:disabled) matters here - without it a capped "Add company" still lit up on hover and
+   read as clickable, which is the opposite of what disabling it is for. */
+.shell-company-item:hover:not(:disabled) {
+    background: var(--xan-glass-overlay);
+}
+
+.shell-company-item:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: -2px;
+}
+
+/* Dimmed and inert, but still readable: the reason is in the title attribute, and a control
+   nobody can read is worse than one they cannot press. */
+.shell-company-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.shell-company-item-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shell-company-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--border-default);
+}
+
+/* ---------- Main / navbar ---------- */
+
+.shell-main {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.shell-navbar {
+    height: 67px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--bg-canvas);
+}
+
+.shell-navbar-title {
+    color: var(--text-primary);
+    text-transform: capitalize;
+    font-family: "GEB", sans-serif;
+        text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: calc(24px * var(--font-scale-body, 1));
+}
+
+.shell-navbar-spacer {
+    flex: 1;
+}
+
+.shell-icon-btn {
+    border: none;
+    background: transparent;
+    color: var(--icon-default);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-control);
+    transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.shell-icon-btn:hover {
+    background: var(--bg-field-on-canvas);
+    color: var(--icon-strong);
+}
+
+.shell-segmented {
+    display: flex;
+    align-items: center;
+    /* Only as wide as its tabs. As a plain block-level flex it stretched to whatever contained
+       it, so three tabs sat in a strip running the width of the page with most of it empty -
+       which reads as a toolbar that has lost its buttons rather than as a set of tabs.
+       fit-content keeps the scrolling behaviour below intact, and .shell-segmented--fill is
+       still there for the rows that genuinely want the full width. */
+    width: fit-content;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    border: 1px solid var(--border-default);
+    /* The strip scrolls inside itself instead of pushing the page wider. With six report
+       tabs on a phone this row was wider than the viewport, so the WHOLE layout scrolled
+       sideways - every table and toolbar with it - to reach a tab. min-width:0 is what lets
+       it shrink at all: as a flex child it would otherwise refuse to go below its content. */
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    /* No visible scrollbar: it would sit inside the control's border and read as a defect.
+       The partly-cut tab at the edge is the affordance. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.shell-segmented::-webkit-scrollbar {
+    display: none;
+}
+
+.shell-segmented-btn {
+    /* Keeps its label on one line and its own width. Without this the labels wrapped and
+       spilled out of the 28px tab - "Purchase Report (12)" broke across two lines inside a
+       control one line tall. The --fill variant below overrides the flex to share the row. */
+    flex: 0 0 auto;
+    /* So a tab can carry an icon beside its label without the two colliding. Tabs with no icon
+       are unaffected: an inline-flex row of one text node lays out exactly as it did. */
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    height: 28px;
+    padding: 0 12px;
+    border: none;
+    border-radius: calc(var(--radius-control) - 3px);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: calc(13.5px * var(--font-scale-body, 1));
+    letter-spacing: 0.3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--motion-base), color var(--motion-base), transform var(--dur-base) var(--ease-overshoot);
+}
+
+/* The tab being pressed gives, like every other button. Nothing on :hover - a strip of six
+   tabs that all move as the pointer crosses them is noise, not feedback. */
+.shell-segmented-btn:active {
+    transform: scale(0.96, 0.93);
+}
+
+html[data-theme="dark"] .shell-segmented-btn {
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .shell-segmented-btn.active {
+    color: var(--xan-blue);
+}
+
+.shell-segmented-btn:hover:not(.active) {
+    background: var(--xan-glass-overlay);
+    color: var(--text-primary);
+}
+
+.shell-segmented-btn.active {
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+}
+
+.shell-content {
+    flex: 1;
+    padding: 24px;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+    .shell-sidebar {
+        position: fixed;
+        left: -260px;
+        top: 0;
+        bottom: 0;
+        z-index: 50;
+        transition: left var(--motion-fast);
+    }
+
+    .shell-sidebar.mobile-open {
+        left: 0;
+    }
+}
+
+/* ---------- Dashboard: stat cards, cards, tables, search, pagination ---------- */
+
+/* Cards read as separate objects rather than one welded slab: the row no longer paints a
+   shared border underneath, and each card carries its own. */
+.stat-card-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 4px;
+    margin: 4px 0 24px;
+}
+
+.stat-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat-card-label {
+    color: var(--text-secondary);
+}
+
+.stat-card-accent {
+    box-shadow: inset 3px 0 0 var(--xan-blue);
+}
+
+.stat-card-standalone {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    height: 100%;
+}
+
+.stat-card-standalone.stat-card-accent {
+    box-shadow: var(--shadow-raised), inset 3px 0 0 var(--xan-blue);
+}
+
+.stat-card-accent .stat-card-label svg {
+    color: var(--xan-blue);
+}
+
+/* ---------- Card-grid hub (Configure, More) ---------- */
+
+/* The cards settle in rather than sliding: they start slightly small and low, and the
+   overshoot in the easing lets them arrive with a little weight instead of stopping dead.
+   Paired with the per-card animationDelay the hubs set, the grid assembles itself. */
+@keyframes configure-card-in {
+    0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.97);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.configure-card {
+    padding: 28px 24px;
+    border-radius: var(--radius-panel, 12px);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* A touch of overshoot at the end - the standard ease stops flat, which reads as a
+       slide rather than something arriving. */
+    animation: configure-card-in 0.44s var(--ease-settle) both;
+    transition: transform 0.22s var(--ease-settle), border-color 0.22s ease,
+        box-shadow 0.22s ease;
+    will-change: transform;
+}
+
+.configure-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--card-accent, var(--xan-blue));
+    /* Tinted to the card's own accent, so the lift belongs to that card rather than being
+       one generic grey shadow on every tile. */
+    box-shadow: 0 10px 24px -12px var(--card-accent, var(--xan-blue));
+}
+
+/* Pressing it should feel like pressing something. Without this the card lifts on hover and
+   then does nothing at all on the click that actually navigates. */
+.configure-card:active {
+    transform: translateY(-1px) scale(0.995);
+    transition-duration: 0.08s;
+}
+
+.configure-card:focus-visible {
+    outline: 2px solid var(--card-accent, var(--xan-blue));
+    outline-offset: 2px;
+}
+
+.configure-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.28s var(--ease-settle);
+}
+
+.configure-card:hover .configure-card-icon {
+    transform: scale(1.12) rotate(-4deg);
+}
+
+/* The count is the card's one piece of live data; nudging it the other way to the icon on
+   hover keeps the top row from feeling static. */
+.bento-card-count {
+    transition: transform 0.28s var(--ease-settle), color 0.22s ease;
+}
+
+.configure-card:hover .bento-card-count {
+    transform: translateX(2px);
+    color: var(--card-accent, var(--xan-blue));
+}
+
+/* Motion is decoration here - the hubs must still be usable without it. Cards appear at
+   once, and hover keeps only the colour changes that carry meaning. */
+@media (prefers-reduced-motion: reduce) {
+    .configure-card,
+    .configure-card-icon,
+    .bento-card-count {
+        animation: none;
+        transition: border-color 0.22s ease, color 0.22s ease;
+    }
+
+    .configure-card:hover,
+    .configure-card:active,
+    .configure-card:hover .configure-card-icon,
+    .configure-card:hover .bento-card-count {
+        transform: none;
+    }
+}
+
+.configure-hero-strip {
+    height: 3px;
+    border-radius: 3px;
+    margin-bottom: 20px;
+    background: linear-gradient(90deg, var(--xan-blue), var(--xan-emerald), var(--xan-amber), var(--xan-rose), var(--xan-violet));
+    opacity: 0.7;
+}
+
+/* ---------- Bento grid (Configure landing) ---------- */
+
+/* Flex, not grid, and that is the whole fix for the empty spaces.
+ *
+ * A grid places cards into fixed column tracks, so the tiles have to tile. These hubs do not:
+ * More is six cards occupying 2+2+1+2+2+2 = 11 cells, and 11 divides into no useful column
+ * count - three columns wants 12, four wants 12 - so SOME hole was guaranteed at every width,
+ * whatever auto-fill/auto-fit/dense did. dense can backfill a hole with a later card; it
+ * cannot invent one.
+ *
+ * Wrapping flex has no tracks. Each row takes as many cards as fit and then flex-grow shares
+ * the leftover among exactly the cards on that row, so a row is always full and the last row
+ * closes itself. The basis is the old track width, so the arrangement is unchanged at widths
+ * that did tile - it just stops leaving gaps at the ones that did not.
+ */
+.bento-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.bento-grid > * {
+    /* Grow into spare space, shrink before overflowing, starting from the old track width. */
+    flex: 1 1 230px;
+    min-width: 0;
+    height: 168px;
+}
+
+/* "Wide" is now a preference, not a span: twice the basis, so it still reads as the bigger
+   tile wherever there is room, but it shrinks with everything else instead of forcing a
+   column count the row cannot satisfy. No breakpoint needed - flex-shrink handles the narrow
+   case the old span-2 had to be switched off for. */
+.bento-card--wide {
+    flex-basis: 476px;
+}
+
+.bento-card .configure-card {
+    height: 100%;
+    justify-content: space-between;
+    padding: 22px;
+    background: linear-gradient(155deg, var(--bg-raised) 55%, var(--card-accent-tint, var(--bg-raised)) 145%);
+    position: relative;
+    overflow: hidden;
+}
+
+.bento-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.bento-card-count {
+    font-size: calc(26px * var(--font-scale-body, 1));
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.bento-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bento-card-desc {
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+    line-height: 1.4;
+    max-width: 34ch;
+}
+
+.shell-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+/* Template picker cards are <button> elements wearing .shell-card. Buttons don't inherit the
+   page's text colour, and .shell-card sets none - so they fell back to the UA default
+   (`buttontext`, i.e. black), which is unreadable on the dark canvas. Set it explicitly:
+   blue for the unselected cards, white for the selected one whose ground is a solid blue tint. */
+.template-card {
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .template-card {
+    color: var(--xan-blue);
+}
+
+html[data-theme="dark"] .template-card.is-active {
+    color: #fff;
+}
+
+.shell-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Wraps rather than overflowing. This row carries a table's search box, its column
+       filter and its create button, and on a phone the three do not fit one line - they
+       overflowed the card, which is overflow:hidden (.xan-panel), so they were CLIPPED
+       AWAY: no scrollbar, no way to reach them, the controls simply did not exist on a
+       phone. Wrapping puts them on a second line instead.
+       min-width:0 on the children is what lets the search field shrink to make that
+       decision possible; a flex child refuses to go below its content width otherwise. */
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: calc(19px * var(--font-scale-body, 1));
+}
+
+.shell-card-header > * {
+    min-width: 0;
+}
+
+/* On a phone the search box takes its own row and the actions sit under it, rather than
+   three controls fighting over 390px and each ending up too small to use. */
+@media (max-width: 600px) {
+    .shell-card-header {
+        padding: 12px 14px;
+    }
+
+    .shell-card-header > *:first-child {
+        flex: 1 1 100%;
+        max-width: 100% !important;
+    }
+}
+
+/* "Finished" beside a job-id: every card on it has reached Done.
+   A state, not an announcement - a quiet tag next to the identifier rather than a banner
+   across the body, so it stays true for as long as it is true and costs no vertical space in
+   a modal that already scrolls.
+   text-transform:none and the letter-spacing reset are deliberate: .shell-card-header sets
+   uppercase and 1px tracking for its title, which a small pill inherits and renders as
+   "F I N I S H E D". The status pair is used together - -text is contrast-checked against
+   its own -bg in both themes. */
+.job-finished-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--status-lime-bg);
+    color: var(--status-lime-text);
+    font-size: calc(11px * var(--font-scale-body, 1));
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    /* The heading it sits beside is 19px; without this the pill drags the baseline around. */
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.shell-card-header .text-heading-brand {
+    font-size: calc(19px * var(--font-scale-body, 1));
+    letter-spacing: 1px;
+
+}
+
+/* Client picker on the Job/Quotation Create modals (AssigneeDropdown variant="dashed") -
+   dashed border, no drop-shadow, overriding Argon's .form-control-alternative.
+   The background was a hardcoded #fff, which stayed white in dark mode and left the control
+   glowing against the modal with unreadable text. --bg-field tracks the theme. */
+/* The caret on a dropdown's trigger. Recedes, because it is a sign that the control opens -
+   not a thing to read. */
+.assignee-dropdown-caret {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    /* The accent: it is the only mark saying the control opens, and in receding ink it was
+       quiet enough that people read the trigger as a plain box of text. */
+    color: var(--xan-blue);
+}
+
+.assignee-dropdown-dashed {
+    background: var(--bg-field) !important;
+    color: var(--text-primary) !important;
+    border: 1px dashed var(--border-default) !important;
+    box-shadow: none !important;
+}
+
+.shell-search-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+
+.shell-search-field input {
+    border: none;
+    background: transparent;
+    outline: none;
+    color: var(--text-primary);
+    caret-color: var(--text-primary);
+    font-family: inherit;
+    /* Sized off Table rows (Account settings > Appearance) rather than inheriting whatever
+       the surrounding header happens to be: you are typing the thing you are about to read
+       in the rows below, so the two should be the same size. */
+    font-size: calc(13px * var(--font-scale-table-row, 1));
+    /* Grows to fill the box instead of sitting at a fixed 180px. Several callers give the
+       wrapper flex:1 or a maxWidth, and a fixed input left the clear button stranded in the
+       middle of a wide field with dead space after it. 180px is the BASIS, so an
+       auto-width header still sizes the same as before.
+       min-width:0 lets it shrink below that basis rather than pushing its container wider. */
+    flex: 1 1 180px;
+    min-width: 0;
+}
+
+/* A search with something in it is a filtered view - the accent border says the list you are
+   looking at is not the whole list. */
+.shell-search-field.is-active {
+    border-color: var(--xan-blue);
+    box-shadow: 0 0 0 2px var(--xan-blue-bg);
+}
+
+.shell-search-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    line-height: 0;
+}
+
+.shell-search-clear:hover {
+    color: var(--xan-rose);
+}
+
+.shell-search-clear:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.shell-search-field input:focus,
+.shell-search-field input:focus-visible {
+    outline: none;
+}
+
+.shell-search-field input::placeholder {
+    color: var(--text-tertiary);
+    /* Follows the input, so the box does not change size the moment you type into it. */
+    font-size: inherit;
+}
+
+/*
+ * reactstrap's <Button> always adds Bootstrap's own "btn" + "btn-{color}" classes
+ * (defaulting color to "secondary" when none is passed), alongside whatever className
+ * we give it. Those compiled Bootstrap rules - especially their :hover states - can
+ * win the cascade over ours depending on stylesheet order, so every state here is
+ * !important to stay authoritative regardless of which extra btn-* classes rode along.
+ */
+.shell-btn {
+    height: 36px;
+    padding: 0 14px;
+    /* A button carrying an icon reads larger than its type size suggests, so it wants a
+       smaller label than body text to stay balanced beside the glyph. 13px by default, set
+       from Account settings > Appearance - already resolved to px there, so it is NOT
+       multiplied again here (docs/STYLE.md). */
+    font-size: var(--button-font-size, 13px);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+    border-radius: var(--radius-control) !important;
+    border: none !important;
+    cursor: pointer;
+    white-space: nowrap;
+    /* transform joins the transition so the press below has something to animate. The
+       release runs on the overshoot curve, which is what gives it weight: the button passes
+       its resting size and comes back rather than simply stopping there. */
+    transition: background-color var(--motion-fast), transform var(--dur-fast) var(--ease-overshoot);
+}
+
+/* Squash on press, volume kept - the same idea as the loader's blob-drift, which stretches
+   one axis as it compresses the other instead of just scaling down. 3% and 6% over 120ms is
+   meant to be felt rather than watched; it is one pair of numbers to dial back if it ever
+   reads as too much.
+
+   :active only, so a button that is merely hovered or focused does not move. */
+.shell-btn:active:not(:disabled) {
+    transform: scale(0.97, 0.94);
+}
+
+/* The press is motion, so it goes entirely rather than being shortened. The button still
+   answers a click - the background change carries that on its own. */
+@media (prefers-reduced-motion: reduce) {
+    .shell-btn {
+        transition: background-color var(--motion-fast);
+    }
+
+    .shell-btn:active:not(:disabled),
+    .shell-segmented-btn:active {
+        transform: none;
+    }
+
+    .shell-segmented-btn {
+        transition: background-color var(--motion-fast), color var(--motion-fast);
+    }
+}
+
+/* A disabled shell button had no styling of its own anywhere in the app: it still painted at
+   full strength and still showed a pointer cursor, so "Save" looked clickable while refusing
+   every click. That is most visible on the forms that follow the required-fields pattern in
+   docs/STYLE.md, where submit is deliberately disabled until the form is complete - the user
+   was left clicking a button that gave no reason for doing nothing.
+
+   The variant rules below set background with !important, so the hover rules are narrowed to
+   :not(:disabled) rather than overridden here. */
+.shell-btn:disabled,
+.shell-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+}
+
+.shell-btn-primary,
+.shell-btn-primary:focus {
+    /* --btn-accent lets a form (Products/People/Suppliers/etc.) tint its own submit button
+       to match that section's edit-mode border color - see triggerFormAttention callers. */
+    /* --accent-gradient is only set when a gradient accent is chosen (Common/appearance.js);
+       otherwise the chain falls through to the flat --bg-primary exactly as before. A
+       per-form --btn-accent still wins over both. */
+    background: var(--btn-accent, var(--accent-gradient, var(--bg-primary))) !important;
+    color: var(--text-on-primary) !important;
+}
+
+.shell-btn-primary:hover:not(:disabled) {
+    background: var(--btn-accent-hover, var(--accent-gradient, var(--bg-primary-hover))) !important;
+    color: var(--text-on-primary) !important;
+    /* A gradient cannot darken to a hover colour the way a flat fill does, so it dims
+       slightly instead. Harmless on the flat fill, which has its own hover colour. */
+    filter: brightness(0.94);
+}
+
+.shell-btn-secondary,
+.shell-btn-secondary:focus {
+    background: var(--bg-field-on-canvas) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-default) !important;
+}
+
+.shell-btn-secondary:hover:not(:disabled) {
+    background: var(--bg-field) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-default) !important;
+}
+
+.shell-btn-danger,
+.shell-btn-danger:focus {
+    background: var(--status-red-bg) !important;
+    color: var(--status-red-text) !important;
+}
+
+.shell-btn-danger:hover:not(:disabled) {
+    filter: brightness(0.96);
+    background: var(--status-red-bg) !important;
+    color: var(--status-red-text) !important;
+}
+
+.shell-btn-accent,
+.shell-btn-accent:focus {
+    background: var(--xan-blue-bg) !important;
+    color: var(--xan-blue) !important;
+    border: 1px solid var(--xan-blue) !important;
+}
+
+.shell-btn-accent:hover {
+    background: var(--xan-blue) !important;
+    color: #ffffff !important;
+    border-color: var(--xan-blue) !important;
+}
+
+.shell-btn-sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+}
+
+/* The "Rows" heading line in Job Detail. Carries the whole-job "Notify customer" button,
+   which replaces the per-row send buttons once every card is Done. */
+.job-rows-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+/* Delivery status of the customer alert, in WhatsApp's own tick vocabulary. Quiet by
+   design - it reports on something already done, so it must not compete with the actions
+   around it. Only a failure raises its voice. */
+.alert-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-field-on-canvas);
+    font-size: calc(11.5px * var(--font-scale-body, 1));
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.alert-status-muted {
+    color: var(--text-secondary);
+}
+
+/* Read is the one good-news state worth colouring - it is the only one that says a human
+   actually looked at the message. */
+.alert-status-read {
+    background: var(--status-green-bg);
+    border-color: transparent;
+    color: var(--status-green-text);
+}
+
+.alert-status-failed {
+    background: var(--status-red-bg);
+    border-color: transparent;
+    color: var(--status-red-text);
+}
+
+.alert-status-label {
+    font-weight: 600;
+}
+
+.alert-status-time {
+    color: inherit;
+    opacity: 0.7;
+}
+
+/* The second tick sits back over the first, the way a double-check mark is drawn. */
+.alert-ticks {
+    display: inline-flex;
+    align-items: center;
+}
+
+.alert-ticks.is-double svg:last-child {
+    margin-left: -6px;
+}
+
+/* ---------- WhatsApp send button (Job Detail > Entries rows) ---------- */
+
+.whatsapp-send-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px 0 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    background: rgba(37, 211, 102, 0.1);
+    color: #1f9e56;
+    font-size: calc(11.5px * var(--font-scale-body, 1));
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast),
+        transform var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.whatsapp-send-btn:hover:not(:disabled) {
+    background: #25d366;
+    border-color: #25d366;
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -2px rgba(37, 211, 102, 0.45);
+}
+
+.whatsapp-send-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.whatsapp-send-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.whatsapp-send-btn.is-sent {
+    background: #25d366;
+    border-color: #25d366;
+    color: #fff;
+}
+
+.whatsapp-send-btn-spin {
+    animation: whatsapp-send-spin 0.8s linear infinite;
+}
+
+@keyframes whatsapp-send-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.shell-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+}
+
+.shell-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.shell-page-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-chip);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.shell-page-btn:hover:not(:disabled) {
+    background: var(--bg-field-on-canvas);
+}
+
+.shell-page-btn:disabled {
+    color: var(--text-tertiary);
+    cursor: default;
+}
+
+.shell-page-btn.active {
+    background: var(--bg-primary);
+    color: var(--text-on-primary);
+}
+
+.people-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 1023px) {
+    .people-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Draws the eye back to a form card after it gets populated from a row's "Edit" action
+   (row click and form live in different parts of the layout, so the state change alone is
+   easy to miss). Retriggered imperatively - see triggerFormAttention in the consuming
+   component - rather than via a React key, so it can't stack/replay oddly on rapid clicks.
+   Uses `outline` (not `border-width`) for the thick-border flash so it never shifts layout -
+   outline is painted outside the box model, border-width would resize the card. */
+@keyframes shell-attention-pulse {
+    0% {
+        outline: 3px solid var(--pulse-color-strong, var(--xan-blue));
+        outline-offset: 0px;
+        box-shadow: 0 0 0 0 var(--pulse-color, var(--xan-blue-bg));
+        border-color: var(--pulse-color-strong, var(--xan-blue));
+    }
+    55% {
+        outline: 3px solid var(--pulse-color-strong, var(--xan-blue));
+        outline-offset: 0px;
+    }
+    70% {
+        box-shadow: 0 0 0 16px rgba(0, 0, 0, 0);
+    }
+    100% {
+        outline: 3px solid transparent;
+        outline-offset: 3px;
+        box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+        border-color: var(--border-default);
+    }
+}
+
+.shell-attention-pulse {
+    animation: shell-attention-pulse 1.1s var(--xan-ease, ease) 1;
+}
+
+/* Gentle breathing glow that keeps running for as long as a form is in edit mode (applied
+   declaratively via `isEditing`, separate from the one-shot flash above which fires once per
+   click). Only animates box-shadow - the persistent thick border is a plain inline style so
+   the two never fight over the same property. */
+@keyframes shell-attention-loop {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 var(--pulse-color, var(--xan-blue-bg));
+    }
+    50% {
+        box-shadow: 0 0 0 8px var(--pulse-color, var(--xan-blue-bg));
+    }
+}
+
+.shell-attention-active {
+    animation: shell-attention-loop 1.8s var(--xan-ease, ease) infinite;
+}
+
+/* ---------- Phone navigation ----------
+   Below 768px the sidebar becomes an off-canvas drawer opened from the navbar's hamburger.
+   Above that width both the hamburger and the drawer close button are hidden and the
+   sidebar behaves exactly as before, so desktop is untouched. */
+
+.shell-hamburger,
+.shell-drawer-close {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .shell-hamburger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        margin-right: 4px;
+        flex-shrink: 0;
+        border: none;
+        border-radius: var(--radius-control);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+    }
+
+    .shell-hamburger:active {
+        background: var(--xan-glass-overlay);
+    }
+
+    /* Off-canvas. transform rather than width/display so it animates on the compositor and
+       the nav keeps its layout while hidden. */
+    .shell-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 60;
+        width: 264px !important;
+        padding: 19px 18px !important;
+        transform: translateX(-100%);
+        transition: transform 0.28s var(--ease-settle);
+        box-shadow: 12px 0 40px -12px rgba(0, 0, 0, 0.45);
+    }
+
+    .shell-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    /* The desktop collapsed/hover-expand behaviour makes no sense in a drawer - it is either
+       open or off-screen. Neutralise it so a collapsed desktop preference doesn't produce a
+       76px-wide drawer. */
+    .shell-sidebar.collapsed .shell-brand-text,
+    .shell-sidebar.collapsed .shell-nav-item span,
+    .shell-sidebar.collapsed .shell-nav-group-label {
+        opacity: 1;
+        width: auto;
+        max-width: none;
+        max-height: none;
+    }
+
+    .shell-sidebar.collapsed .shell-nav-item {
+        justify-content: flex-start;
+        padding: 0 12px;
+    }
+
+    .shell-sidebar.collapsed .shell-brand-mark {
+        display: flex;
+    }
+
+    /* The collapse chevron is meaningless off-canvas. */
+    .shell-collapse-btn {
+        display: none;
+    }
+
+    .shell-drawer-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 14px;
+        right: 12px;
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: var(--radius-chip);
+        background: var(--xan-glass-overlay);
+        color: var(--text-primary);
+        cursor: pointer;
+        z-index: 1;
+    }
+
+    .shell-nav-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(2px);
+    }
+
+    /* Main content takes the full width once the sidebar is out of flow. */
+    .shell-main {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .shell-navbar {
+        padding-left: 10px;
+        padding-right: 10px;
+        gap: 6px;
+    }
+
+    .shell-navbar-title {
+        font-size: calc(16px * var(--font-scale-body, 1));
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* --- Segmented control (one-of-N picker) --- */
+.segmented {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin: 8px 0 16px;
+    background: var(--bg-field);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+}
+
+.segmented-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-control) - 2px);
+    background: transparent;
+    color: var(--icon-muted);
+    font-family: var(--font-family);
+    font-size: calc(13px * var(--font-scale-body, 1));
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.segmented-option span {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.25;
+}
+
+.segmented-option small {
+    font-weight: 400;
+    font-size: calc(11px * var(--font-scale-body, 1));
+    opacity: 0.75;
+}
+
+.segmented-option:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.segmented-option.active {
+    background: var(--bg-raised);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-raised);
+}
+
+/* --- Native date/time inputs in dark theme ---
+   The browser paints its own value text and picker glyph. Without color-scheme it keeps
+   the light-theme palette, so the date reads near-black on a dark field. */
+:root[data-theme="dark"] input[type="date"],
+:root[data-theme="dark"] input[type="datetime-local"],
+:root[data-theme="dark"] input[type="month"],
+:root[data-theme="dark"] input[type="time"] {
+    color-scheme: dark;
+    color: var(--text-primary);
+}
+
+:root:not([data-theme="light"]) input[type="date"],
+:root:not([data-theme="light"]) input[type="datetime-local"],
+:root:not([data-theme="light"]) input[type="month"],
+:root:not([data-theme="light"]) input[type="time"] {
+    color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) input[type="date"],
+    :root:not([data-theme="light"]) input[type="datetime-local"],
+    :root:not([data-theme="light"]) input[type="month"],
+    :root:not([data-theme="light"]) input[type="time"] {
+        color-scheme: dark;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .segmented-option { transition: none; }
+}
+
+/* --- Required field that was left empty on submit ---
+   A red "breathing" border, distinct from the blue .shell-attention-pulse used for
+   drawing the eye to a populated form. Two cycles, then it stops on its own. */
+.brf-client-missing > .assignee-dropdown,
+.brf-client-missing input,
+.brf-client-missing button {
+    border-color: var(--status-red-text) !important;
+}
+
+.brf-client-missing {
+    animation: field-breathe 1.2s ease-in-out 2;
+    border-radius: var(--radius-control);
+}
+
+@keyframes field-breathe {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.28);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .brf-client-missing {
+        animation: none;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.35);
+    }
+}
+
+/* --- Staged template selection confirm --- */
+.template-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    background: var(--bg-field);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+}
+
+.template-confirm-label {
+    font-size: calc(12px * var(--font-scale-body, 1));
+    color: var(--text-primary);
+}
+
+.template-confirm-actions {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.template-confirm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--border-default);
+    background: var(--bg-raised);
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.template-confirm-btn.is-yes {
+    color: var(--status-lime-text, #168c61);
+}
+
+.template-confirm-btn.is-yes:hover:not(:disabled) {
+    background: var(--status-lime-bg);
+}
+
+.template-confirm-btn.is-no {
+    color: var(--status-red-text);
+}
+
+.template-confirm-btn.is-no:hover:not(:disabled) {
+    background: var(--status-red-bg);
+}
+
+.template-confirm-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .template-confirm-btn { transition: none; }
+}
+
+/* Tall is gone as a row span - rows do not exist in a wrapping flex container, and it was
+   the other half of why these hubs could not tile. The class is kept so features.js needs no
+   change and a future layout could use it again; it now only makes the card a little wider
+   than its plain neighbours. */
+.bento-card--tall {
+    flex-basis: 300px;
+}
+
+.bento-card--tall .configure-card {
+    height: 100%;
+}
+
+/* Segmented control sized like a half-width form field, so a pair of tabs lines up with the
+   inputs beneath instead of hugging its own text. */
+.segmented--field {
+    display: flex;
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 12px;
+}
+
+.segmented--field .segmented-option {
+    flex: 1;
+    justify-content: center;
+}
+
+/* The active pill must stay legible in both themes - it previously inherited a muted
+   secondary colour that all but vanished on the dark field. */
+.segmented-option.active {
+    color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .segmented-option.active,
+html[data-theme="dark"] .segmented-option.active {
+    color: var(--text-on-primary);
+    background: var(--bg-primary);
+}
+
+:root[data-theme="dark"] .segmented-option.active small,
+html[data-theme="dark"] .segmented-option.active small {
+    color: var(--text-on-primary);
+    opacity: 0.85;
+}
+
+/* --- Relationship toggle (e.g. "They supply us too" on the client form) ---
+   A selectable card rather than a checkbox: this creates a second record, so it deserves to
+   state its consequence and show its state unambiguously. */
+.relation-toggle {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 14px;
+    margin-bottom: 16px;
+    background: var(--bg-field);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+
+.relation-toggle:hover {
+    border-color: var(--border-strong);
+}
+
+.relation-toggle.is-on {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+}
+
+.relation-toggle-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    color: var(--icon-muted);
+}
+
+.relation-toggle.is-on .relation-toggle-icon {
+    color: var(--xan-blue);
+    border-color: var(--xan-blue);
+}
+
+.relation-toggle-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.relation-toggle-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.relation-toggle-state {
+    font-size: calc(10px * var(--font-scale-body, 1));
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    color: var(--icon-muted);
+    border: 1px solid var(--border-default);
+}
+
+.relation-toggle.is-on .relation-toggle-state {
+    color: var(--text-on-primary);
+    background: var(--xan-blue);
+    border-color: var(--xan-blue);
+}
+
+.relation-toggle-desc {
+    font-size: calc(12px * var(--font-scale-body, 1));
+    line-height: 1.45;
+    color: var(--icon-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .relation-toggle { transition: none; }
+}
+
+/* --- Confirmation modals (Save this invoice, and anything following the same shape) ---
+   These used legacy utility classes and Bootstrap button colours, so the text stayed
+   light-theme dark in dark mode and used a different typeface from the rest of the app. */
+.confirm-modal-title {
+    font-family: var(--font-outfit);
+    font-size: calc(18px * var(--font-scale-body, 1));
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.confirm-modal-body {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-family: var(--font-family);
+}
+
+.confirm-modal-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-control);
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+}
+
+.confirm-modal-lead {
+    margin: 0 0 4px;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.confirm-modal-sub {
+    margin: 0;
+    font-size: calc(11px * var(--font-scale-body, 1));
+    line-height: 1.5;
+    color: var(--icon-muted);
+}
+
+/* --- Required fields (Common/useRequiredFields.js) ---
+   A red border plus a message under the field, so the user is told which value is missing
+   rather than being left to guess from a single generic form-level error. */
+.is-required-missing,
+.form-control.is-required-missing {
+    border-color: var(--status-red-text) !important;
+}
+
+.is-required-missing:focus {
+    border-color: var(--status-red-text) !important;
+    box-shadow: 0 0 0 2px var(--status-red-bg) !important;
+}
+
+.field-error {
+    display: block;
+    margin-top: 4px;
+    font-size: calc(12px * var(--font-scale-body, 1));
+    color: var(--status-red-text);
+}
+
+/* The asterisk marking a mandatory label. */
+.required-star {
+    color: var(--status-red-text);
+    margin-left: 2px;
+}
+
+/* The relationship toggle's active state paints an --xan-blue-bg panel. In dark theme that
+   tint is dark, so --color-ink-900 title text sat too close to it - the heading read as grey
+   on grey. Lift the title (and the description) once the card is on.
+
+   The description used --color-neutral-200, which is a PALETTE-SCALE token and is redefined
+   in the dark block: #e2e4e6 in light, #2a2a2a in dark. This rule only ever runs in dark, so
+   it resolved to near-black on a dark panel - 1.13:1, which is not "hard to read", it is not
+   visible. The pale value the author was picturing would have been 12.69:1.
+
+   --text-primary is the semantic role and already resolves correctly in both themes. This is
+   the trap docs/STYLE.md names, with the twist that the token IS overridden here - and the
+   override inverts. */
+:root[data-theme="dark"] .relation-toggle.is-on .relation-toggle-title,
+html[data-theme="dark"] .relation-toggle.is-on .relation-toggle-title {
+    color: var(--text-on-primary);
+}
+
+:root[data-theme="dark"] .relation-toggle.is-on .relation-toggle-desc,
+html[data-theme="dark"] .relation-toggle.is-on .relation-toggle-desc {
+    color: var(--text-primary);
+}
+
+/* Unselected cards keep their normal heading colour, which already has contrast against
+   --bg-field in both themes. */
+:root[data-theme="dark"] .relation-toggle-title,
+html[data-theme="dark"] .relation-toggle-title {
+    color: var(--text-primary);
+}
+
+/* Pending job-ids notice on the dashboard: work sitting in the Created queue has not become
+   an Entry, so no sheet lists it. Amber rather than red - this is a prompt, not a fault. */
+.pending-jobs-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--status-amber-bg);
+    border: 1px solid var(--status-amber-text);
+    border-radius: var(--radius-control);
+    font-size: calc(13px * var(--font-scale-body, 1));
+    color: var(--status-amber-text);
+}
+
+.pending-jobs-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    background: var(--status-amber-text);
+    color: var(--text-on-primary);
+    font-weight: 700;
+    font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+.pending-jobs-link {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--status-amber-text);
+    white-space: nowrap;
+}
+
+/* --- Job-id picker (New invoice from job-ids) ---
+   A list of selectable cards rather than checkboxes: each row carries context (date, how many
+   rows are billable, why the rest are not) that a checkbox label cannot hold. */
+.job-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    margin-top: 6px;
+}
+
+.job-pick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    background: var(--bg-field);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+
+.job-pick:hover {
+    border-color: var(--border-strong);
+}
+
+.job-pick.is-on {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+}
+
+.job-pick-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.job-pick-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    color: var(--text-primary);
+}
+
+.job-pick-amount {
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+:root[data-theme="dark"] .job-pick.is-on .job-pick-id,
+:root[data-theme="dark"] .job-pick.is-on .job-pick-amount,
+html[data-theme="dark"] .job-pick.is-on .job-pick-id,
+html[data-theme="dark"] .job-pick.is-on .job-pick-amount {
+    color: var(--text-on-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .job-pick { transition: none; }
+}
+
+/* "Still needed: …" beside a disabled submit button.
+   These modals disable submit until every required field is filled, so a reveal-errors-on-
+   submit pass can never run - the button cannot be clicked. Without this the user faces a
+   dead button with no explanation. */
+.missing-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: calc(12px * var(--font-scale-body, 1));
+    color: var(--status-amber-text);
+    max-width: 60%;
+    line-height: 1.35;
+}
+
+.missing-hint strong {
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .missing-hint {
+        max-width: 100%;
+    }
+}
+
+/* "All rows are Done — add to entries?" prompt at the top of a job's detail modal.
+   Prompted rather than automatic: conversion creates billable records, which should not
+   happen silently because a checkbox flipped. */
+/* A segmented control that spans its container, with the options sharing the width evenly.
+ * Used where the control is the row rather than one item in it - the client's job status
+ * filter, which otherwise sat at content width against a full-width search field. */
+.shell-segmented--fill {
+	width: 100%;
+}
+
+.shell-segmented--fill .shell-segmented-btn {
+	flex: 1 1 0;
+	justify-content: center;
+}
+
+/* --- Compact stat cards -------------------------------------------------------------------
+ * A strip of four or five figures does not need cards sized for a single headline number.
+ * .text-kpi-value is 31.5px, which reads as a dashboard hero and pushes the table below the
+ * fold once there are several of them.
+ *
+ * Deliberately compacts only - it sets no layout, so it can sit on a flex row, a grid, or a
+ * reactstrap Row without fighting whatever that container already does. Sizes still multiply
+ * by --font-scale-body, so the Appearance setting keeps working (docs/STYLE.md).
+ */
+.stats-compact .stat-card {
+	padding: 10px 14px;
+	gap: 2px;
+}
+
+.stats-compact .stat-card-label {
+	font-size: calc(11px * var(--font-scale-body, 1));
+	color: var(--text-secondary);
+}
+
+.stats-compact .text-kpi-value {
+	font-size: calc(17px * var(--font-scale-body, 1));
+	line-height: calc(24px * var(--font-scale-body, 1));
+}
+
+.stats-compact .stat-card-label svg {
+	width: 13px;
+	height: 13px;
+}
+
+
+/* ---------- Accent swatches (Account settings > Appearance) ---------- */
+
+.accent-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.accent-swatch {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    /* The ring sits outside the colour rather than over it, so the swatch still shows the
+       exact colour it will apply. */
+    box-shadow: 0 0 0 1px var(--border-default);
+    transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.accent-swatch:hover {
+    transform: scale(1.08);
+}
+
+.accent-swatch.is-on {
+    box-shadow: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--text-primary);
+}
+
+.accent-swatch-wide {
+    width: 56px;
+    border-radius: var(--radius-chip);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .accent-swatch {
+        transition: none;
+    }
+    .accent-swatch:hover {
+        transform: none;
+    }
+}
+
+
+/* ---------- Export buttons ---------- */
+
+/* The two exports read as one grey pair, so which format you were reaching for was a matter
+   of reading the label every time. XLSX takes emerald (the spreadsheet green everyone already
+   associates with it) and PDF takes the app's accent, so they are told apart by shape of
+   colour before the word is read. Filled, not tinted: these sit in a card header beside
+   other secondary buttons and would otherwise still blend in. */
+.shell-btn-xlsx,
+.shell-btn-xlsx:focus {
+    background: var(--xan-emerald) !important;
+    color: #ffffff !important;
+    border-color: var(--xan-emerald) !important;
+}
+
+.shell-btn-xlsx:hover {
+    background: var(--xan-emerald) !important;
+    color: #ffffff !important;
+    filter: brightness(0.94);
+}
+
+/* Follows the accent, gradient included - see Common/appearance.js. */
+.shell-btn-pdf,
+.shell-btn-pdf:focus {
+    background: var(--accent-gradient, var(--bg-primary)) !important;
+    color: var(--text-on-primary) !important;
+    border-color: transparent !important;
+}
+
+.shell-btn-pdf:hover {
+    background: var(--accent-gradient, var(--bg-primary-hover)) !important;
+    color: var(--text-on-primary) !important;
+    filter: brightness(0.94);
+}
+
+/* Disabled has to beat both of the filled rules above, or an export with nothing to export
+   still looks clickable. */
+.shell-btn-xlsx:disabled,
+.shell-btn-pdf:disabled {
+    background: var(--bg-field-on-canvas) !important;
+    color: var(--text-tertiary) !important;
+    border-color: var(--border-default) !important;
+    filter: none;
+}
+
+/* A job-id listed for completeness rather than for picking: every row still on it is in
+   production. Shown, because a job-id that silently vanishes from the picker cannot be told
+   apart from one that was never there - but plainly not selectable. */
+.job-pick.is-waiting {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.job-pick.is-waiting:hover {
+    border-color: var(--border-default);
+    background: transparent;
+}
+
+/* GST / IGST split above the invoice table. Sits between the card header and the table so it
+   reads as a filter on what follows, not as another header action. */
+/* Inside the card header now, directly under Table/Board - so it needs no gutter of its own
+   and no rule under it. The header already provides both, and a strip with its own padding
+   and border sitting under the header read as a second header. */
+.invoice-gst-tabs {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+/* Said before the invoice exists rather than after: an IGST invoice files under a different
+   head, and correcting it later means reissuing. */
+.invoice-igst-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-control);
+    background: var(--xan-amber-bg);
+    color: var(--xan-amber);
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+}
+
+/* ---------- Numbering (Configure > Numbering) ---------- */
+
+
+
+.numbering-fields {
+    display: grid;
+    grid-template-columns: 1.4fr 1.6fr 0.8fr 0.8fr;
+    gap: 10px;
+}
+
+@media (max-width: 700px) {
+    .numbering-fields {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+
+/* The sample is the point of the whole screen - it is what tells you the format is right. */
+.numbering-preview {
+    padding: 6px 10px;
+    border-radius: var(--radius-chip);
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+    font-weight: 700;
+}
+
+/* ---------- Opening balance ---------- */
+
+.opening-balance {
+    display: grid;
+    gap: 6px;
+}
+
+.opening-balance-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 200px) 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+@media (max-width: 620px) {
+    .opening-balance-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Banks, as a form. The name used to be a lone input in the card header; an opening balance
+   needs an amount and a direction beside it, which that header had no room for. */
+.bank-form {
+    display: grid;
+    gap: 16px;
+    padding: 20px;
+    max-width: 620px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.bank-form-field {
+    display: grid;
+    gap: 6px;
+}
+
+.bank-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* The row currently loaded into the form, so it is obvious which account is being edited. A
+   left marker rather than a background tint: on the dark theme the row and field surfaces are
+   a shade apart and the tint was invisible. */
+.row-editing td:first-child {
+    box-shadow: inset 3px 0 0 var(--bg-primary);
+}
+
+/* The opening balance line of a bank's transaction list. Set apart from the movement below
+   it: it is where the running balance starts, not something that happened on a date. */
+.row-opening td {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Identifier fields - GSTIN, and anything else the schema stores through docNumber.
+ *
+ * Presentation only. The rule itself stays where STYLE.md puts it, in the Mongoose setter
+ * (Helpers/TextCase.js), so this is not a second implementation that can drift - it just
+ * stops the field from showing something different to what will be saved. Typing "24abcde"
+ * and seeing it stay lower case, then finding it uppercased after save, reads as the app
+ * changing your data behind your back.
+ */
+.input-identifier {
+    text-transform: uppercase;
+}
+
+/* The placeholder is prose, not an identifier, so it should not shout. */
+.input-identifier::placeholder {
+    text-transform: none;
+}
+
+/* The row under a paged table: how much of it you are looking at, and the pager. Shared
+   because every list needs the identical thing, and five near-copies in five view stylesheets
+   is five chances for them to drift apart. */
+/* The row-count/pagination strip under a table. Shares .shell-card-footer's 20px inset so
+   the count lines up with the card header above it - it had margin-top only, which left it
+   flush against the card edge while everything else in the card was inset, and the two
+   footers looked like different components on adjacent pages. Bottom padding rather than
+   margin-top, so the strip sits inside the card's rounded corners. */
+.table-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+}
+
+.table-foot-count {
+    color: var(--text-tertiary);
+}
+
+/* The customer page's header (ClientMenuPanel).
+ *
+ * These two lines used the legacy Argon font utilities - `.geb` for GEB at a fixed
+ * `fs-24`, `.text-muted` for the eyebrow - while the tab strip immediately beside
+ * them is a shell control inheriting the app's own stack. Two type systems in one
+ * header row, which is what "global fonts haven't been set" was describing.
+ *
+ * Family and size now come from the .text-* scale, which also means this header
+ * finally responds to Account settings > Appearance > Font size. `fs-24` is a
+ * hardcoded pixel value and never did.
+ *
+ * The uppercase treatment is kept: it is the page's established look, and this
+ * change is about the typeface, not the design. */
+.client-panel-eyebrow {
+    margin: 0;
+    color: var(--text-tertiary);
+}
+
+.client-panel-title {
+    margin: 0;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* A button that reads as a link. Used where a table cell opens a record in place rather than
+   navigating - the affordance should still say "this opens something", but an <a> with no
+   href is not a link and a real href would take the page away. */
+.link-button {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--xan-blue);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.link-button:hover {
+    text-decoration: underline;
+}
+
+.link-button:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+/* --- Type-the-name delete confirmation (Common/ConfirmDeleteModal) ---------------------- */
+.confirm-delete-lead {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.confirm-delete-icon {
+    flex: none;
+    margin-top: 2px;
+    color: var(--text-danger);
+}
+
+.confirm-delete-text {
+    margin: 0;
+    font-size: calc(14px * var(--font-scale-body, 1));
+    color: var(--text-primary);
+}
+
+/* The consequence, not the instruction - stated in the danger colour because it is the part
+   that cannot be undone, and set apart from the sentence above so it is not skimmed past. */
+.confirm-delete-warning {
+    margin: 6px 0 0;
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    color: var(--text-danger);
+}

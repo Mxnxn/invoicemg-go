@@ -1,0 +1,25 @@
+/* The read-only view of one purchase invoice. */
+
+.pi-detail-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 24px;
+	margin-bottom: 16px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.pi-detail-meta span {
+	color: var(--text-tertiary);
+}
+
+.pi-detail-meta p {
+	margin: 4px 0 0;
+	color: var(--text-primary);
+}
+
+.pi-detail-total {
+	margin: 16px 0 0;
+	text-align: right;
+	color: var(--text-primary);
+}

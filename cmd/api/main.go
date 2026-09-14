@@ -20,6 +20,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
+	"github.com/mxnxn/invoicemg-go/internal/units"
 )
 
 func main() {
@@ -95,12 +96,25 @@ func routes(db *mongostore.Store) http.Handler {
 	}
 
 	dayHandler := days.New(db.Days())
+	unitHandler := units.New(db.Units())
 
 	// Method and path together, which Go 1.22's mux understands. The Node app mounts
 	// everything as POST, including reads, and that is preserved: the frontend posts FormData
 	// to all of these, and changing a verb would mean changing the client.
 	mux.Handle("POST /sheet/only", admin(dayHandler.Only))
 	mux.Handle("POST /sheet/open-jobs", admin(dayHandler.OpenJobs))
+
+	// Units live inside the Products manager, so they carry the products permission - and the
+	// write routes carry the write-level gate ON TOP of it, exactly as routes/Unit.js layers
+	// requireCreate and requireDelete under its router-wide requireFeature.
+	feature := func(key string, h http.HandlerFunc, extra ...func(http.Handler) http.Handler) http.Handler {
+		mw := append([]func(http.Handler) http.Handler{guard.Require, auth.RequireFeature(key)}, extra...)
+		return auth.Chain(h, mw...)
+	}
+	mux.Handle("POST /unit/list", feature("products", unitHandler.List))
+	mux.Handle("POST /unit/create", feature("products", unitHandler.Create, auth.RequireCreate("products")))
+	mux.Handle("POST /unit/update", feature("products", unitHandler.Update))
+	mux.Handle("POST /unit/delete", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
 
 	mux.HandleFunc("GET /healthz", health(db))
 

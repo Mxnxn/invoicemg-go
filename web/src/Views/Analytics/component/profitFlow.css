@@ -1,0 +1,41 @@
+/* The Revenue -> Net Profit strip above the Analytics tabs - see ProfitFlow.jsx.
+   The lane, tile and operator styles are reused from cashflow.css, which kept them after the
+   tab rewrite removed their last consumer. Only the shell around them lives here.
+   Semantic role tokens throughout; no raw --color-ink-* / --color-neutral-*. */
+
+.profit-flow {
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    background: var(--bg-raised);
+}
+
+.profit-flow-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+/* cashflow-lane-title carries its own margin-bottom, which double-spaces inside this header. */
+.profit-flow-head .cashflow-lane-title {
+    margin-bottom: 0;
+}
+
+.profit-flow-note {
+    margin: 0;
+    padding: 10px 0;
+    color: var(--text-tertiary);
+}
+
+/* The lane scrolls sideways on a narrow screen rather than crushing five tiles - the page
+   body must never scroll horizontally. cashflow.css already sets overflow-x on .cashflow-lane;
+   this only stops the tiles collapsing below a readable width first. */
+@media (max-width: 900px) {
+    .profit-flow .cashflow-lane > .cashflow-tile {
+        min-width: 128px;
+    }
+}

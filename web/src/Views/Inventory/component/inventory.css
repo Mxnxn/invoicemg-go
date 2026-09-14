@@ -1,0 +1,211 @@
+/* Inventory report - see InventoryIndex.jsx.
+   Every colour is a semantic role token or a status PAIR used whole (bg with its own text),
+   which is what keeps this correct under both :root and html[data-theme="dark"]. No raw
+   --color-ink-* / --color-neutral-* appears here: those are the palette scale, not roles,
+   and the dark block does not override them. */
+
+.inventory-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.inventory-search-wrap {
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+
+.inventory-search {
+    /* Matches the 38px form field height the rest of the app uses - see docs/STYLE.md item 9. */
+    height: 38px;
+}
+
+/* Negative stock, in red.
+
+   The selector is deliberately `.xan-table td.inventory-negative`, not `.inventory-negative`
+   on its own: dataTable.css sets `.xan-table td { color: var(--xan-text) }` at specificity
+   0,1,1, which beats a lone class at 0,1,0 - so the plain version rendered in normal text
+   colour and the highlight never appeared.
+
+   --text-danger, not --status-red-text: the latter is half of a chip pair and is only legible
+   on --status-red-bg. Printed straight onto the dark table surface it is ~2.6:1. */
+.xan-table td.inventory-negative {
+    color: var(--text-danger);
+    font-weight: 600;
+}
+
+.inventory-companies {
+    display: block;
+    color: var(--text-tertiary);
+}
+
+.inventory-caveat,
+.inventory-empty {
+    padding: 12px 14px;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    color: var(--text-tertiary);
+}
+
+.inventory-caveat {
+    margin-bottom: 16px;
+}
+
+/* The sharing toggle. Card-shaped rather than a bare checkbox because it changes what the
+   numbers on screen mean, and a control with that consequence should state it. */
+.inventory-share {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color var(--motion-fast), background-color var(--motion-fast);
+}
+
+.inventory-share:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--bg-field-on-canvas);
+}
+
+.inventory-share:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.inventory-share:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.inventory-share.is-on {
+    border-color: var(--bg-primary);
+}
+
+.inventory-share-body {
+    display: block;
+}
+
+.inventory-share-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.inventory-share-state {
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-field);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.inventory-share.is-on .inventory-share-state {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+
+.inventory-share-desc {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-tertiary);
+}
+
+/* Not counted */
+.inventory-notcounted {
+    margin-top: 20px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+}
+
+.inventory-notcounted-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+    cursor: pointer;
+    transition: filter var(--motion-fast);
+}
+
+.inventory-notcounted-head:hover {
+    filter: brightness(0.97);
+}
+
+.inventory-notcounted-head:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: -2px;
+}
+
+.inventory-source {
+    text-transform: capitalize;
+    color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .inventory-share,
+    .inventory-notcounted-head {
+        transition: none;
+    }
+}
+
+/* The inline "Set unit" picker in the Not counted panel. Compact rather than the app's usual
+   38px field: it sits inside a warnings table where a full-height control would make each row
+   twice as tall as the ones it is explaining. */
+.inventory-unit-pick {
+    height: 30px;
+    min-width: 120px;
+    padding: 0 8px;
+    font-size: 13px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-chip);
+    background: var(--bg-raised);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color var(--motion-fast);
+}
+
+.inventory-unit-pick:hover:not(:disabled) {
+    border-color: var(--border-strong);
+}
+
+.inventory-unit-pick:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 1px;
+}
+
+.inventory-unit-pick:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* A row nothing can be done about from here still needs to occupy the column, or the table
+   reads as though the control failed to render. */
+.inventory-nofix {
+    color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .inventory-unit-pick {
+        transition: none;
+    }
+}
+
+.inventory-count {
+    color: var(--text-tertiary);
+}

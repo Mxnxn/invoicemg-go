@@ -1,0 +1,241 @@
+/* One day's sheet.
+ *
+ * The page the shop reads to know what to make, so it is built to be read across a room and
+ * on a phone: the date in words, the money once at the top, then a block per customer holding
+ * their job-ids as cards.
+ *
+ * Semantic role tokens only - they are defined in both :root and html[data-theme="dark"],
+ * which the raw palette scales are not.
+ */
+
+.sheet-page {
+	min-height: 100vh;
+	background: var(--bg-canvas);
+	color: var(--text-primary);
+	padding-bottom: 48px;
+}
+
+.sheet-container {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding-top: 20px;
+}
+
+/* --- the day, and what it came to -------------------------------------------------------- */
+
+.sheet-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	flex-wrap: wrap;
+	padding: 16px 18px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+}
+
+.sheet-date {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+/* The day, big. Somebody arriving at this page already knows roughly when; the number is what
+   confirms it in one glance. */
+.sheet-date-day {
+	font-size: calc(40px * var(--font-scale-heading, 1));
+	font-weight: 400;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.sheet-date-rest {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.sheet-date-mon {
+	font-size: calc(15px * var(--font-scale-body, 1));
+	font-weight: 600;
+	color: var(--text-secondary);
+	line-height: 1.1;
+}
+
+.sheet-date-weekday {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--text-tertiary);
+	font-size: calc(11.5px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.sheet-date-chip {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	letter-spacing: 0;
+	text-transform: none;
+	font-size: calc(10.5px * var(--font-scale-body, 1));
+}
+
+.sheet-totals {
+	display: flex;
+	align-items: center;
+	gap: 22px;
+	flex-wrap: wrap;
+}
+
+.sheet-total {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.sheet-total-label {
+	color: var(--text-tertiary);
+	font-size: calc(11px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.sheet-total-value {
+	font-size: calc(17px * var(--font-scale-body, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Only what is still owed gets a colour. Four coloured figures is four things claiming to be
+   the important one. */
+.sheet-total.is-due .sheet-total-value {
+	color: var(--xan-amber);
+}
+
+.sheet-search {
+	max-width: 420px;
+}
+
+/* --- a customer -------------------------------------------------------------------------- */
+
+.sheet-client {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px 18px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+}
+
+.sheet-client-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.sheet-client-who {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	min-width: 0;
+}
+
+.sheet-monogram {
+	flex-shrink: 0;
+	width: 38px;
+	height: 38px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	font-weight: 700;
+	font-size: calc(13.5px * var(--font-scale-body, 1));
+}
+
+.sheet-client-names {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.sheet-client-firm {
+	font-size: calc(16px * var(--font-scale-body, 1));
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sheet-client-person {
+	color: var(--text-tertiary);
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+.sheet-client-money {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	flex-wrap: wrap;
+}
+
+.sheet-money-item {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.sheet-money-label {
+	color: var(--text-tertiary);
+	font-size: calc(10.5px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.sheet-money-value {
+	font-size: calc(13.5px * var(--font-scale-body, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.sheet-money-item.is-due .sheet-money-value {
+	color: var(--xan-amber);
+}
+
+/* The job-id cards themselves are Common/cards/cards.css - .job-card-deck and .job-card.
+   They used to be duplicated here under sheet- names, which is how the sheet's card and the
+   customer page's card drift apart. */
+
+.sheet-empty {
+	padding: 40px 4px;
+	text-align: center;
+	color: var(--text-tertiary);
+}
+
+@media (max-width: 640px) {
+	.sheet-head,
+	.sheet-client-head {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.sheet-totals {
+		gap: 14px;
+	}
+
+	.sheet-search {
+		max-width: none;
+	}
+}
+

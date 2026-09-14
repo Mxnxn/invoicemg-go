@@ -1,0 +1,115 @@
+/* Customer reviews on the Operations tab - see ReviewsPanel.jsx.
+   Semantic role tokens only. The star colour is --xan-amber, which IS defined in both theme
+   blocks; --status-*-text are not, and would fail on the dark surface. */
+
+.reviews-body {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) minmax(220px, 1.2fr);
+    gap: 20px;
+    align-items: start;
+}
+
+/* One column below the grid's comfortable width, rather than two cramped ones. */
+@media (max-width: 720px) {
+    .reviews-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+.reviews-scores {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reviews-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.reviews-row:last-child {
+    border-bottom: none;
+}
+
+/* Overall is the customer's own summary, not a mean of the four above it, so it is set apart
+   rather than reading as one more dimension in the list. */
+.reviews-row.is-overall {
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-strong);
+}
+
+.reviews-row.is-overall .reviews-label,
+.reviews-row.is-overall .reviews-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.reviews-label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.reviews-value {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    min-width: 26px;
+    text-align: right;
+}
+
+.reviews-stars {
+    display: inline-flex;
+    gap: 1px;
+    color: var(--text-tertiary);
+}
+
+.reviews-stars .is-filled {
+    color: var(--xan-amber);
+    fill: var(--xan-amber);
+}
+
+.reviews-spread-title {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+/* Recent reviews */
+.reviews-recent {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--border-default);
+}
+
+.reviews-recent-item {
+    padding: 7px 0;
+}
+
+.reviews-recent-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.reviews-recent-job {
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.reviews-recent-comment {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-style: italic;
+}

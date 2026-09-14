@@ -1,0 +1,206 @@
+/*
+ * The customer review on the public job page (Views/Alert/component/ReviewForm.jsx).
+ *
+ * Same rules as alertJob.css beside it: semantic role tokens only, so a customer arriving on
+ * a dark-mode phone gets the dark page. No raw --color-ink-* / --color-neutral-*, which are
+ * the palette scale and are not redefined for dark.
+ *
+ * The star colour is --xan-amber, which IS defined in both theme blocks. Gold on white and
+ * gold on near-black both read as a filled star; a single hardcoded #f59e0b would not.
+ */
+
+.review-card {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-default);
+}
+
+.review-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--text-primary);
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.review-intro {
+    margin: 0 0 18px;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+}
+
+/* ---- one dimension ---- */
+.review-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.review-row:last-of-type {
+    border-bottom: none;
+}
+
+.review-row-label {
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.review-stars {
+    display: flex;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+/* Generous hit area: this is tapped on a phone, and 22px of icon is well under the ~44px
+   a thumb needs. The padding does that without making the stars themselves huge. */
+.review-star {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-chip);
+    transition: color var(--motion-fast), transform var(--motion-fast);
+}
+
+.review-star svg {
+    fill: none;
+}
+
+.review-star.is-filled {
+    color: var(--xan-amber);
+}
+
+/* Filled means filled - an outline at a different colour reads as "selected" rather than as
+   a rating, and at a glance five outlines look like zero stars. */
+.review-star.is-filled svg {
+    fill: var(--xan-amber);
+}
+
+.review-star:hover:not(:disabled) {
+    color: var(--xan-amber);
+    transform: scale(1.12);
+}
+
+.review-star:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 1px;
+}
+
+/* A read-back review is not interactive, so it must not offer a pointer or a hover lift. */
+span.review-star {
+    cursor: default;
+}
+
+span.review-star:hover {
+    transform: none;
+}
+
+/* ---- comment ---- */
+.review-comment-label {
+    display: block;
+    margin: 18px 0 6px;
+    color: var(--text-primary);
+    font-size: 13.5px;
+}
+
+.review-optional {
+    color: var(--text-tertiary);
+}
+
+.review-comment {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color var(--motion-fast);
+}
+
+.review-comment:focus {
+    outline: none;
+    border-color: var(--bg-primary);
+}
+
+.review-comment::placeholder {
+    color: var(--text-tertiary);
+}
+
+/* ---- submit ---- */
+.review-submit {
+    margin-top: 14px;
+    width: 100%;
+    padding: 11px 16px;
+    border: none;
+    border-radius: var(--radius-control);
+    background: var(--bg-primary);
+    color: var(--text-on-primary);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--motion-fast), opacity var(--motion-fast);
+}
+
+.review-submit:hover:not(:disabled) {
+    background: var(--bg-primary-hover);
+}
+
+.review-submit:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.review-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.review-hint,
+.review-error {
+    margin: 8px 0 0;
+    font-size: 13px;
+    text-align: center;
+}
+
+.review-hint {
+    color: var(--text-tertiary);
+}
+
+/* --text-danger, not --status-red-text: that one is half of a chip pair and is only legible
+   on its own pink background. This sits directly on the card. */
+.review-error {
+    color: var(--text-danger);
+}
+
+.review-quote {
+    margin: 14px 0 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--border-strong);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .review-star,
+    .review-submit,
+    .review-comment {
+        transition: none;
+    }
+    .review-star:hover:not(:disabled) {
+        transform: none;
+    }
+}

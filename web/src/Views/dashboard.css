@@ -1,0 +1,448 @@
+/* The dashboard's two decks of cards.
+ *
+ * Everything here uses the semantic role tokens, which are defined in BOTH :root and
+ * html[data-theme="dark"] - the raw palette scales are not, and a component reaching for one
+ * renders invisible in dark mode.
+ *
+ * The motion has one job: to say that a new set of cards arrived, and which. It is not
+ * decoration, so it is short, it never blocks a click, and it is removed entirely for anyone
+ * who has asked for less of it.
+ */
+
+.dash {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+/* Tabs left, search right, stacking on a narrow screen rather than squeezing the search to
+   nothing - the search is the control that rescues a long list, so it keeps its width. */
+.dash-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.dash-search {
+	flex: 1 1 260px;
+	max-width: 420px;
+	margin-left: auto;
+}
+
+/* How many are behind the tab, on the tab. It answers "is there anything in there" before you
+   press it, which is the question a tab you have never opened always raises. */
+.dash-tab-count {
+	margin-left: 7px;
+	padding: 1px 6px;
+	border-radius: 999px;
+	background: var(--bg-field);
+	color: var(--text-tertiary);
+	font-size: 0.85em;
+	font-variant-numeric: tabular-nums;
+}
+
+.shell-segmented-btn.active .dash-tab-count {
+	background: var(--xan-blue);
+	color: var(--text-on-primary);
+}
+
+/* --- the pending strip ------------------------------------------------------------------- */
+
+/* --- job-ids on no day ----------------------------------------------------------------------
+   It was one amber strip: a count, six words, a chevron. Amber text on amber ground for the
+   whole thing, which makes the explanation as loud as the alarm and leaves no room to say
+   anything a person could act on.
+   Now the amber is a mark and an edge, and the body sits on the normal raised surface - so the
+   sentence explaining the rule can use ordinary text tokens and be read at ordinary contrast. */
+.dash-pending {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 14px 16px;
+	border: 1px solid var(--border-default);
+	/* The one loud thing, down the edge rather than across the whole panel. */
+	border-left: 3px solid var(--xan-amber);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+}
+
+.dash-pending-icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--radius-control);
+	background: var(--xan-amber-bg);
+	color: var(--xan-amber);
+}
+
+.dash-pending-body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+}
+
+.dash-pending-title {
+	margin: 0;
+	color: var(--text-primary);
+	font-size: calc(14px * var(--font-scale-body, 1));
+	font-weight: 600;
+}
+
+/* The rule, not the symptom. Secondary, because you read it once and then you know it. */
+.dash-pending-detail {
+	margin: 0;
+	color: var(--text-secondary);
+	max-width: 68ch;
+}
+
+.dash-pending-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* --font-code, not --font-mono: applyAppearance replaces --font-mono with whatever face the
+   user picked, which can be proportional, and job-ids stop lining up with the same job-ids
+   everywhere else. */
+.dash-pending-chip {
+	padding: 2px 8px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-chip);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+	font-family: var(--font-code);
+	font-size: calc(11.5px * var(--font-scale-table-row, 1));
+	white-space: nowrap;
+}
+
+/* "2/5" - cards left of cards on it. Quieter than the job-id, because the id is what you go
+   looking for and this is what you learn once you have found it. */
+.dash-pending-chip-count {
+	margin-left: 6px;
+	color: var(--text-tertiary);
+	font-variant-numeric: tabular-nums;
+}
+
+.dash-pending-chip.is-more {
+	border-style: dashed;
+	background: transparent;
+	color: var(--text-tertiary);
+	font-family: inherit;
+}
+
+.dash-pending-action {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 32px;
+	padding: 0 12px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+	font-size: calc(12.5px * var(--font-scale-body, 1));
+	font-weight: 500;
+	text-decoration: none;
+	transition: border-color var(--dur-base) var(--ease-liquid), color var(--dur-base) var(--ease-liquid),
+		background var(--dur-base) var(--ease-liquid);
+}
+
+.dash-pending-action:hover,
+.dash-pending-action:focus-visible {
+	border-color: var(--xan-amber);
+	background: var(--xan-amber-bg);
+	color: var(--xan-amber);
+	text-decoration: none;
+}
+
+@media (max-width: 640px) {
+	/* The action drops under the text rather than squeezing it into a column two words wide. */
+	.dash-pending {
+		flex-wrap: wrap;
+	}
+
+	.dash-pending-action {
+		margin-left: 46px;
+	}
+}
+
+/* --- the decks --------------------------------------------------------------------------- */
+
+/* auto-fill, not auto-fit: auto-fit collapses empty tracks, so a single card on the last page
+   would stretch to the full width of the page and stop looking like a card. */
+.dash-grid {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.dash-grid.is-customers {
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.dash-card {
+	position: relative;
+	display: flex;
+	text-align: left;
+	padding: 14px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	/* Arrives: see the keyframes below. The fill keeps it at the end state rather than
+	   snapping back to opacity 0 when the animation finishes. */
+	opacity: 0;
+	animation: dash-card-in var(--dur-base, 240ms) var(--ease-liquid, cubic-bezier(0.22, 1, 0.36, 1)) both;
+	transition: border-color var(--dur-base) var(--ease-liquid), transform var(--dur-base) var(--ease-liquid),
+		box-shadow var(--dur-base) var(--ease-liquid);
+}
+
+@keyframes dash-card-in {
+	from {
+		opacity: 0;
+		transform: translateY(10px) scale(0.985);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.dash-card:hover {
+	border-color: var(--xan-blue);
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-floating);
+}
+
+.dash-card:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+.dash-card:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+/* --- a day ------------------------------------------------------------------------------- */
+
+.dash-day {
+	flex-direction: column;
+	gap: 10px;
+	min-height: 132px;
+}
+
+.dash-day-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.dash-day-weekday {
+	color: var(--text-tertiary);
+	font-size: calc(11.5px * var(--font-scale-card, 1));
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+/* Today and Yesterday only - see relativeDayLabel. */
+.dash-day-chip {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	font-size: calc(10.5px * var(--font-scale-card, 1));
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.dash-day-date {
+	display: flex;
+	align-items: baseline;
+	gap: 7px;
+}
+
+/* The day, big. It is what someone is scanning for. */
+.dash-day-num {
+	font-size: calc(30px * var(--font-scale-card-title, 1));
+	font-weight: 400;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.dash-day-mon {
+	display: flex;
+	flex-direction: column;
+	color: var(--text-secondary);
+	font-size: calc(13px * var(--font-scale-card, 1));
+	font-weight: 600;
+	line-height: 1.15;
+}
+
+.dash-day-year {
+	color: var(--text-tertiary);
+	font-weight: 500;
+	font-size: 0.85em;
+}
+
+/* The answer the card exists to give. */
+.dash-day-count {
+	margin-top: auto;
+	padding-top: 10px;
+	border-top: 1px solid var(--border-default);
+	color: var(--text-secondary);
+	font-size: calc(12.5px * var(--font-scale-card, 1));
+}
+
+/* <strong> carries a bold weight of its own, which is the whole point of the element and the
+   wrong thing for a figure. The count is made prominent by size and by ink, not by weight. */
+.dash-day-count strong {
+	color: var(--text-primary);
+	font-size: calc(15px * var(--font-scale-card, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* A day with work on it today reads first. One accent edge, not a fill - a grid of filled
+   cards has no hierarchy left to give the one that matters. */
+.dash-day.is-recent {
+	border-color: var(--xan-blue);
+}
+
+/* --- a customer -------------------------------------------------------------------------- */
+
+.dash-customer {
+	align-items: center;
+	gap: 12px;
+	min-height: 84px;
+}
+
+/* Stands in for a face. Recognising a customer in a grid is shape-matching before it is
+   reading, and a firm's initials are the only shape we have. */
+.dash-monogram {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	font-weight: 700;
+	font-size: calc(14px * var(--font-scale-card, 1));
+	letter-spacing: 0.02em;
+}
+
+.dash-customer-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+/* min-width:0 above plus this is what actually makes a long firm name ellipsis rather than
+   push the card wider - a grid child will not shrink below its content without it. */
+.dash-customer-firm,
+.dash-customer-name,
+.dash-customer-phone {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+
+.dash-customer-firm {
+	font-size: calc(14px * var(--font-scale-card-title, 1));
+	font-weight: 600;
+}
+
+.dash-customer-name {
+	color: var(--text-tertiary);
+	font-size: calc(12px * var(--font-scale-card, 1));
+}
+
+/* The accent, because it is the one piece of the card someone came looking for - and the card
+   has no other colour on it, so nothing competes. Not a link: it used to be a tel: anchor,
+   which put a second target inside a card that is already one button. */
+.dash-customer-phone {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-top: 2px;
+	width: fit-content;
+	color: var(--xan-blue);
+	font-size: calc(12.5px * var(--font-scale-card, 1));
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+
+.dash-customer-phone.is-missing {
+	color: var(--text-tertiary);
+	font-style: italic;
+}
+
+/* --- the rest ---------------------------------------------------------------------------- */
+
+.dash-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-top: 4px;
+}
+
+.dash-count {
+	color: var(--text-tertiary);
+}
+
+.dash-empty {
+	padding: 40px 4px;
+	text-align: center;
+	color: var(--text-tertiary);
+}
+
+@media (max-width: 560px) {
+	.dash-search {
+		margin-left: 0;
+		max-width: none;
+	}
+
+	.dash-grid,
+	.dash-grid.is-customers {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+}
+
+/* Asked for less movement means none of it - but the cards must still END UP visible. The
+   animation is dropped and opacity forced, rather than the rule removed, which would leave a
+   deck of invisible cards for exactly the people least able to work out why. */
+@media (prefers-reduced-motion: reduce) {
+	.dash-card {
+		animation: none;
+		opacity: 1;
+		transition: none;
+	}
+
+	.dash-card:hover {
+		transform: none;
+	}
+
+	.dash-pending-action {
+		transition: none;
+	}
+}

@@ -1,0 +1,176 @@
+/* Approved-template browser in Configure > WhatsApp. */
+
+.tpl-picker {
+    display: grid;
+    gap: 12px;
+}
+
+.tpl-picker-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tpl-search {
+    position: relative;
+    flex: 1 1 220px;
+    display: flex;
+    align-items: center;
+}
+
+.tpl-search svg {
+    position: absolute;
+    left: 10px;
+    color: var(--icon-muted);
+    pointer-events: none;
+}
+
+.tpl-search input {
+    padding-left: 30px;
+}
+
+.tpl-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+    /* Long accounts should scroll the list, not the settings page. */
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.tpl-row {
+    width: 100%;
+    text-align: left;
+    display: grid;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+
+.tpl-row:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-field-on-canvas);
+}
+
+.tpl-row:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.tpl-row.is-selected {
+    border-color: var(--bg-primary);
+    background: var(--bg-field-on-canvas);
+}
+
+.tpl-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tpl-name {
+    font-size: calc(14px * var(--font-scale-body, 1));
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.tpl-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: calc(11px * var(--font-scale-body, 1));
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.tpl-status-ok {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+
+.tpl-status-warn {
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+}
+
+.tpl-header {
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* The template body, as WhatsApp will render it - kept to a few lines so one long template
+   cannot push every other option off the screen. */
+.tpl-body {
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tpl-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: calc(11.5px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+}
+
+.tpl-meta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.tpl-empty {
+    margin: 0;
+    padding: 12px 0;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tpl-row {
+        transition: none;
+    }
+}
+
+/* The template list is cards, not a table, so it cannot use DataTable's shimmer body - but it
+   reuses .xan-shimmer-cell, so the app has one shimmer look rather than two. */
+.tpl-skeleton-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	margin-bottom: 8px;
+}
+
+.tpl-skeleton-name {
+	width: 40%;
+}
+
+.tpl-skeleton-body {
+	width: 85%;
+}
+
+.tpl-skeleton-meta {
+	width: 55%;
+}

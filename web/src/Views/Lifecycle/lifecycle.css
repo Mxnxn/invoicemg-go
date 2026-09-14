@@ -1,0 +1,307 @@
+
+/* --- Invoiced job lock bar (JobDetailModal) ----------------------------------------------
+ * Amber rather than red: a locked job is not a fault, it is a billed record being protected.
+ * Colours come from the status pair, which reads correctly in both themes - the pale -bg is
+ * theme-invariant and the -text shade is chosen to meet contrast against it (docs/STYLE.md).
+ */
+.job-lock-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+	padding: 8px 12px;
+	border-radius: var(--radius-control);
+	background: var(--status-amber-bg);
+	border: 1px solid var(--status-amber-text);
+	color: var(--status-amber-text);
+}
+
+.job-lock-bar .job-lock-btn {
+	margin-left: auto;
+	padding: 4px 12px;
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+/* --- Notes panel (JobDetailModal) --------------------------------------------------------
+ * Notes were half of a "Notes & Queues" tab. The queues board is gone, and notes are
+ * reference material rather than a second view of the job - so they slide in over the right
+ * edge while the rows stay on screen behind them.
+ *
+ * Absolutely positioned against the modal body rather than taking a grid column, so opening
+ * the panel never reflows the table underneath it.
+ */
+/* Notes narrow the rows rather than covering them.
+
+   They used to be an absolutely-positioned overlay, which meant the only way to read the
+   rows you were writing notes about was to close the notes. Taking a note is not a separate
+   task from looking at the job - so the panel takes its own column and the table gives up
+   the width, the same arrangement the Received panel uses on an invoice
+   (Views/Invoice/invoice.css .invoice-detail-body). */
+.job-detail-split {
+	display: flex;
+	align-items: flex-start;
+	gap: 20px;
+}
+
+/* min-width:0 so the rows table shrinks instead of shoving the notes off the dialog - as a
+   flex child it would otherwise refuse to go narrower than its content. Same reason
+   .invoice-detail-main carries it. */
+.job-detail-split-main {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.job-notes-panel {
+	flex: 0 0 clamp(280px, 34%, 420px);
+	align-self: stretch;
+	max-height: 60vh;
+	overflow-y: auto;
+	padding: 14px 16px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	background: var(--bg-field-on-canvas);
+}
+
+.job-notes-panel-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+/* The panel is positioned against the scrolling body, so that body is the containing block. */
+.job-detail-body {
+	position: relative;
+}
+
+/* Directly beneath the modal's close control, on the same edge as the panel it opens. */
+.job-notes-toggle {
+	position: absolute;
+	top: 56px;
+	right: 16px;
+	z-index: 3;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--border-default);
+	background: var(--bg-raised);
+	color: var(--icon-default);
+	cursor: pointer;
+	transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.job-notes-toggle:hover,
+.job-notes-toggle.is-open {
+	background: var(--bg-field);
+	color: var(--text-primary);
+}
+
+/* Says whether there is anything in there without opening it - which is why the button can
+   be an icon at all. */
+.job-notes-count {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	border-radius: var(--radius-pill);
+	background: var(--status-amber-text);
+	color: var(--text-on-primary);
+	font-size: 10px;
+	line-height: 16px;
+	text-align: center;
+}
+
+/* One column when there is not room for two. The notes panel keeps a floor of 280px, so
+   below roughly 900px the rows table would be squeezed past readable rather than the panel
+   giving way - stacked, both get the full width in turn. */
+@media (max-width: 900px) {
+	.job-detail-split {
+		flex-direction: column;
+	}
+
+	.job-notes-panel {
+		flex: 1 1 auto;
+		width: 100%;
+		max-height: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.job-notes-toggle {
+		transition: none;
+	}
+}
+
+/* Row size under the description in the job's rows table (JobDetailModal). Muted and
+ * tabular so it reads as a spec line qualifying the description, not as a second
+ * description competing with it. */
+.job-row-dimensions {
+	margin-top: 2px;
+	font-size: calc(11px * var(--font-scale-body, 1));
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+}
+
+/* IGST promoted out of Extra into its own column, and the X that sends it back.
+ * The chip matches OptionalRowField's dashed "+ Label" look so it reads as one of the same
+ * family of optional fields, even though pressing it changes the whole table rather than
+ * adding one cell. */
+.igst-promote {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 3px 7px;
+	border: 1px dashed var(--border-default);
+	border-radius: var(--radius-chip);
+	background: transparent;
+	color: var(--text-tertiary);
+	font-size: calc(11.5px * var(--font-scale-body, 1));
+	font-family: inherit;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+
+.igst-promote:hover {
+	color: var(--text-primary);
+	border-color: var(--border-strong);
+}
+
+.igst-promote:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+/* .igst-col-close's colour, hover, focus and disabled treatment is shared with every other
+ * clear/cancel "x" in the app - see .xan-clear-btn in Common/DataTable/dataTable.css. Only
+ * the bits specific to sitting in a table heading stay here. */
+
+/* An invoiced row is frozen, so the regime cannot be switched under it. */
+.igst-col-close:disabled {
+	cursor: default;
+	opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.igst-promote,
+	.igst-col-close {
+		transition: none;
+	}
+}
+
+/* "Move the whole job-id" on the row queue dialog. Set apart from the stage list above it:
+   it changes what pressing a stage does, so it should not read as one more stage. */
+.row-queue-all {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.row-queue-all input {
+    margin-top: 2px;
+    flex: 0 0 auto;
+    cursor: pointer;
+}
+
+/* States what will happen, not what the setting is called - the consequence is the thing
+   worth reading before pressing a stage. */
+.row-queue-all-hint {
+    display: block;
+    margin-top: 1px;
+    color: var(--text-tertiary);
+    font-size: 12.5px;
+}
+
+/* A stage that cannot be removed because cards are standing on it.
+
+   A shake rather than a colour change: the press already looked like it would work, so the
+   feedback has to be about THAT press - a static red state reads as a property of the stage
+   instead of an answer to what was just done. Short and damped, three passes, so it reads as
+   a refusal and not as something broken.
+
+   The class is removed on animationend (see RowQueueDialog) so pressing the same button again
+   replays it rather than doing nothing. */
+.queue-stage-refused {
+	animation: queue-stage-shake 260ms var(--ease-settle, ease-out) 1;
+	border-color: var(--status-red-text) !important;
+}
+
+@keyframes queue-stage-shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	20% {
+		transform: translateX(-5px);
+	}
+	40% {
+		transform: translateX(4px);
+	}
+	60% {
+		transform: translateX(-3px);
+	}
+	80% {
+		transform: translateX(2px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.queue-stage-refused {
+		/* Still answers the press, just without the movement - the toast carries the reason
+		   either way, and the red edge says which stage was refused. */
+		animation: none;
+	}
+}
+
+
+/* --- "Still open", arrived at from the dashboard ----------------------------------------------
+   A list filtered by a link is a list that is quietly shorter than it should be. The chip is
+   what stops that being a mystery: it names the filter, counts it, and undoes it in one press. */
+.lifecycle-filter-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 10px;
+	border: 1px solid var(--xan-blue);
+	border-radius: var(--radius-chip);
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	font-size: calc(12px * var(--font-scale-body, 1));
+	font-weight: 500;
+	/* The header is uppercase with wide tracking; a chip carrying a sentence is not. */
+	text-transform: none;
+	letter-spacing: normal;
+	cursor: pointer;
+	transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.lifecycle-filter-chip:hover {
+	background: var(--xan-blue);
+	color: var(--text-on-primary);
+}
+
+.lifecycle-filter-chip-count {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lifecycle-filter-chip {
+		transition: none;
+	}
+}

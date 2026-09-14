@@ -1,0 +1,23 @@
+# The port-80 server once HTTPS is live: answer ACME, redirect everything else.
+#
+# Swapped in over default.conf by docker/enable-ssl.sh. It REPLACES the HTTP server rather
+# than adding to it - nginx rejects two `location /` blocks in one server, so the redirect
+# cannot simply be included alongside the SPA config.
+
+server {
+    listen 80;
+    server_name invoicemg.in www.invoicemg.in;
+    server_tokens off;
+
+    # Stays on plain HTTP and is never redirected: renewals depend on Let's Encrypt fetching
+    # this over port 80, and a 301 here breaks every renewal from the next one onward.
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

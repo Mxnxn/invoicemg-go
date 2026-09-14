@@ -1,0 +1,377 @@
+/* Bento layout for the Cash & profitability panel. Sized to sit above the existing analytics
+   charts without pushing them off screen, so everything reads in one view. */
+
+.cashflow-bento {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 16px;
+}
+
+/* The chart and the two tables each take half the width and sit on the second row. */
+.cashflow-bento .bento-wide {
+    grid-column: span 2;
+}
+
+@media (max-width: 1200px) {
+    .cashflow-bento {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .cashflow-bento .bento-wide {
+        grid-column: span 2;
+    }
+}
+
+/* Deliberately smaller than Shell/StatCard: eight of these plus a chart and two tables have
+   to fit in one viewport, and at that density the full-size card is mostly padding. */
+.cashflow-tile {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    padding: 10px 12px;
+    min-width: 0;
+}
+
+.cashflow-tile-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cashflow-tile-value {
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text-primary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cashflow-tile-sub {
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The headline tile - net cashflow - is the one number to read first. */
+.cashflow-tile.is-hero {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+}
+
+.cashflow-tile.is-hero .cashflow-tile-value {
+    font-size: 23px;
+}
+
+/* Sign carries meaning on the money tiles: positive is emerald, negative rose. These are
+   status colours on text, not series colours - the chart's identity palette is separate. */
+.cashflow-pos {
+    color: var(--xan-emerald);
+}
+
+.cashflow-neg {
+    color: var(--xan-rose);
+}
+
+.cashflow-panel {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    padding: 10px 12px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.cashflow-panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+}
+
+/* Compact margin tables - five rows each, so they never grow with the product count. */
+.cashflow-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+
+.cashflow-mini-table td {
+    padding: 3px 0;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
+}
+
+.cashflow-mini-table td:first-child {
+    width: 55%;
+    color: var(--text-primary);
+}
+
+.cashflow-mini-table td.num {
+    text-align: right;
+    font-family: var(--font-mono);
+    width: 22.5%;
+}
+
+.cashflow-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 10.5px;
+    color: var(--text-secondary);
+}
+
+.cashflow-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.cashflow-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+/* ---------- Compacting the older analytics cards ----------
+   These components use the full-size Shell StatCard (20px padding, 31.5px KPI) and standard
+   card headers, which next to the bento tiles looked like two different pages. Scoped to
+   .analytics-compact so every other screen keeps the roomier defaults. */
+
+.analytics-compact .stat-card {
+    padding: 10px 12px;
+    gap: 4px;
+}
+
+.analytics-compact .stat-card .text-kpi-value {
+    font-size: 19px;
+    line-height: 24px;
+    letter-spacing: -0.2px;
+}
+
+.analytics-compact .stat-card-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.analytics-compact .stat-card-row {
+    margin-bottom: 10px !important;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.analytics-compact .shell-card-header {
+    padding: 8px 12px;
+    letter-spacing: 0.08em;
+}
+
+.analytics-compact .shell-card-header .text-heading-brand {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+}
+
+/* Bootstrap row gutters between the chart rows - mt-4 (24px) is a lot of air at this density. */
+.analytics-compact .row + .row,
+.analytics-compact .mt-4 {
+    margin-top: 10px !important;
+}
+
+.analytics-compact .shell-card {
+    margin-bottom: 10px;
+}
+
+/* The legacy cards' own footers/labels sit at the table scale; keep them in step. */
+.analytics-compact .shell-card-footer {
+    padding: 6px 12px;
+}
+
+/* The two timing stat cards share the third column with a chart card beside them, so they
+   need to read as one stacked pair rather than two full-height cards. */
+.analytics-compact .stat-card-standalone {
+    margin-bottom: 10px;
+}
+
+/* At xl the charts are a third of the width - a 12px title plus a long label wraps and pushes
+   the canvas down, so let the header wrap tightly instead. */
+.analytics-compact .shell-card-header {
+    flex-wrap: wrap;
+    gap: 6px;
+    row-gap: 4px;
+}
+
+/* ---------- Flow lanes ----------
+   The tiles are read as a statement, not a bag of numbers: revenue minus cost minus wastage
+   equals operating profit, and cash in minus cash out equals net cashflow. The operators
+   between them carry that arithmetic, so the eye follows the same path the money does. */
+
+.cashflow-lane {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+}
+
+.cashflow-lane > .cashflow-tile {
+    flex: 1 1 0;
+    min-width: 108px;
+}
+
+/* The result of each lane - the number the lane exists to produce. */
+.cashflow-lane > .cashflow-tile.is-result {
+    border-color: var(--xan-blue);
+    background: var(--xan-blue-bg);
+}
+
+.cashflow-op {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 14px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    user-select: none;
+}
+
+.cashflow-lane-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+}
+
+/* Deductions read as subtractions from the lane's headline, so their value is muted rather
+   than competing with the result tile. */
+.cashflow-tile.is-deduction .cashflow-tile-value {
+    color: var(--text-secondary);
+}
+
+/* ---------- One spacing rhythm ----------
+   The page was mixing three systems: Bootstrap's 30px column gutters (15px padding each side),
+   a 10px bento gap, and per-card margins. Everything below drives off one variable so
+   horizontal and vertical gaps match. */
+
+.analytics-compact {
+    --analytics-gap: 10px;
+}
+
+/* Bootstrap's default gutter is 15px per side; halve it to 5px so the space between two
+   columns equals the vertical gap between two rows. */
+.analytics-compact .row {
+    margin-left: calc(var(--analytics-gap) / -2);
+    margin-right: calc(var(--analytics-gap) / -2);
+}
+
+.analytics-compact .row > [class*="col-"],
+.analytics-compact .row > .col {
+    padding-left: calc(var(--analytics-gap) / 2);
+    padding-right: calc(var(--analytics-gap) / 2);
+}
+
+.analytics-compact .row + .row,
+.analytics-compact .mt-4,
+.analytics-compact .mt-3 {
+    margin-top: var(--analytics-gap) !important;
+}
+
+.analytics-compact .shell-card,
+.analytics-compact .stat-card-row {
+    margin-bottom: var(--analytics-gap) !important;
+}
+
+.analytics-compact .cashflow-bento {
+    gap: var(--analytics-gap);
+    margin-bottom: var(--analytics-gap);
+}
+
+.analytics-compact .cashflow-lane {
+    margin-bottom: var(--analytics-gap);
+}
+
+
+
+/* --------------------------------------------------------------------------
+   Analytics minimalism pass
+   --------------------------------------------------------------------------
+   The page wasn't too dense so much as uniformly loud: every card carried the
+   same border, shadow, header bar and padding, so nothing led the eye and the
+   charts competed with their own chrome. This strips the frame and lets
+   whitespace do the separating, so the ink that remains is the data.
+
+   Deliberately CSS-only - the card components keep their markup and behaviour,
+   which keeps the change reversible and testable. */
+
+.analytics-compact .shell-card {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    /* Space, not boxes, is what separates the panels now. */
+    padding: 0 0 28px;
+    margin-bottom: 4px;
+}
+
+/* A hairline under the title is enough of a boundary once the box is gone. */
+.analytics-compact .shell-card-header {
+    padding: 0 0 8px;
+    margin-bottom: 14px;
+    background: transparent;
+    border-bottom: 1px solid var(--border-default);
+}
+
+/* Titles step back: this is a label for the chart, not a headline competing with it. */
+.analytics-compact .shell-card-header .text-heading-brand {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--icon-muted);
+}
+
+.analytics-compact .card-body,
+.analytics-compact .shell-card > div:not(.shell-card-header) {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* The KPI row keeps its cards - those ARE the summary, so they stay the one
+   framed element on the page and read as the anchor. */
+.analytics-compact .stat-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+}
+
+/* Quieter empty/loading text - it should recede, not announce itself. */
+.analytics-compact .text-muted {
+    font-size: 12px;
+    color: var(--icon-muted);
+}
+
+@media (max-width: 991px) {
+    .analytics-compact .shell-card {
+        padding-bottom: 20px;
+    }
+}

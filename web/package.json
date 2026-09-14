@@ -1,0 +1,56 @@
+{
+  "name": "invoice-mg",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": "https://invoice.manangraphics.com/",
+  "dependencies": {
+    "@react-pdf/renderer": "^1.6.8",
+    "axios": "^0.19.2",
+    "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^1.39.0",
+    "motion": "^13.2.0",
+    "nouislider": "14.1.1",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-feather": "^2.0.8",
+    "react-redux": "^7.2.4",
+    "react-router-dom": "^6.26.2",
+    "reactstrap": "^8.5.1",
+    "recharts": "^2",
+    "sass": "^1.77.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^30.0.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^5.4.8",
+    "vite-plugin-node-polyfills": "^0.28.0",
+    "vitest": "^4.1.10"
+  },
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 3000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:icons": "node scripts/check-feather-icons.mjs"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

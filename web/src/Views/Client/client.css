@@ -1,0 +1,252 @@
+/* One customer's work, gathered by the day it came in.
+ *
+ * The inversion of the sheet, and dressed to match it: a day heading you can read, and the
+ * job-ids under it as cards. The cards themselves are Common/cards/cards.css - the same
+ * drawing both pages use.
+ *
+ * Semantic role tokens only - they are defined in both :root and html[data-theme="dark"],
+ * which the raw palette scales are not.
+ */
+
+.client-deck {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 16px 18px;
+}
+
+.client-deck-note {
+	padding: 24px 0;
+	color: var(--text-tertiary);
+	text-align: center;
+}
+
+.client-day {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* A rule under the heading rather than a box around the day. A card per day inside a card of
+   job-ids is a box in a box in a box, and the page already has one. */
+.client-day-head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.client-day-when {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+/* Big enough to be the thing you scan down the page for, small enough not to outrank the
+   customer's own name above it. */
+.client-day-num {
+	font-size: calc(26px * var(--font-scale-heading, 1));
+	font-weight: 400;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.client-day-rest {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.client-day-mon {
+	font-size: calc(13.5px * var(--font-scale-body, 1));
+	font-weight: 600;
+	color: var(--text-secondary);
+	line-height: 1.1;
+}
+
+.client-day-weekday {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-tertiary);
+	font-size: calc(11px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.client-day-chip {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	letter-spacing: 0;
+	text-transform: none;
+	font-size: calc(10.5px * var(--font-scale-body, 1));
+}
+
+.client-day-money {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	flex-wrap: wrap;
+}
+
+.client-day-figure {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.client-day-label {
+	color: var(--text-tertiary);
+	font-size: calc(10.5px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.client-day-value {
+	font-size: calc(13.5px * var(--font-scale-body, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Only what is still owed carries a colour. Three coloured figures is three things claiming to
+   be the important one. */
+.client-day-figure.is-due .client-day-value {
+	color: var(--xan-amber);
+}
+
+@media (max-width: 640px) {
+	.client-deck {
+		padding: 14px;
+	}
+
+	.client-day-head {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.client-day-money {
+		gap: 14px;
+	}
+}
+
+/* --- whose page this is ------------------------------------------------------------------- */
+
+/* The customer, said once at the top. The page used to name them nowhere at all - three stat
+   cards and a table of their work, with no indication whose it was. */
+.client-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	flex-wrap: wrap;
+	margin: 12px 0;
+	padding: 16px 18px;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	background: var(--bg-raised);
+}
+
+.client-head-who {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.client-head-monogram {
+	flex-shrink: 0;
+	width: 44px;
+	height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--xan-blue-bg);
+	color: var(--xan-blue);
+	font-weight: 700;
+	font-size: calc(15px * var(--font-scale-body, 1));
+}
+
+.client-head-names {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.client-head-firm {
+	font-size: calc(19px * var(--font-scale-heading, 1));
+	font-weight: 600;
+	line-height: 1.15;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.client-head-sub {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	color: var(--text-tertiary);
+	font-size: calc(12.5px * var(--font-scale-body, 1));
+}
+
+/* The number in the accent, like the dashboard's customer cards - it is the one thing on the
+   line somebody reaches for. */
+.client-head-phone {
+	color: var(--xan-blue);
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+}
+
+.client-head-money {
+	display: flex;
+	align-items: center;
+	gap: 22px;
+	flex-wrap: wrap;
+}
+
+.client-head-figure {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.client-head-label {
+	color: var(--text-tertiary);
+	font-size: calc(11px * var(--font-scale-body, 1));
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.client-head-value {
+	font-size: calc(17px * var(--font-scale-body, 1));
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.client-head-figure.is-due .client-head-value {
+	color: var(--xan-amber);
+}
+
+@media (max-width: 640px) {
+	.client-head {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.client-head-money {
+		gap: 16px;
+	}
+}

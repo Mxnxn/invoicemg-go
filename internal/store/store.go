@@ -23,6 +23,22 @@ import (
 // decision belongs to the handler, not here.
 var ErrNotFound = errors.New("store: not found")
 
+// ErrBadID is an identifier that is not shaped like one at all - "nonsense" where an ObjectID
+// belongs.
+//
+// It is deliberately NOT ErrNotFound. Mongoose throws a CastError when it cannot cast a string
+// to an ObjectID, which lands in each route's catch block, so the Node API answers 500 for a
+// malformed id where a reasonable API would answer 404. That is a bug, and reproducing it is
+// still right: while both services are live the same client must get the same answer from
+// either, and a Go service that "fixed" it would make the pair inconsistent. Fix it in both at
+// once, later, or not at all.
+var ErrBadID = errors.New("store: malformed id")
+
+// ErrDuplicate is a uniqueness constraint refusing a write - Mongo's E11000, and whatever
+// Postgres raises later. Named here rather than leaked as a driver error precisely so the
+// handler that turns it into "That unit already exists." survives the swap.
+var ErrDuplicate = errors.New("store: already exists")
+
 // ---------------------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------------------
@@ -108,10 +124,44 @@ type Days interface {
 	OpenJobs(ctx context.Context, companyID ID, limit int) ([]OpenJob, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Units
+// ---------------------------------------------------------------------------------------
+
+// Unit is a measurement unit offered on purchase-invoice rows.
+type Unit struct {
+	ID        ID
+	UID       ID
+	CompanyID ID
+	Name      string
+	// Key is Name with case, spacing and punctuation removed, so "SQ. Ft", "sq ft" and
+	// "SQ.FT" collapse to one value. It exists as its own field because the uniqueness has
+	// to be enforced by an INDEX, and an index cannot normalise on the way in.
+	Key       string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	// Version is Mongoose's __v. It travels because Mongoose includes it in what the client
+	// receives today; omitting it would be tidier and would also be a difference.
+	Version int
+}
+
+type Units interface {
+	List(ctx context.Context, companyID ID) ([]Unit, error)
+	Create(ctx context.Context, uid, companyID ID, name string) (Unit, error)
+	Rename(ctx context.Context, unitID, companyID ID, name string) (Unit, error)
+	Delete(ctx context.Context, unitID, companyID ID) error
+
+	// SeedDefaults inserts the default units this company does not already have, matched by
+	// NORMALISED name so a company that typed "sq ft" is not given a near-duplicate.
+	// Idempotent.
+	SeedDefaults(ctx context.Context, uid, companyID ID) error
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
 	Days() Days
+	Units() Units
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

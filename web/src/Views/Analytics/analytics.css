@@ -1,0 +1,42 @@
+/* Analytics page layout. Tokens only, both themes - see docs/STYLE.md. */
+
+.analytics-page {
+	padding-top: 16px;
+}
+
+.analytics-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+	gap: 16px;
+	margin-top: 16px;
+}
+
+.analytics-kpis {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 12px;
+	margin-top: 16px;
+}
+
+.analytics-note {
+	margin: 12px 0 0;
+	font-size: 12.5px;
+	color: var(--text-tertiary);
+}
+
+/* The Revenue period selector and its drill-down escape hatch. Sits above the KPI row, since
+   it governs every figure below it - a control placed under the numbers it changes reads as
+   belonging to the chart alone. */
+.revenue-periods {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.revenue-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}

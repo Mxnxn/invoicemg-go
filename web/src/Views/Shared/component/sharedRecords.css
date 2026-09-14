@@ -1,0 +1,277 @@
+/* Configure > Across Company - SharedRecordsIndex.jsx and DuplicateProducts.jsx.
+   Semantic role tokens and whole status pairs only. No raw --color-ink-* / --color-neutral-*:
+   those are the palette scale, not roles, and the dark block does not override them. */
+
+/* ---- the sharing switch -------------------------------------------------------------- */
+/* Card-shaped rather than a bare checkbox: it changes what another business can see, and a
+   control with that consequence should state it rather than sit as an unlabelled tick. */
+.shared-switch {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color var(--motion-fast), background-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.shared-switch:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--bg-field-on-canvas);
+}
+
+.shared-switch:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.shared-switch:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.shared-switch.is-on {
+    border-color: var(--xan-violet);
+    box-shadow: inset 3px 0 0 var(--xan-violet);
+}
+
+.shared-switch-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-control);
+    background: var(--xan-violet-bg);
+    color: var(--xan-violet);
+}
+
+.shared-switch-body {
+    display: block;
+    min-width: 0;
+}
+
+.shared-switch-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.shared-switch-state {
+    padding: 1px 9px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-field);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.shared-switch.is-on .shared-switch-state {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+
+.shared-switch-desc {
+    display: block;
+    margin-top: 4px;
+    max-width: 78ch;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+}
+
+/* ---- section headers and lists -------------------------------------------------------- */
+.shared-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.shared-section-title {
+    margin-bottom: 4px;
+}
+
+.shared-section-sub {
+    margin: 0;
+    max-width: 68ch;
+    color: var(--text-tertiary);
+}
+
+.shared-note {
+    padding: 16px;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    color: var(--text-tertiary);
+}
+
+/* The duplicate count. Amber pair used whole, so contrast holds in both themes. */
+.shared-dupes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-control);
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+}
+
+.shared-company {
+    color: var(--text-secondary);
+}
+
+.shared-missing {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.shared-count {
+    color: var(--text-tertiary);
+}
+
+.shared-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ---- duplicates table ----------------------------------------------------------------- */
+/* A rule above the first row of each group, so several copies of one product read as one
+   block instead of as unrelated rows that happen to share a name. */
+.shared-group-start > td {
+    border-top: 2px solid var(--border-strong);
+}
+
+.shared-group-name {
+    vertical-align: top;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.shared-group-count {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+/* The price spread, when copies disagree. Amber rather than red: two companies charging two
+   rates is often deliberate, so this is a finding to look at, not an error. */
+.shared-mismatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+    font-weight: 500;
+}
+
+.shared-rate-flagged {
+    color: var(--status-amber-text);
+    font-weight: 600;
+}
+
+/* ---- confirmation dialog -------------------------------------------------------------- */
+.shared-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.shared-confirm {
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 22px 24px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    background: var(--bg-raised);
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+}
+
+.shared-confirm-title {
+    margin: 0 0 10px;
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 17px;
+}
+
+.shared-confirm-body {
+    margin: 0 0 10px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.shared-confirm-list {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.shared-confirm-list li {
+    margin-bottom: 4px;
+}
+
+.shared-confirm-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+}
+
+.shared-confirm-input {
+    height: 38px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.shared-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Destructive confirm. The red status pair is used whole so the label stays legible on it in
+   both themes, rather than borrowing --text-on-primary which is defined for a different bg. */
+.shared-btn-danger {
+    background: var(--status-red-text);
+    border-color: var(--status-red-text);
+    color: #ffffff;
+}
+
+.shared-btn-danger:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.shared-btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shared-switch {
+        transition: none;
+    }
+}

@@ -1,0 +1,1253 @@
+/*
+ * Design tokens for the new app shell/dashboard — see /style.md for the source spec.
+ * Scoped under [data-shell] so the legacy Argon/reactstrap views (still on their own
+ * SCSS) are unaffected while both stacks coexist during the incremental migration.
+ */
+
+:root {
+    --color-neutral-0: #ffffff;
+    --color-neutral-50: #f5f7f9;
+    --color-neutral-100: #eff1f3;
+    --color-neutral-200: #e2e4e6;
+    --color-neutral-350: #d2d5d9;
+    --color-neutral-400: #9ba0a6;
+    --color-neutral-600: #4e525a;
+    --color-neutral-700: #3b3f4b;
+    --color-neutral-850: #1b1e28;
+    --color-neutral-900: #0d0f14;
+    --color-neutral-1000: #1a1d25;
+
+    --color-ink-900: #17191f;
+    --color-ink-800: #262a32;
+
+    --status-red-bg: #fde8e5;
+    --status-red-text: #b42318;
+    /* Hover/press tint for a red control that sits directly on a surface rather than inside
+       a chip. NOT --status-red-bg: that one is the chip half and the dark block never
+       overrides it, so it would stay a pale pink patch on the near-black canvas. This is
+       defined in both blocks, which is the reason it exists. */
+    --status-red-bg-subtle: rgba(180, 35, 24, 0.08);
+    --status-amber-bg: #fbf0da;
+    --status-amber-text: #a66a08;
+    --status-lime-bg: #ecf5da;
+    --status-lime-text: #457f19;
+    --status-green-bg: #e2f4e6;
+    --status-green-text: #147a3a;
+    --status-online-dot: #07b93b;
+
+    --bg-canvas: var(--color-neutral-0);
+    --bg-sidebar: var(--color-neutral-50);
+    --bg-field: var(--color-neutral-100);
+    --bg-field-on-canvas: var(--color-neutral-50);
+    /* The loading placeholder, and the sheen that sweeps across it.
+       Its own pair of tokens because the surfaces it used to borrow are not a gradient: in
+       light mode --bg-field-on-canvas and --bg-sidebar are BOTH --color-neutral-50, so the
+       shimmer was a flat block with no sweep in it at all - the animation ran and nothing
+       moved. The sheen is lighter than the base in both themes, because a shimmer reads as
+       light passing over a surface; a darker band reads as a hole in it. */
+    --shimmer-base: var(--color-neutral-200);
+    --shimmer-sheen: #fbfcfd;
+    --bg-raised: var(--color-neutral-0);
+    --bg-primary: var(--color-ink-900);
+    --bg-primary-hover: var(--color-ink-800);
+
+    --text-primary: var(--color-neutral-900);
+    --text-secondary: var(--color-neutral-600);
+    --text-tertiary: var(--color-neutral-400);
+    --text-on-primary: var(--color-neutral-0);
+    /* A negative figure printed on the page background - a loss, negative stock, an overdue
+       balance. NOT --status-red-text: that one is half of a chip pair and is only ever legible
+       on --status-red-bg. Read directly on a dark surface it is 2.6:1, which fails. This is
+       defined per theme, which is the whole reason it exists. */
+    --text-danger: #b42318;
+    /* A clickable identifier inside a table cell - a job-id, an invoice number. Defined
+       per theme like --text-danger above, because one hue cannot serve both grounds:
+       this violet is 6.07:1 on white but only 2.98:1 on the dark --bg-raised. */
+    --text-link: #6c3ce9;
+
+    --border-default: var(--color-neutral-200);
+    --border-strong: var(--color-neutral-350);
+
+    --icon-default: var(--color-neutral-600);
+    --icon-muted: var(--color-neutral-400);
+    --icon-strong: var(--color-neutral-900);
+
+    --radius-checkbox: 5px;
+    --radius-chip: 6px;
+    --radius-pill: 7px;
+    --radius-control: 10px;
+    --radius-surface: 14px;
+
+    --shadow-raised: 0 2px 5px rgba(13, 15, 20, 0.08), 0 1px 1px rgba(13, 15, 20, 0.05);
+    --shadow-floating: 0 12px 32px -4px rgba(13, 15, 20, 0.22), 0 2px 6px rgba(13, 15, 20, 0.1);
+
+    /* ---- Motion ----------------------------------------------------------------------
+       One settle curve and one overshoot curve, because the app had three easings hardcoded
+       28 times between them - the house curve from docs/STYLE.md, a near-identical expo-out,
+       and a back-out - so nothing shared a feel with anything else.
+
+       The liquid language is the loader's (see global/Loader/loader.css): things settle
+       rather than stop, and a press squashes while keeping its volume the way a body of
+       liquid does. --ease-overshoot is what carries that - it passes its target and comes
+       back, which is what makes a movement read as having weight.
+
+       Motion is not theme-dependent, so all of this lives at :root only. */
+    --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --dur-fast: 120ms;
+    --dur-base: 160ms;
+    --dur-slow: 260ms;
+
+    /* Duration and easing together, because that is how the ~110 existing transitions
+       consume them: `transition: background var(--motion-fast)`. Their easing was "ease-out"
+       until this pass; moving it to the settle curve is the single line that brings those
+       transitions into the system. */
+    --motion-fast: var(--dur-fast) var(--ease-settle);
+    --motion-base: var(--dur-base) var(--ease-settle);
+    --motion-slow: var(--dur-slow) var(--ease-settle);
+
+    --font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Categorical series for charts. Validated with the dataviz skill's
+       validate_palette.js against this app's own surfaces - do not substitute a hue
+       without re-running it. Light warns on slots 3, 4 and 5 (below 3:1 on white),
+       which is why every chart also carries a legend and a table view. */
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-7: #4a3aa7;
+    --series-8: #e34948;
+    /* Card-age ramp for the Production tab. Sequential, one hue, light to dark - the rule
+       for an ordered magnitude is lightness monotonicity, not the CVD separation a
+       categorical palette needs. A lighter first ramp was rejected: its lightest step sat
+       at 1.12:1 against the card surface, which inside a stacked bar reads as empty space
+       rather than as fresh work. Every segment also carries a hairline so the pale steps
+       keep their edges, and the ChartCard table view is the required relief for the steps
+       still under 3:1. */
+    /* Data-bar ends. --radius-control is 10px, which on a 22px bar is almost a
+       semicircle - a one-card bar renders as a blob rather than a bar. 4px is the
+       dataviz mark spec for a rounded data-end. */
+    --radius-databar: 4px;
+    --age-1: #f7d0b4;
+    --age-2: #f0a06a;
+    --age-3: #e06a26;
+    --age-4: #a8380f;
+}
+
+/*
+ * Dark mode — see /style3.md for the source palette. Applied on <html data-theme="dark">
+ * (set in src/index.js before first paint, and mirrored there any time AdminLayout's
+ * toggle changes it) so the theme is a genuinely global, app-wide setting - it reaches
+ * pre-auth pages and anything portaled to document.body, not just the admin shell.
+ */
+html[data-theme="dark"] {
+    --bg-canvas: #0d0d0d;
+    --bg-sidebar: #161616;
+    --bg-field: #1c1c1c;
+    --bg-field-on-canvas: #1c1c1c;
+    /* Lighter than the base, like the light theme - the dark shimmer used to sweep #161616
+       across #1c1c1c, which was both backwards and six points of luminance, so it read as
+       nothing happening. */
+    --shimmer-base: #24262b;
+    --shimmer-sheen: #34373e;
+    --bg-raised: #161616;
+    --bg-primary: #3b82f6;
+    --bg-primary-hover: #2563eb;
+
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+    --text-on-primary: #ffffff;
+    /* Light red on near-black: ~7:1, where the light theme's #b42318 would be ~2.6:1. */
+    --text-danger: #f87171;
+    --status-red-bg-subtle: rgba(248, 113, 113, 0.14);
+    /* 4.9:1 on --bg-raised, where the light violet would be 2.98:1. */
+    --text-link: #3b82f6;
+
+    --border-default: #222222;
+    --border-strong: #333333;
+
+    --icon-default: #94a3b8;
+    --icon-muted: #64748b;
+    --icon-strong: #f1f5f9;
+
+    --color-neutral-1000: #1c1c1c;
+    --color-neutral-200: #2a2a2a;
+
+    --shadow-raised: 0 2px 5px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+    --shadow-floating: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+
+    --xan-bg-base: #0d0d0d;
+    --xan-bg-panel: #161616;
+    --xan-bg-input: #1c1c1c;
+    --xan-border: #222222;
+    --xan-text: #f1f5f9;
+    --xan-text-dim: #94a3b8;
+    --xan-glass-overlay: rgba(255, 255, 255, 0.04);
+    --xan-glass-border: rgba(255, 255, 255, 0.05);
+
+    /* Amber/emerald were bumped to more saturated tones for light-mode visibility (see
+       :root below) - dark mode keeps the original softer values, which already read fine
+       against a dark background. */
+    --xan-emerald: #34d399;
+    --xan-emerald-bg: rgba(52, 211, 153, 0.1);
+    --xan-amber: #fbbf24;
+    --xan-amber-bg: rgba(251, 191, 36, 0.1);
+
+    --toast-bg: #161616;
+    --toast-text: #f1f5f9;
+    --toast-border: #222222;
+    --toast-success-accent: #34d399;
+    --toast-error-accent: #fb7185;
+    --toast-warning-accent: #fbbf24;
+    --toast-info-accent: #3b82f6;
+
+    --scrollbar-track: #161616;
+    --scrollbar-thumb: #333333;
+    --scrollbar-thumb-hover: #444444;
+
+    /* The same eight hues re-stepped for the dark surface - a selected palette,
+       not an automatic flip. All six checks pass here, contrast included. */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    /* Selected against #161616, not flipped: on a dark surface the oldest work has to be
+       the BRIGHTEST step to stay the most prominent, so the ramp runs dim to bright while
+       the light one runs light to dark. Both are monotonic in lightness. */
+    --radius-databar: 4px;
+    --age-1: #5a2a12;
+    --age-2: #8a4018;
+    --age-3: #c25a20;
+    --age-4: #f0a06a;
+}
+
+html[data-theme="dark"] body {
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] a {
+    color: var(--xan-blue);
+}
+
+html[data-theme="dark"] a:hover {
+    color: var(--xan-blue);
+}
+
+/*
+ * Pragmatic dark pass for the legacy Argon/Bootstrap primitives that haven't been
+ * migrated to the new shell yet (Card, Modal, form controls, Bootstrap's own
+ * .dropdown-menu, badges). Not a full reskin of every legacy screen, but keeps them
+ * readable instead of staying hardcoded light/white against a dark page.
+ */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .dropdown-menu {
+    background-color: var(--bg-raised);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+}
+
+html[data-theme="dark"] .text-default,
+html[data-theme="dark"] .card h1,
+html[data-theme="dark"] .card h2,
+html[data-theme="dark"] .card h3,
+html[data-theme="dark"] .card h4,
+html[data-theme="dark"] .modal-content h1,
+html[data-theme="dark"] .modal-content h2,
+html[data-theme="dark"] .modal-content h3 {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .card-header,
+html[data-theme="dark"] .card-footer,
+html[data-theme="dark"] .modal-header,
+html[data-theme="dark"] .modal-footer {
+    background-color: transparent;
+    border-color: var(--border-default);
+}
+
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-control-alternative,
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+    background-color: var(--bg-field);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .dropdown-item {
+    color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .dropdown-item:hover,
+html[data-theme="dark"] .dropdown-item:focus {
+    background-color: var(--bg-field);
+    color: var(--text-primary);
+}
+
+html[data-theme="dark"] .table {
+    color: var(--text-primary);
+}
+
+/*
+ * The legacy Argon footer paints its own $footer-bg (white). That matched the light
+ * canvas by accident and read as a lighter band against the dark one - every caller was
+ * already passing style={{ background: "transparent" }} trying to defeat it, which a
+ * stylesheet !important quietly beat. Let the footer inherit the page in both themes
+ * instead, so it sits flush on /sheet/:id, /invoice/:id and every admin screen.
+ */
+.footer {
+    background: transparent !important;
+    border-top: 1px solid var(--border-default);
+}
+
+html[data-theme="dark"] .footer {
+    color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .footer .copyright,
+html[data-theme="dark"] .footer .nav-footer,
+html[data-theme="dark"] .footer i {
+    color: var(--text-secondary) !important;
+}
+
+html[data-theme="dark"] .footer a.text-primary {
+    color: var(--xan-blue) !important;
+}
+
+/*
+ * Argon's compiled Bootstrap primary color is a purple (#6C3CE9) baked into .card,
+ * .btn-primary, .dropdown-item.active, .nav-pills, .badge-primary, the custom-toggle
+ * switch, etc. at build time - can't swap the Sass variable per-theme at runtime, so
+ * repaint the highest-visibility instances to the app's blue accent for dark mode.
+ */
+html[data-theme="dark"] .bg-primary,
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .badge-primary,
+html[data-theme="dark"] .dropdown-item.active,
+html[data-theme="dark"] .dropdown-item:active,
+html[data-theme="dark"] .custom-toggle input:checked + .custom-toggle-slider,
+html[data-theme="dark"] .nav-pills .nav-link.active {
+    background-color: var(--xan-blue) !important;
+    border-color: var(--xan-blue) !important;
+}
+
+html[data-theme="dark"] .text-primary {
+    color: var(--xan-blue) !important;
+}
+
+html[data-theme="dark"] .btn-outline-primary {
+    color: var(--xan-blue) !important;
+    border-color: var(--xan-blue) !important;
+}
+
+html[data-theme="dark"] .btn-outline-primary:hover {
+    background-color: var(--xan-blue) !important;
+    color: #ffffff !important;
+}
+
+/*
+ * Scrollbar theming (WebKit + Firefox), applied globally so it follows the same
+ * light/dark tokens as everything else.
+ */
+:root {
+    --scrollbar-track: transparent;
+    --scrollbar-thumb: var(--color-neutral-350, #d2d5d9);
+    --scrollbar-thumb-hover: var(--color-neutral-400, #9ba0a6);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* No spinner arrows on any number field, anywhere.
+ *
+ * They cost roughly 14px of every numeric column, they only ever step by 1 - which is wrong
+ * for a size that is as likely to be 2.5, a rate, or a GST percentage - and a mis-aimed click
+ * silently changes a money figure. Nothing is lost: the field is still type="number", so the
+ * keyboard arrows, the numeric mobile keypad and validation all behave exactly as before.
+ *
+ * Firefox needs the appearance reset; WebKit and Blink need the pseudo-elements hidden. Both
+ * are stated because neither alone covers every browser this runs in. */
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+}
+
+.app-toast {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace !important;
+    background-color: var(--toast-bg) !important;
+    color: var(--toast-text) !important;
+    border: 1px solid var(--toast-border);
+    border-left: 4px solid var(--toast-accent, var(--toast-info-accent));
+    border-radius: 10px;
+    box-shadow: 0 12px 32px -4px rgba(13, 15, 20, 0.22), 0 2px 6px rgba(13, 15, 20, 0.1);
+}
+
+/* Dismiss control on every toast (see App.js `action`). Sized as a real hit target - the
+   previous toasts had no close affordance at all. */
+.app-toast-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-left: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    opacity: 0.75;
+    cursor: pointer;
+}
+
+.app-toast-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.app-toast-success {
+    --toast-accent: var(--toast-success-accent);
+}
+.app-toast-error {
+    --toast-accent: var(--toast-error-accent);
+}
+.app-toast-warning {
+    --toast-accent: var(--toast-warning-accent);
+}
+.app-toast-info,
+.app-toast-default {
+    --toast-accent: var(--toast-info-accent);
+}
+
+/* --toast-* light defaults live alongside the other :root light tokens above; these are
+   the only ones that need an explicit fallback since .app-toast reads them unconditionally. */
+:root {
+    --toast-bg: #ffffff;
+    --toast-text: #17191f;
+    --toast-border: #e2e4e6;
+    --toast-success-accent: #147a3a;
+    --toast-error-accent: #b42318;
+    --toast-warning-accent: #a66a08;
+    --toast-info-accent: #3b82f6;
+}
+
+/*
+ * Global modal reskin - every reactstrap <Modal> across the app compiles down to the
+ * same Bootstrap .modal-* classes, so restyling those here (instead of touching each
+ * of the ~25 modal call sites individually) brings all of them onto the shell's shape
+ * language in one place. Theme-aware since it reads the same tokens as everything else.
+ */
+.modal-content {
+    background-color: var(--bg-raised);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-floating);
+    font-family: var(--font-family);
+    animation: modal-land var(--dur-slow) var(--ease-overshoot) both;
+}
+
+/* Bootstrap slides .modal-dialog down from -50px on its own 300ms ease-out. Left alone that
+   runs at the same time as the landing below, and two movements of different lengths on the
+   same element read as a stutter rather than as one thing arriving. This file is imported
+   after the Argon stylesheet, so an equal-specificity rule here wins on source order. */
+.modal.fade .modal-dialog {
+    transform: none;
+    transition: none;
+}
+
+/* Rises, passes its resting place, settles - and stretches vertically as it comes, the way
+   the loader's blob trades one axis against the other. The same shape as the toast, because
+   they are the same event: something arriving on top of what you were already looking at. */
+@keyframes modal-land {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97, 1.04);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(-3px) scale(1.01, 0.99);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal-content {
+        animation: none;
+    }
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-default);
+    padding: 18px 24px;
+}
+
+.modal-header .modal-title {
+    color: var(--text-primary);
+    font-weight: 800;
+        text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Matches .shell-icon-btn (same size, rounded-square radius, hover treatment) so the
+   modal close control looks like the rest of the app's icon buttons, not a one-off. */
+.modal-header .close {
+    color: var(--icon-default);
+    text-shadow: none;
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.modal-header .close:hover {
+    color: var(--icon-strong);
+}
+
+/* Argon's .close renders the visible "x" as a circular <span>, styled with its own
+   hardcoded rgba(0,0,0,.6) color (see custom/close/_close.scss) - overrides the button's
+   own color above regardless of theme, so it has to be repainted here specifically.
+   The "x" itself is also just a text glyph (&times;) - hidden via font-size:0 and
+   redrawn as a proper stroked X icon (matching react-feather's X) through a mask, so
+   it's crisp at the larger 36x36 size instead of a stretched-out character. */
+.modal-header .close > span:not(.sr-only) {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-control);
+    color: var(--icon-default) !important;
+    background-color: transparent !important;
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.modal-header .close > span:not(.sr-only)::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    display: block;
+    background-color: currentColor;
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>');
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+}
+
+.modal-header .close:hover > span:not(.sr-only),
+.modal-header .close:focus > span:not(.sr-only) {
+    color: var(--icon-strong) !important;
+    background-color: var(--bg-field-on-canvas) !important;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-default);
+    padding: 16px 24px;
+}
+
+.modal-content .form-control,
+.modal-content .form-control-alternative {
+    border-radius: var(--radius-control);
+    border: 1px solid var(--border-default);
+    background-color: var(--bg-field);
+    color: var(--text-primary);
+}
+
+.modal-content .form-control:focus,
+.modal-content .form-control-alternative:focus {
+    border-color: var(--xan-blue);
+    box-shadow: 0 0 0 3px var(--xan-blue-bg);
+}
+
+.modal-content label {
+    color: var(--text-secondary);
+}
+
+.modal-content .btn {
+    border-radius: var(--radius-control);
+}
+
+.modal-content .btn-primary {
+    background-color: var(--bg-primary);
+    border-color: var(--bg-primary);
+    color: var(--text-on-primary);
+}
+
+.modal-content .btn-primary:hover {
+    background-color: var(--bg-primary-hover);
+    border-color: var(--bg-primary-hover);
+}
+
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-family);
+}
+
+::placeholder {
+    font-family: var(--font-family);
+    opacity: 1;
+}
+
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6 {
+    color: var(--text-primary);
+}
+
+[data-shell] {
+    font-family: var(--font-family);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+}
+
+[data-shell] *,
+[data-shell] *::before,
+[data-shell] *::after {
+    box-sizing: border-box;
+}
+
+[data-shell] :focus-visible {
+    outline: 2px solid var(--color-ink-900);
+    outline-offset: 2px;
+}
+
+/* Text sizes multiply by a per-role scale, set from Account settings > Appearance
+ * (Common/appearance.js): headings, body text and tables are sized independently, because
+ * wanting bigger numbers on a stat card is not the same as wanting a denser table. Each
+ * defaults to 1, so nothing moves until someone chooses otherwise. */
+.text-kpi-value {
+    font-weight: 600;
+    font-size: calc(31.5px * var(--font-scale-heading, 1));
+    line-height: calc(38px * var(--font-scale-heading, 1));
+    letter-spacing: -0.4px;
+}
+.text-heading-page {
+    font-weight: 600;
+    font-size: calc(23.5px * var(--font-scale-heading, 1));
+    line-height: calc(30px * var(--font-scale-heading, 1));
+    letter-spacing: -0.3px;
+}
+.text-heading-brand {
+    font-weight: 600;
+    font-size: calc(16px * var(--font-scale-heading, 1));
+    line-height: calc(22px * var(--font-scale-heading, 1));
+    letter-spacing: -0.25px;
+}
+.text-body-large {
+    font-weight: 400;
+    font-size: calc(16px * var(--font-scale-body, 1));
+    line-height: calc(22px * var(--font-scale-body, 1));
+}
+.text-body-medium {
+    font-weight: 500;
+    font-size: calc(14px * var(--font-scale-body, 1));
+    line-height: calc(20px * var(--font-scale-body, 1));
+    letter-spacing: -0.25px;
+}
+.text-body-regular {
+    font-weight: 400;
+    font-size: calc(14px * var(--font-scale-body, 1));
+    line-height: calc(20px * var(--font-scale-body, 1));
+    letter-spacing: -0.1px;
+}
+.text-body-small {
+    font-weight: 400;
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    line-height: calc(18px * var(--font-scale-body, 1));
+}
+.text-label-tab {
+    font-weight: 500;
+    font-size: calc(14px * var(--font-scale-body, 1));
+    line-height: calc(20px * var(--font-scale-body, 1));
+    letter-spacing: -0.15px;
+}
+.text-label-score {
+    font-weight: 500;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    line-height: calc(18px * var(--font-scale-body, 1));
+}
+.text-label-caps {
+    font-weight: 500;
+    font-size: calc(12px * var(--font-scale-body, 1));
+    line-height: calc(16px * var(--font-scale-body, 1));
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/*
+ * Xan CRM table system tokens — see /style3.md for the source spec (light-mode variant).
+ * Additive: powers the shared DataTable/StatusBadge/BulkActionsBar/SpotlightCard components
+ * in src/Common/DataTable/. Declared on :root (not scoped to [data-shell]) so both the new
+ * shell and legacy reactstrap views can use them without a wrapper migration.
+ */
+:root {
+    --xan-bg-base: #ffffff;
+    --xan-bg-panel: #f8f9fa;
+    --xan-bg-input: #ffffff;
+    --xan-border: #e2e8f0;
+    --xan-text: #0f172a;
+    --xan-text-dim: #64748b;
+    --xan-glass-overlay: rgba(15, 23, 42, 0.04);
+    --xan-glass-border: rgba(15, 23, 42, 0.08);
+
+    --xan-blue: #3b82f6;
+    --xan-blue-bg: rgba(59, 130, 246, 0.1);
+    --xan-emerald: #168c61;
+    --xan-emerald-bg: rgba(22, 140, 97, 0.1);
+    --xan-amber: #ff6e00;
+    --xan-amber-bg: rgba(255, 110, 0, 0.1);
+    --xan-rose: #fb7185;
+    --xan-rose-bg: rgba(251, 113, 133, 0.1);
+    --xan-violet: #a78bfa;
+    --xan-violet-bg: rgba(167, 139, 250, 0.1);
+
+    --xan-radius-input: 8px;
+    --xan-radius-button: 12px;
+    --xan-radius-panel: 8px;
+    --xan-row-height: 44px;
+    --xan-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    --font-outfit: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Genuinely fixed-width, and never repainted by Appearance.
+       --font-mono above is NOT that any more: applyAppearance deliberately overwrites it with
+       whichever face the user picked, so table figures follow their choice (they stay aligned
+       on font-variant-numeric, not on the face). That is right for a column of numbers and
+       wrong for the few places that need real monospace for a reason - a URL somebody checks
+       character by character, where a proportional face makes l/1/I and 0/O the same shape.
+       Those read this instead. */
+    --font-code: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* Status badge fills — bind color to meaning, not to raw hex, when composing new components */
+.status-paid {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+.status-pending {
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+}
+.status-overdue {
+    background: var(--status-red-bg);
+    color: var(--status-red-text);
+}
+.status-neutral {
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+}
+
+/* Circular "reveal" animation for the theme toggle (see Common/themeTransition.js).
+ * Disable the browser's default cross-fade so only our clip-path circle, driven from
+ * the toggle button's click position, is visible. Unscoped since view-transition
+ * pseudo-elements always render on the document root, not inside [data-shell]. */
+::view-transition-group(root) {
+    animation-duration: 0s;
+}
+::view-transition-old(root) {
+    animation: none;
+    z-index: 1;
+}
+::view-transition-new(root) {
+    animation: none;
+    z-index: 2;
+}
+
+/* ---------- Auth page (merged Login/Register) ---------- */
+
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-canvas);
+    padding: 24px;
+}
+
+.auth-brand {
+    position: fixed;
+    top: 24px;
+    left: 28px;
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow-floating);
+    padding: 28px 28px 24px;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 22px;
+    background: var(--bg-field);
+    border-radius: var(--radius-control);
+}
+
+.auth-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    border-radius: calc(var(--radius-control) - 4px);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background var(--motion-fast, 0.15s), color var(--motion-fast, 0.15s);
+}
+
+.auth-tab.active {
+    background: var(--bg-raised);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-floating);
+}
+
+.auth-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-control);
+    background: var(--status-red-bg, rgba(251, 113, 133, 0.12));
+    color: var(--status-red-text, #fb7185);
+    font-size: 12.5px;
+}
+
+.auth-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    margin-bottom: 14px;
+    height: 42px;
+    background: var(--bg-field-on-canvas);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+}
+
+.auth-field-icon {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+}
+
+.auth-input {
+    flex: 1;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: none;
+}
+
+.auth-input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.auth-submit {
+    width: 100%;
+    margin-top: 6px;
+    height: 42px;
+    font-size: 13.5px;
+}
+
+.auth-switch {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+}
+
+.auth-switch-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: var(--xan-blue);
+    font-weight: 600;
+    font-size: inherit;
+    cursor: pointer;
+}
+
+.auth-switch-link:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Native date/month inputs in dark mode ----------
+   These were never styled, so the browser kept its light-mode rendering: black text on the
+   dark field, and a near-invisible calendar glyph. Affects every date picker in the app
+   (Batch Receive, the month-range filters, job and invoice forms), not just the one modal. */
+html[data-theme="dark"] input[type="date"],
+html[data-theme="dark"] input[type="month"],
+html[data-theme="dark"] input[type="datetime-local"] {
+    color: var(--text-primary);
+    background-color: var(--bg-field);
+    border-color: var(--border-default);
+    color-scheme: dark;
+}
+
+/* The picker glyph is a browser-drawn bitmap; inverting is the only way to lighten it. */
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+html[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
+html[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.75;
+    cursor: pointer;
+}
+
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator:hover,
+html[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+/* ---------- Per-feature permission matrix (Configure > People) ----------
+   A row per feature, a column per action. Replaces the flat checkbox list, which could only
+   express "all or nothing" per feature. */
+
+.perm-matrix {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+}
+
+.perm-matrix-head,
+.perm-matrix-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) repeat(3, 62px);
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+}
+
+.perm-matrix-head {
+    background: var(--xan-glass-overlay);
+    border-bottom: 1px solid var(--border-default);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.perm-matrix-head span:not(:first-child),
+.perm-matrix-cell {
+    text-align: center;
+    justify-self: center;
+}
+
+.perm-matrix-row + .perm-matrix-row {
+    border-top: 1px solid var(--border-default);
+}
+
+.perm-matrix-row:hover {
+    background: var(--xan-glass-overlay);
+}
+
+/* The feature name doubles as a select-all/none for its row. */
+.perm-matrix-label {
+    border: none;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.perm-matrix-label:hover {
+    color: var(--xan-blue);
+    text-decoration: underline;
+}
+
+.perm-matrix-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    cursor: pointer;
+}
+
+.perm-matrix-cell input {
+    cursor: pointer;
+}
+
+/* --- Two-step registration (Views/Auth/components/AuthForm.jsx) --- */
+
+.auth-panel {
+	animation: auth-slide-in var(--motion-fast) ease both;
+}
+
+@keyframes auth-slide-in {
+	from {
+		opacity: 0;
+		transform: translateX(12px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+.auth-stepper {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 18px;
+}
+
+.auth-step-dot {
+	flex: 1;
+	height: 4px;
+	border-radius: var(--radius-pill);
+	background: var(--border-default);
+	transition: background var(--motion-fast) ease;
+}
+
+.auth-step-dot[data-active="true"] {
+	background: var(--bg-primary);
+}
+
+.auth-step-hint {
+	color: var(--icon-muted);
+	font-size: 13px;
+	margin: 0 0 14px;
+}
+
+.auth-drop {
+	display: block;
+	border: 1px dashed var(--border-strong);
+	border-radius: var(--radius-control);
+	background: var(--bg-field);
+	padding: 14px;
+	margin-bottom: 12px;
+	text-align: center;
+	cursor: pointer;
+	transition: border-color var(--motion-fast) ease;
+}
+
+.auth-drop:hover {
+	border-color: var(--bg-primary);
+}
+
+.auth-drop input[type="file"] {
+	display: none;
+}
+
+.auth-drop-title {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--color-ink-900);
+}
+
+.auth-drop-hint {
+	display: block;
+	font-size: 12px;
+	color: var(--icon-muted);
+	margin-top: 2px;
+}
+
+.auth-optional {
+	font-weight: 400;
+	color: var(--icon-muted);
+}
+
+.auth-drop-preview {
+	display: block;
+	max-width: 100%;
+	max-height: 88px;
+	margin: 0 auto 8px;
+	border-radius: var(--radius-control);
+}
+
+/* The slide is decorative - drop it entirely when less motion is requested. */
+@media (prefers-reduced-motion: reduce) {
+	.auth-panel {
+		animation: none;
+	}
+	.auth-step-dot,
+	.auth-drop {
+		transition: none;
+	}
+}
+
+/* Section divider inside the registration wizard - groups the optional bank block so it
+   reads as "skippable" rather than as three more required fields. */
+.auth-section-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 18px 0 10px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--color-ink-900);
+}
+
+.auth-section-label::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--border-default);
+}
+
+.auth-step-actions {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+
+.auth-step-actions .shell-btn-secondary {
+	flex: 0 0 auto;
+}
+
+.auth-step-actions .auth-submit {
+	flex: 1;
+	margin-top: 0;
+}
+
+/* The People form's fields are short - name, type, email, password, phone - and one per line
+   pushed the permission matrix below the fold before it could be read. Two per row, collapsing
+   to one on a phone where two would be unreadable. */
+.people-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 16px;
+}
+
+@media (max-width: 767px) {
+    .people-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* PasswordInput's wrapper is height:100% so it can fill hosts that own the frame (the auth
+   field). In a plain FormGroup it grew taller than the Input beside it, leaving the Email and
+   Password row uneven. 38px is what .form-control actually renders to here - bootstrap's own
+   calc() gives 35px, because the app overrides its padding, so the sibling input is the
+   source of truth rather than the framework formula. */
+.people-form-grid .password-input,
+.people-form-grid .password-input > input {
+    height: 38px;
+}
+
+/* Keep me signed in. Sits between the password (or the 2FA code) and the submit button, so
+   the choice is made while looking at the thing it applies to. */
+.auth-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -2px 0 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.auth-remember input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--xan-blue);
+}
+
+.auth-remember:hover {
+    color: var(--text-primary);
+}
+
+/* Raises a reset request rather than sending a mail - there is no mail sender here, so a
+   reset is a person handing over a password. Understated: it is the exit from a form most
+   people complete without it. */
+.auth-forgot {
+    align-self: flex-start;
+    margin: -4px 0 10px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 12.5px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.auth-forgot:hover {
+    color: var(--xan-blue);
+}

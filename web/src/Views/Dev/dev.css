@@ -1,0 +1,692 @@
+/* Developer-team panel. Built on the shell tokens like the rest of the new UI, with a
+   deliberately more sober palette - this screen destroys and restores customer data, so it
+   should not look like a place to click around casually. */
+
+.dev-page {
+	padding-top: 8px;
+}
+
+.dev-muted {
+	color: var(--icon-muted);
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+.dev-chip {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 1px 7px;
+	font-size: calc(10px * var(--font-scale-body, 1));
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--icon-muted);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-pill);
+}
+
+.dev-cell-name {
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+/* --- token card --- */
+.dev-token-card {
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	padding: 18px 20px;
+	margin-bottom: 20px;
+}
+
+.dev-token-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-family: var(--font-outfit);
+	font-weight: 700;
+	margin-bottom: 4px;
+	color: var(--text-primary);
+}
+
+.dev-token-value {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin: 10px 0;
+	padding: 10px 12px;
+	background: var(--bg-field);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+}
+
+.dev-token-value code {
+	font-family: var(--font-mono);
+	font-size: calc(12px * var(--font-scale-body, 1));
+	color: var(--text-primary);
+	word-break: break-all;
+}
+
+/* --- buttons --- */
+.dev-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--border-default);
+	background: var(--bg-raised);
+	color: var(--text-primary);
+	font-family: var(--font-family);
+	font-size: calc(13px * var(--font-scale-body, 1));
+	font-weight: 600;
+	cursor: pointer;
+	transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+
+.dev-btn:hover:not(:disabled) {
+	background: var(--bg-field);
+}
+
+.dev-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.dev-btn--primary {
+	background: var(--bg-primary);
+	border-color: var(--bg-primary);
+	color: var(--text-on-primary);
+}
+
+.dev-btn--primary:hover:not(:disabled) {
+	background: var(--bg-primary-hover);
+}
+
+.dev-btn--ghost {
+	padding: 5px 10px;
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+.dev-btn--danger {
+	background: var(--status-red-text);
+	border-color: var(--status-red-text);
+	color: var(--text-on-primary);
+}
+
+.dev-btn--danger:hover:not(:disabled) {
+	filter: brightness(0.92);
+}
+
+.dev-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	margin-left: 4px;
+	border-radius: var(--radius-control);
+	border: 1px solid var(--border-default);
+	background: var(--bg-raised);
+	color: var(--icon-default);
+	cursor: pointer;
+	transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.dev-icon-btn:hover:not(:disabled) {
+	background: var(--bg-field);
+	color: var(--text-primary);
+}
+
+.dev-icon-btn--danger:hover:not(:disabled) {
+	background: var(--status-red-bg);
+	color: var(--status-red-text);
+	border-color: var(--status-red-text);
+}
+
+.dev-icon-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.dev-actions {
+	text-align: right;
+	white-space: nowrap;
+}
+
+/* --- inputs --- */
+.dev-label {
+	display: block;
+	font-size: calc(12px * var(--font-scale-body, 1));
+	margin: 14px 0 6px;
+	color: var(--text-primary);
+}
+
+.dev-input {
+	width: 100%;
+	padding: 9px 11px;
+	background: var(--bg-field);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	color: var(--text-primary);
+	font-family: var(--font-family);
+	font-size: calc(13px * var(--font-scale-body, 1));
+}
+
+.dev-input--date {
+	width: auto;
+	padding: 5px 8px;
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+/* --- wipe dialog --- */
+.dev-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.dev-modal {
+	width: 100%;
+	max-width: 520px;
+	max-height: 88vh;
+	overflow-y: auto;
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+}
+
+.dev-modal--danger {
+	border-top: 3px solid var(--status-red-text);
+}
+
+.dev-modal-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--border-default);
+	font-family: var(--font-outfit);
+	font-weight: 700;
+	color: var(--status-red-text);
+}
+
+.dev-modal-body {
+	padding: 18px 20px;
+}
+
+.dev-modal-lead {
+	margin: 0 0 12px;
+	color: var(--text-primary);
+}
+
+.dev-modal-foot {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 14px 20px;
+	border-top: 1px solid var(--border-default);
+}
+
+.dev-footprint {
+	background: var(--bg-field);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	padding: 12px 14px;
+}
+
+.dev-footprint-total {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 8px;
+	color: var(--icon-muted);
+	font-size: calc(12px * var(--font-scale-body, 1));
+}
+
+.dev-footprint-num {
+	font-family: var(--font-outfit);
+	font-size: calc(22px * var(--font-scale-body, 1));
+	font-weight: 800;
+	color: var(--text-primary);
+}
+
+.dev-footprint-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 150px;
+	overflow-y: auto;
+}
+
+.dev-footprint-list li {
+	display: flex;
+	justify-content: space-between;
+	font-size: calc(12px * var(--font-scale-body, 1));
+	padding: 2px 0;
+	color: var(--icon-muted);
+	font-family: var(--font-mono);
+}
+
+.dev-reassure {
+	margin: 12px 0 0;
+	font-size: calc(12px * var(--font-scale-body, 1));
+	color: var(--icon-muted);
+}
+
+.dev-reassure code {
+	font-family: var(--font-mono);
+	color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dev-btn,
+	.dev-icon-btn {
+		transition: none;
+	}
+}
+
+/* --- active/inactive toggle -------------------------------------------------------------
+ * The toggle was neutral grey in both states, so activate and deactivate looked identical
+ * until you read the tooltip. Colour comes from the status pairs, which is what the badge
+ * in the same row uses - button and badge now agree at a glance. Both halves of each pair
+ * are theme-aware, unlike the raw palette scale. See docs/STYLE.md.
+ */
+.dev-icon-btn--toggle {
+	transition: background var(--motion-fast) ease, color var(--motion-fast) ease,
+		border-color var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.dev-icon-btn--on {
+	background: var(--status-lime-bg);
+	color: var(--status-lime-text);
+	border-color: var(--status-lime-text);
+}
+
+.dev-icon-btn--off {
+	background: var(--status-red-bg);
+	color: var(--status-red-text);
+	border-color: var(--status-red-text);
+}
+
+.dev-icon-btn--toggle:hover:not(:disabled) {
+	transform: scale(1.08);
+}
+
+.dev-icon-btn--toggle:active:not(:disabled) {
+	transform: scale(0.94);
+}
+
+/* The status badge cross-fades rather than snapping when a row flips state. */
+.dev-table tbody .xan-status-badge {
+	animation: dev-status-in var(--motion-fast) ease both;
+}
+
+@keyframes dev-status-in {
+	from {
+		opacity: 0;
+		transform: translateY(-2px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.dev-expiry {
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+}
+
+/* Every transition above is decorative feedback - drop it entirely when less motion is
+ * requested, matching shell.css. The colours stay: they carry the meaning. */
+@media (prefers-reduced-motion: reduce) {
+	.dev-icon-btn--toggle,
+	.dev-table tbody .xan-status-badge {
+		transition: none;
+		animation: none;
+	}
+
+	.dev-icon-btn--toggle:hover:not(:disabled),
+	.dev-icon-btn--toggle:active:not(:disabled) {
+		transform: none;
+	}
+}
+
+/* Owned / allowed, side by side: the count is context for the number being granted. */
+.dev-limit {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.dev-input--limit {
+	width: 52px;
+	text-align: center;
+	/* Spinners are gone app-wide - see the input[type="number"] rule in styles/tokens.css.
+	   `min` still guards the range on submit. */
+}
+
+/* Pending password resets. The count is the point: a request nobody notices is worse than
+   no request path at all. */
+.dev-badge-count {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: var(--status-red-bg);
+    color: var(--status-red-text);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.dev-pw-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.dev-pw-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+}
+
+.dev-pw-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+}
+
+/* WhatsApp inbox -------------------------------------------------------- */
+/* Every colour below is a semantic role token, so both themes resolve without a
+   second block - see docs/STYLE.md. */
+
+.dev-inbox {
+	display: grid;
+	grid-template-columns: minmax(240px, 320px) 1fr;
+	gap: 0;
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	overflow: hidden;
+	background: var(--bg-raised);
+	min-height: 420px;
+}
+
+@media (max-width: 768px) {
+	.dev-inbox {
+		grid-template-columns: 1fr;
+	}
+}
+
+.dev-inbox-list {
+	border-right: 1px solid var(--border-default);
+	overflow-y: auto;
+	max-height: 520px;
+}
+
+.dev-inbox-empty {
+	padding: 24px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.dev-inbox-row {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	width: 100%;
+	padding: 12px 14px;
+	text-align: left;
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var(--border-default);
+	cursor: pointer;
+	color: var(--text-primary);
+	transition: background-color var(--motion-fast);
+}
+
+.dev-inbox-row:hover {
+	background: var(--bg-sidebar);
+}
+
+.dev-inbox-row:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: -2px;
+}
+
+.dev-inbox-row.is-active {
+	background: var(--bg-field-on-canvas);
+}
+
+.dev-inbox-row-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.dev-inbox-name {
+	font-weight: 500;
+	display: block;
+}
+
+.dev-inbox-phone,
+.dev-inbox-time {
+	font-size: 12px;
+}
+
+.dev-inbox-preview {
+	font-size: 12.5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dev-inbox-chip {
+	font-size: 11px;
+	padding: 1px 7px;
+	border-radius: var(--radius-pill, 7px);
+	border: 1px solid var(--border-default);
+	color: var(--text-tertiary);
+	white-space: nowrap;
+}
+
+/* The status pair is chosen to meet contrast against its own background. */
+.dev-inbox-chip.is-customer {
+	background: var(--status-green-bg);
+	color: var(--status-green-text);
+	border-color: transparent;
+}
+
+.dev-inbox-unread {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+}
+
+.dev-inbox-thread-wrap {
+	display: flex;
+	flex-direction: column;
+	min-height: 420px;
+}
+
+.dev-inbox-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border-default);
+}
+
+.dev-inbox-head-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--bg-field-on-canvas);
+	color: var(--icon-default);
+}
+
+.dev-inbox-head-sub {
+	display: block;
+	font-size: 12px;
+}
+
+.dev-inbox-thread {
+	flex: 1;
+	overflow-y: auto;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-height: 400px;
+}
+
+.dev-inbox-bubble {
+	max-width: 78%;
+	padding: 8px 12px;
+	border-radius: var(--radius-surface);
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.dev-inbox-bubble.is-in {
+	align-self: flex-start;
+	background: var(--bg-field-on-canvas);
+	color: var(--text-primary);
+}
+
+.dev-inbox-bubble.is-out {
+	align-self: flex-end;
+	background: var(--bg-primary);
+	color: var(--text-on-primary);
+}
+
+.dev-inbox-bubble-body {
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-size: 13.5px;
+}
+
+.dev-inbox-bubble-meta {
+	font-size: 10.5px;
+	opacity: 0.75;
+}
+
+.dev-inbox-composer {
+	display: flex;
+	gap: 8px;
+	padding: 12px 16px;
+	border-top: 1px solid var(--border-default);
+}
+
+.dev-inbox-composer input {
+	flex: 1;
+	background: var(--bg-field-on-canvas);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	padding: 8px 12px;
+	color: var(--text-primary);
+	font: inherit;
+}
+
+.dev-inbox-composer input:focus-visible {
+	outline: 2px solid var(--border-strong);
+	outline-offset: 1px;
+}
+
+.dev-inbox-composer input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.dev-inbox-closed {
+	padding: 14px 16px;
+	border-top: 1px solid var(--border-default);
+	margin: 0;
+	font-size: 12.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dev-inbox-row {
+		transition: none;
+	}
+}
+
+/* Registration token popover (navbar) ------------------------------------ */
+
+.dev-token-menu {
+	position: relative;
+	display: inline-flex;
+}
+
+.dev-token-pop {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	z-index: 60;
+	width: 288px;
+	padding: 14px;
+	background: var(--bg-raised);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-surface);
+	box-shadow: var(--shadow-floating);
+	text-align: left;
+}
+
+.dev-token-pop-title {
+	font-weight: 500;
+	margin: 0 0 4px;
+}
+
+.dev-token-pop-note {
+	font-size: 12px;
+	margin: 0 0 10px;
+}
+
+.dev-token-pop-value {
+	display: block;
+	width: 100%;
+	padding: 8px 10px;
+	background: var(--bg-field-on-canvas);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-control);
+	font-family: var(--font-family);
+	font-size: 12.5px;
+	color: var(--text-primary);
+	word-break: break-all;
+}
+
+.dev-token-pop-expiry {
+	font-size: 11.5px;
+	margin: 6px 0 10px;
+}
+
+.dev-token-pop-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.dev-token-pop-label {
+	display: block;
+	font-size: 12px;
+	margin: 4px 0 4px;
+	color: var(--text-primary);
+}

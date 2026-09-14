@@ -1,0 +1,11 @@
+/* The export pair sits at the right of a report's toolbar. Sizing comes from the shared
+ * button size (Appearance > Buttons) - two button sizes on one toolbar looked like a
+ * mistake. */
+.report-downloads {
+	display: flex;
+	gap: 8px;
+	margin-left: auto;
+}
+
+/* Follows the shared button size (Appearance > Button text) rather than pinning its own -
+   two button sizes on one toolbar looked like a mistake. */

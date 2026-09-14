@@ -1,0 +1,258 @@
+/* Date field + its calendar panel. See Common/DateField.jsx. */
+
+.date-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 8px 0 10px;
+    border-radius: var(--radius-control);
+    background: var(--bg-field-on-canvas);
+    border: 1px solid var(--border-default);
+    transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+/* The whole field lights up when the caret is anywhere inside it, so it matches the way the
+   search box and the other inputs report focus. */
+.date-field:focus-within {
+    border-color: var(--xan-blue);
+    box-shadow: 0 0 0 2px var(--xan-blue-bg);
+}
+
+.date-field-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none !important;
+    background: transparent !important;
+    outline: none;
+    box-shadow: none !important;
+    padding: 0 !important;
+    height: auto !important;
+    color: var(--text-primary) !important;
+    font-family: inherit;
+    font-size: calc(13px * var(--font-scale-table-row, 1)) !important;
+    accent-color: var(--xan-blue);
+}
+
+/* The browser's own calendar button. Hidden rather than restyled - the button beside it opens
+   our panel, and leaving both would put two calendars on one field. Typing is untouched. */
+.date-field-input::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+}
+
+.date-field-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.date-field-trigger:hover,
+.date-field-trigger[aria-expanded="true"] {
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+}
+
+.date-field-trigger:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 1px;
+}
+
+.date-field-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* ---------- The panel ---------- */
+
+/* Portalled to <body> and positioned from the field's rect, the same clip-safe pattern as
+   AssigneeDropdown and RowActionMenu - a card with overflow would otherwise cut it off. */
+.date-panel {
+    position: fixed;
+    z-index: 1200;
+    width: 280px;
+    padding: 10px;
+    border-radius: var(--radius-control);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-floating);
+    font-family: var(--font-family);
+}
+
+.date-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.date-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* The heading doubles as the way back out - month opens the months, year opens the years. It
+   is a button, so it says so on hover rather than looking like inert text you happen to be
+   able to click. */
+.date-panel-crumb {
+    padding: 3px 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: calc(13px * var(--font-scale-body, 1));
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.date-panel-crumb:hover:not(:disabled) {
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+}
+
+.date-panel-crumb:disabled {
+    cursor: default;
+}
+
+.date-panel-crumb:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: 1px;
+}
+
+.date-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+/* Months and years want wider cells than days, but the panel must not change size between
+   levels - three columns of the same overall width does that. */
+.date-panel-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    /* Four rows of months against six of days; the padding keeps the two the same height so
+       the panel does not jump as you step in and out. */
+    padding: 14px 0;
+}
+
+.date-panel-weekdays {
+    margin-bottom: 4px;
+}
+
+.date-panel-weekdays span {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 4px 0;
+}
+
+.date-panel-day {
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: calc(12.5px * var(--font-scale-table-row, 1));
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.date-panel-day:hover {
+    background: var(--bg-field);
+}
+
+/* Today is outlined, the selection is filled - so when they are the same day the ring still
+   reads underneath rather than one state hiding the other. */
+.date-panel-day.is-today {
+    box-shadow: inset 0 0 0 1px var(--xan-blue);
+    color: var(--xan-blue);
+}
+
+.date-panel-day.is-selected {
+    background: var(--accent-gradient, var(--bg-primary));
+    color: var(--text-on-primary);
+    font-weight: 700;
+}
+
+.date-panel-day:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: -2px;
+}
+
+.date-panel-cell {
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: var(--bg-field);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: calc(12.5px * var(--font-scale-table-row, 1));
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.date-panel-cell:hover {
+    background: var(--xan-blue-bg);
+    color: var(--xan-blue);
+}
+
+.date-panel-cell.is-today {
+    box-shadow: inset 0 0 0 1px var(--xan-blue);
+    color: var(--xan-blue);
+}
+
+.date-panel-cell.is-selected {
+    background: var(--accent-gradient, var(--bg-primary));
+    color: var(--text-on-primary);
+    font-weight: 700;
+}
+
+.date-panel-cell:focus-visible {
+    outline: 2px solid var(--xan-blue);
+    outline-offset: -2px;
+}
+
+.date-panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-default);
+}
+
+.date-panel-value {
+    font-size: calc(11.5px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .date-field,
+    .date-field-trigger,
+    .date-panel-day,
+    .date-panel-cell,
+    .date-panel-crumb {
+        transition: none;
+    }
+}

@@ -81,3 +81,15 @@ func Internal(w http.ResponseWriter, err error) {
 	}
 	Write(w, Envelope{Code: 500, Message: "Internal Error", Status: False()})
 }
+
+// LogSwallowed records an error a handler deliberately ignores.
+//
+// Several Node routes swallow a failure on purpose - /unit/list seeds defaults and continues
+// if the seed fails, because the company keeps whatever units it has and a broken seed must
+// not break the list. Reproducing that behaviour silently would make the Go service harder to
+// debug than the one it replaces, so the decision is kept and the evidence is not.
+func LogSwallowed(what string, err error) {
+	if err != nil {
+		log.Printf("httpx: continuing after a failure in %s: %v", what, err)
+	}
+}

@@ -1,0 +1,125 @@
+/* The table of who wants which WhatsApp message. Shares the shape of notifyPreferences.css
+   next door - same card, same intro, same footer - and adds only what a per-cell toggle
+   needs. */
+
+.reminder-prefs-body {
+	padding: 20px;
+}
+
+.reminder-prefs-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.reminder-prefs-intro {
+	margin: 0;
+	max-width: 52ch;
+	color: var(--text-tertiary);
+}
+
+.reminder-prefs-empty {
+	margin: 0;
+	padding: 18px 0;
+	color: var(--text-tertiary);
+}
+
+/* Said once above the table rather than on every row - it is true of the whole tab. */
+.reminder-prefs-note {
+	margin: 0 0 14px;
+	color: var(--text-tertiary);
+}
+
+/* Each cell is its own button, because each event is answered separately. Sized to its own
+   text rather than stretched, so three of them in a row do not read as one wide control. */
+.reminder-prefs-cell {
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-chip);
+	background: var(--bg-field-on-canvas);
+	color: var(--text-secondary);
+	padding: 3px 10px;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color var(--motion-base), color var(--motion-base), border-color var(--motion-base);
+}
+
+.reminder-prefs-cell:hover:not(:disabled) {
+	border-color: var(--border-strong);
+}
+
+.reminder-prefs-cell:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.reminder-prefs-cell:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+/* On and off are opposites and must not read alike - one of them means a real message reaches
+   a real person. Inherited sits between them in receding ink behind a dashed edge: it is an
+   answer nobody has given, and it should not carry the weight of one. */
+.reminder-prefs-cell.is-on {
+	background: var(--xan-emerald-bg);
+	border-color: transparent;
+	color: var(--xan-emerald);
+}
+
+.reminder-prefs-cell.is-off {
+	background: var(--bg-sidebar);
+	color: var(--text-tertiary);
+}
+
+.reminder-prefs-cell.is-default {
+	background: transparent;
+	border-style: dashed;
+	color: var(--text-tertiary);
+}
+
+.reminder-prefs-actions {
+	text-align: right;
+}
+
+/* A real button rather than a word in accent ink. It sat at the end of every row looking like
+   a link, which in a table of toggles reads as another piece of state - the outline says it is
+   something you press, and the icon says what pressing it does. */
+.reminder-prefs-reset {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	border: 1px solid var(--border-default);
+	background: var(--bg-raised);
+	color: var(--text-secondary);
+	cursor: pointer;
+	padding: 3px 10px;
+	border-radius: var(--radius-chip);
+	white-space: nowrap;
+	transition: color var(--motion-fast), border-color var(--motion-fast), background var(--motion-fast);
+}
+
+.reminder-prefs-reset:hover:not(:disabled) {
+	color: var(--text-primary);
+	border-color: var(--border-strong);
+	background: var(--bg-sidebar);
+}
+
+.reminder-prefs-reset:focus-visible {
+	outline: 2px solid var(--xan-blue);
+	outline-offset: 2px;
+}
+
+.reminder-prefs-reset:disabled {
+	color: var(--text-tertiary);
+	cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reminder-prefs-cell,
+	.reminder-prefs-reset {
+		transition: none;
+	}
+}

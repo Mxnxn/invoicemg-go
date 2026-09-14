@@ -1,0 +1,267 @@
+/*
+ * The public job-status page (Views/Alert). Standalone - it renders outside AdminLayout, so
+ * it cannot lean on the shell's page chrome and paints its own canvas.
+ *
+ * Every colour here is a semantic role token, so the page follows the theme set on <html> in
+ * src/index.js. A customer arriving with a dark-mode phone gets the dark page.
+ */
+
+.alert-page {
+    min-height: 100vh;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    padding: 24px 16px 48px;
+    display: flex;
+    justify-content: center;
+}
+
+.alert-card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-raised);
+    padding: 24px;
+    animation: alert-card-in var(--motion-fast);
+}
+
+.alert-card-centered {
+    text-align: center;
+    padding: 48px 24px;
+}
+
+@keyframes alert-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.alert-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.alert-firm {
+    font-size: calc(16px * var(--font-scale-body, 1));
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.alert-title {
+    font-size: calc(23.5px * var(--font-scale-heading, 1));
+    font-weight: 600;
+    margin: 16px 0 4px;
+    color: var(--text-primary);
+}
+
+.alert-muted {
+    font-size: calc(14px * var(--font-scale-body, 1));
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+}
+
+.alert-muted-tight {
+    font-size: calc(12.5px * var(--font-scale-body, 1));
+    color: var(--text-tertiary);
+    margin: 2px 0 0;
+}
+
+.alert-error-icon {
+    color: var(--status-red-text);
+    margin-bottom: 8px;
+}
+
+/* Status ------------------------------------------------------------------ */
+
+.alert-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: calc(12px * var(--font-scale-body, 1));
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Status pairs are used together - the -text shade is contrast-checked against its own -bg
+   in both themes, which a hand-picked colour on these surfaces would not be. */
+.alert-badge-done {
+    background: var(--status-green-bg);
+    color: var(--status-green-text);
+}
+
+.alert-badge-ready {
+    background: var(--status-lime-bg);
+    color: var(--status-lime-text);
+}
+
+.alert-badge-progress {
+    background: var(--status-amber-bg);
+    color: var(--status-amber-text);
+}
+
+/* Table ------------------------------------------------------------------- */
+
+/* A seven-column table cannot fit a phone. It scrolls inside its own box rather than making
+   the whole page scroll sideways. */
+.alert-table-scroll {
+    overflow-x: auto;
+    margin-top: 16px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-control);
+}
+
+.alert-table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: calc(14px * var(--font-scale-table-row, 1));
+}
+
+.alert-table th {
+    text-align: left;
+    font-size: calc(12px * var(--font-scale-table-head, 1));
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    background: var(--bg-field-on-canvas);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-default);
+    white-space: nowrap;
+}
+
+.alert-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+
+.alert-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.alert-table .alert-num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.alert-table tbody tr.is-linked td {
+    background: var(--bg-field-on-canvas);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.alert-table tfoot td {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border-strong);
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+}
+
+/* Actions ----------------------------------------------------------------- */
+
+.alert-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+}
+
+/* Not .shell-btn: shell.css is imported by the admin shell, which this page never mounts
+   inside. It sizes from the same already-resolved absolute button variable though, and does
+   NOT multiply it by the body scale - that would apply the scale twice. */
+.alert-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--button-font-size, 13px);
+    font-weight: 500;
+    font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-on-primary);
+    border: none;
+    border-radius: var(--radius-control);
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background var(--motion-fast), transform var(--motion-fast);
+}
+
+.alert-download:hover:not(:disabled) {
+    background: var(--bg-primary-hover);
+}
+
+.alert-download:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.alert-download:focus-visible {
+    outline: 2px solid var(--bg-primary);
+    outline-offset: 2px;
+}
+
+.alert-download:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+/* Loading ----------------------------------------------------------------- */
+
+.alert-spinner {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    margin-bottom: 12px;
+    border: 2px solid var(--border-default);
+    border-top-color: var(--text-secondary);
+    border-radius: 50%;
+    animation: alert-spin 700ms linear infinite;
+}
+
+@keyframes alert-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .alert-card,
+    .alert-spinner,
+    .alert-download {
+        animation: none;
+        transition: none;
+    }
+
+    .alert-download:active:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* A row priced by quantity has no size. The dash says the column does not apply to this row,
+   where an empty cell on a customer-facing page reads as something that failed to render.
+   Defined here rather than pulled in from dataTable.css: this page is public and pre-auth,
+   and it should not carry the whole admin table stylesheet for one rule. */
+.xan-cell-na {
+    /* Secondary, not tertiary - see the note in dataTable.css. On a customer-facing page an
+       illegible dash is worse still. */
+    color: var(--text-secondary);
+    user-select: none;
+}
