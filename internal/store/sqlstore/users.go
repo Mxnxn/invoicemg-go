@@ -18,11 +18,11 @@ func (u *users) FindByEmail(ctx context.Context, email string) (store.User, erro
 	var totpSecret *string
 
 	err := u.pool.QueryRow(ctx, `
-		SELECT id, email, password, name, firm, role, active_until, totp_enabled, totp_secret
+		SELECT id, email, password, name, firm, role, company_limit, active_until, totp_enabled, totp_secret
 		  FROM users
 		 WHERE email = $1`, email).
 		Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.Firm,
-			&user.Role, &activeUntil, &user.TotpEnabled, &totpSecret)
+			&user.Role, &user.CompanyLimit, &activeUntil, &user.TotpEnabled, &totpSecret)
 
 	if noRows(err) {
 		return store.User{}, store.ErrNotFound
@@ -31,6 +31,31 @@ func (u *users) FindByEmail(ctx context.Context, email string) (store.User, erro
 		return store.User{}, fmt.Errorf("looking up user: %w", err)
 	}
 
+	user.ActiveUntil = activeUntil
+	if totpSecret != nil {
+		user.TotpSecret = *totpSecret
+	}
+	return user, nil
+}
+
+func (u *users) FindByID(ctx context.Context, uid store.ID) (store.User, error) {
+	var user store.User
+	var activeUntil *time.Time
+	var totpSecret *string
+
+	err := u.pool.QueryRow(ctx, `
+		SELECT id, email, password, name, firm, role, company_limit, active_until, totp_enabled, totp_secret
+		  FROM users
+		 WHERE id = $1`, string(uid)).
+		Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.Firm,
+			&user.Role, &user.CompanyLimit, &activeUntil, &user.TotpEnabled, &totpSecret)
+
+	if noRows(err) {
+		return store.User{}, store.ErrNotFound
+	}
+	if err != nil {
+		return store.User{}, fmt.Errorf("looking up user: %w", err)
+	}
 	user.ActiveUntil = activeUntil
 	if totpSecret != nil {
 		user.TotpSecret = *totpSecret

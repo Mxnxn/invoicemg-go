@@ -20,15 +20,16 @@ type usersStore struct{ db *mongo.Database }
 func (s *Store) Users() store.Users { return &usersStore{db: s.db} }
 
 type userDoc struct {
-	ID          primitive.ObjectID `bson:"_id"`
-	Email       string             `bson:"email"`
-	Password    string             `bson:"password"`
-	Name        string             `bson:"name"`
-	Firm        string             `bson:"firm"`
-	Role        string             `bson:"role"`
-	ActiveUntil *time.Time         `bson:"activeUntil"`
-	TotpEnabled bool               `bson:"totpEnabled"`
-	TotpSecret  string             `bson:"totpSecret"`
+	ID           primitive.ObjectID `bson:"_id"`
+	Email        string             `bson:"email"`
+	Password     string             `bson:"password"`
+	Name         string             `bson:"name"`
+	Firm         string             `bson:"firm"`
+	Role         string             `bson:"role"`
+	CompanyLimit int                `bson:"companyLimit"`
+	ActiveUntil  *time.Time         `bson:"activeUntil"`
+	TotpEnabled  bool               `bson:"totpEnabled"`
+	TotpSecret   string             `bson:"totpSecret"`
 }
 
 func (u *usersStore) FindByEmail(ctx context.Context, email string) (store.User, error) {
@@ -40,17 +41,38 @@ func (u *usersStore) FindByEmail(ctx context.Context, email string) (store.User,
 	if err != nil {
 		return store.User{}, fmt.Errorf("looking up user: %w", err)
 	}
+	return doc.toStore(), nil
+}
+
+func (d userDoc) toStore() store.User {
 	return store.User{
-		ID:           idOf(doc.ID),
-		Email:        doc.Email,
-		PasswordHash: doc.Password,
-		Name:         doc.Name,
-		Firm:         doc.Firm,
-		Role:         doc.Role,
-		ActiveUntil:  doc.ActiveUntil,
-		TotpEnabled:  doc.TotpEnabled,
-		TotpSecret:   doc.TotpSecret,
-	}, nil
+		ID:           idOf(d.ID),
+		Email:        d.Email,
+		PasswordHash: d.Password,
+		Name:         d.Name,
+		Firm:         d.Firm,
+		Role:         d.Role,
+		CompanyLimit: d.CompanyLimit,
+		ActiveUntil:  d.ActiveUntil,
+		TotpEnabled:  d.TotpEnabled,
+		TotpSecret:   d.TotpSecret,
+	}
+}
+
+func (u *usersStore) FindByID(ctx context.Context, uid store.ID) (store.User, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return store.User{}, store.ErrNotFound
+	}
+	var doc userDoc
+	err = u.db.Collection(colUsers).FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.User{}, store.ErrNotFound
+	}
+	if err != nil {
+		return store.User{}, fmt.Errorf("looking up user: %w", err)
+	}
+	return doc.toStore(), nil
 }
 
 func (u *usersStore) CreateSession(ctx context.Context, s store.NewSession) (store.Session, error) {

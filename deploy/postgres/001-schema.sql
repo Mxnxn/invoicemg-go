@@ -49,6 +49,8 @@ CREATE TABLE users (
     active_until  timestamptz,
     totp_enabled  boolean NOT NULL DEFAULT false,
     totp_secret   text,
+    -- How many company profiles this admin may create. The switcher's Add control reads it.
+    company_limit integer NOT NULL DEFAULT 1,
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now()
 );
@@ -63,6 +65,11 @@ CREATE TABLE companies (
     address     text NOT NULL DEFAULT '',
     -- The logo/letterhead image path, embedded in customer-facing PDFs and the alert page.
     url         text NOT NULL DEFAULT '',
+    upi_qr      text NOT NULL DEFAULT '',
+    account_no  text NOT NULL DEFAULT '',
+    ifsc        text NOT NULL DEFAULT '',
+    bank_name   text NOT NULL DEFAULT '',
+    is_active   boolean NOT NULL DEFAULT true,
     is_default  boolean NOT NULL DEFAULT false,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()

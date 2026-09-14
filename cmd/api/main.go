@@ -24,6 +24,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/bank"
 	"github.com/mxnxn/invoicemg-go/internal/client"
+	"github.com/mxnxn/invoicemg-go/internal/company"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
@@ -31,6 +32,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
 	"github.com/mxnxn/invoicemg-go/internal/units"
+	"github.com/mxnxn/invoicemg-go/internal/userinfo"
 	"github.com/mxnxn/invoicemg-go/internal/users"
 	"github.com/mxnxn/invoicemg-go/internal/whatsapp"
 )
@@ -118,6 +120,9 @@ func routes(db store.Store) http.Handler {
 	admin := func(h http.HandlerFunc) http.Handler {
 		return auth.Chain(h, guard.Require, auth.RequireAdmin)
 	}
+	// authed is just a valid session, no role or feature gate - what routes/Company.js applies
+	// to /list and /active (the writes add requireAdmin on top).
+	authed := func(h http.HandlerFunc) http.Handler { return auth.Chain(h, guard.Require) }
 	// Units live inside the Products manager, so they carry the products permission - and the
 	// write routes carry the write-level gate ON TOP of it, exactly as routes/Unit.js layers
 	// requireCreate and requireDelete under its router-wide requireFeature.
@@ -132,6 +137,8 @@ func routes(db store.Store) http.Handler {
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	clientHandler := client.New(db.Clients())
+	companyHandler := company.New(db.Companies(), db.Users())
+	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
 
 	// Every route is registered TWICE, under two surfaces.
@@ -185,6 +192,13 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("GET /clients", feature("customers", clientHandler.Getall))
 	mux.Handle("POST /client/only", feature("customers", clientHandler.Only))
 	mux.Handle("GET /clients/only", feature("customers", clientHandler.Only))
+
+	// The shell bootstrap: the company switcher, the active-company letterhead, and the admin
+	// profile. /company/* need only a session; /userinfo/get is admin-only.
+	mux.Handle("POST /company/list", authed(companyHandler.List))
+	mux.Handle("GET /companies", authed(companyHandler.List))
+	mux.Handle("POST /company/active", authed(companyHandler.Active))
+	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

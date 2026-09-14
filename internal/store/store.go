@@ -178,6 +178,8 @@ type User struct {
 	Name         string
 	Firm         string
 	Role         string
+	// CompanyLimit is how many company profiles this admin may create (the switcher's cap).
+	CompanyLimit int
 	// ActiveUntil is what actually locks a login out. nil means no expiry.
 	ActiveUntil *time.Time
 	TotpEnabled bool
@@ -201,6 +203,8 @@ type Users interface {
 	// belongs to the caller so both backends cannot disagree about what "the same address"
 	// means.
 	FindByEmail(ctx context.Context, email string) (User, error)
+	// FindByID returns the account by id, for the profile the shell loads. ErrNotFound if gone.
+	FindByID(ctx context.Context, uid ID) (User, error)
 	CreateSession(ctx context.Context, s NewSession) (Session, error)
 }
 
@@ -361,6 +365,37 @@ type Clients interface {
 	Visible(ctx context.Context, uid, companyID ID) ([]Client, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Companies
+// ---------------------------------------------------------------------------------------
+
+// Company is one business profile - the PUBLIC_FIELDS routes/Company.js exposes to the shell.
+// The nested config (exportTemplate, sharing, numbering, whatsapp) is not stored here yet; the
+// handler fills those with defaults, which is correct for a company that has not customised
+// them and is enough for the shell to render.
+type Company struct {
+	ID        ID
+	Name      string
+	Firm      string
+	Address   string
+	Phone     string
+	Gst       string
+	URL       string
+	UpiQr     string
+	AccountNo string
+	Ifsc      string
+	BankName  string
+	IsDefault bool
+	IsActive  bool
+}
+
+type Companies interface {
+	// List returns the admin's ACTIVE companies for the switcher, default first.
+	List(ctx context.Context, uid ID) ([]Company, error)
+	// Active returns one company the admin owns, for the letterhead. ErrNotFound if missing.
+	Active(ctx context.Context, companyID, uid ID) (Company, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -370,6 +405,7 @@ type Store interface {
 	Alerts() Alerts
 	Banks() Banks
 	Clients() Clients
+	Companies() Companies
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
