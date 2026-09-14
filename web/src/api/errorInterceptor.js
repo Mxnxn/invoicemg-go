@@ -84,6 +84,23 @@ export function isMutation(url = "") {
     return MUTATION_PATH.test(url);
 }
 
+// The session and permission consequences of a failure, in one place.
+//
+// They have to be, because the SAME failure arrives down two different paths depending on
+// which API style the server is running:
+//
+//   legacy  HTTP 200 with {code: 401} in the body  -> axios RESOLVES -> onFulfilled
+//   rest    HTTP 401                               -> axios REJECTS  -> onRejected
+//
+// The Go service can serve either (API_STYLE), and the Node API only serves the first, so the
+// client has to understand both. Before this was shared, a 401 under rest style toasted and
+// then did nothing: the dead session stayed in localStorage and the app kept making calls
+// with it, looking broken rather than logged out.
+function applySessionEffects(code) {
+    if (code === 401) logOutAndRedirect();
+    else if (code === 403) redirectToAuthorizedFeature();
+}
+
 export function onFulfilled(response) {
     const code = response?.data?.code;
     if (code !== undefined && code !== 200) {
@@ -98,8 +115,7 @@ export function onFulfilled(response) {
                 description: endpointOf(response?.config?.url),
             });
         }
-        if (code === 401) logOutAndRedirect();
-        else if (code === 403) redirectToAuthorizedFeature();
+        applySessionEffects(code);
         return response;
     }
 
@@ -113,13 +129,22 @@ export function onFulfilled(response) {
 }
 
 export function onRejected(error) {
+    // Under rest style this is where every business failure lands, so the status has to be
+    // read before the early return - a silenced login error must still not leave a dead
+    // session in place.
+    //
+    // The body's `code` is preferred over the HTTP status because the server sends both and
+    // they agree; the status is the fallback for a failure that never reached a handler at
+    // all (a proxy 502, a dropped connection).
+    const code = error?.response?.data?.code ?? error?.response?.status;
+    applySessionEffects(code);
+
     if (isSilentError(error?.config?.url)) return Promise.reject(error);
-    // A rejected request never reached the envelope, so here the HTTP status IS the useful
-    // code. When there is not even that - the request never left - say so rather than showing
+    // When there is no response at all - the request never left - say so rather than showing
     // a blank chip: "Network" is the distinction between "the server refused" and "nothing
     // answered", which is the first thing worth knowing.
     notifyError(error?.response?.data?.message || error?.message || "Network error", {
-        code: error?.response?.status || "Network",
+        code: code || "Network",
         description: endpointOf(error?.config?.url),
     });
     return Promise.reject(error);

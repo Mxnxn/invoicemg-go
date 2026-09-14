@@ -31,6 +31,24 @@ export default defineConfig({
     server: {
         port: 3000,
         host: true,
+        // The dev server answers /api itself, so `bun run start` works against the Go service
+        // with no CORS and no rebuild - the same relative VITE_API_URL=/api the production
+        // image bakes in. Without this, developing the frontend would mean either rebuilding
+        // the nginx image for every edit or running the app on a different origin from the
+        // API and fighting CORS for the privilege.
+        //
+        // GO_API_URL overrides the target: the all-in-one stack is on 5002, but pointing it at
+        // the Node API on 5001 is how you check a screen against the service that still
+        // implements every route.
+        proxy: {
+            "/api": {
+                target: process.env.GO_API_URL || "http://localhost:5002",
+                changeOrigin: true,
+                // Strips the prefix, so /api/user/login reaches the service as /user/login -
+                // exactly what deploy/nginx.local.conf's trailing slash does in production.
+                rewrite: (path) => path.replace(/^\/api/, ""),
+            },
+        },
         watch: {
             // Bind-mounted from the Windows host into the container, so native fs
             // events (inotify) don't fire on changes made outside the container —

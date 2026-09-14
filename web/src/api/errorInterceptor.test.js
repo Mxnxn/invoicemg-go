@@ -137,3 +137,78 @@ describe("login errors are left to the form", () => {
         expect(notifyError).not.toHaveBeenCalled();
     });
 });
+
+// The Go service can answer in either style (API_STYLE), and the Node API only answers in the
+// first, so this client has to understand both:
+//
+//   legacy  HTTP 200 with {code: 401} in the body  -> axios resolves -> onFulfilled
+//   rest    HTTP 401                               -> axios rejects  -> onRejected
+//
+// Before the session effects were shared between the two paths, a 401 under rest style
+// toasted and then did nothing: the dead session stayed in localStorage and the app kept
+// calling with it, looking broken rather than logged out.
+describe("a real HTTP status, as the Go service sends under API_STYLE=rest", () => {
+    const originalLocation = window.location;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        delete window.location;
+        window.location = { pathname: "/admin/lifecycle", assign: vi.fn(), href: "" };
+        window.localStorage.clear();
+    });
+
+    afterEach(() => {
+        window.location = originalLocation;
+    });
+
+    const rejection = (status, body, url = "http://api/sheet/only") => ({
+        config: { url },
+        response: { status, data: body },
+    });
+
+    it("clears the session on a 401 that arrived as a status rather than a body code", async () => {
+        window.localStorage.setItem("uid", "u1");
+
+        await expect(onRejected(rejection(401, { code: 401, message: "Unauthorized." }))).rejects.toBeTruthy();
+
+        expect(window.localStorage.getItem("uid")).toBeNull();
+        expect(window.location.assign).toHaveBeenCalled();
+    });
+
+    // The status alone has to be enough: a proxy or a dropped connection produces a failure
+    // with no envelope at all, and a dead session must still be cleared.
+    it("clears the session on a bare 401 with no body", async () => {
+        window.localStorage.setItem("uid", "u1");
+
+        await expect(onRejected(rejection(401, undefined))).rejects.toBeTruthy();
+
+        expect(window.localStorage.getItem("uid")).toBeNull();
+    });
+
+    it("prefers the body code over the status when both are present", async () => {
+        await expect(onRejected(rejection(422, { code: 422, message: "Invalid request." }))).rejects.toBeTruthy();
+
+        expect(notifyError).toHaveBeenCalledWith("Invalid request.", expect.objectContaining({ code: 422 }));
+    });
+
+    // Silenced for the toast, never for the consequences - the same rule the legacy path has.
+    it("still clears the session on a 401 from a login path without toasting", async () => {
+        window.localStorage.setItem("uid", "u1");
+
+        await expect(
+            onRejected(rejection(401, { code: 401, message: "Unauthorized." }, "http://api/user/login"))
+        ).rejects.toBeTruthy();
+
+        expect(notifyError).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem("uid")).toBeNull();
+    });
+
+    it("leaves an ordinary failure alone", async () => {
+        window.localStorage.setItem("uid", "u1");
+
+        await expect(onRejected(rejection(500, { code: 500, message: "Internal Error" }))).rejects.toBeTruthy();
+
+        expect(window.localStorage.getItem("uid")).toBe("u1");
+        expect(notifyError).toHaveBeenCalled();
+    });
+});

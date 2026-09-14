@@ -52,7 +52,42 @@ live against the same documents, so anything that writes has to be right the fir
 
 ## Running it
 
-Go is not required on the host; everything goes through Docker.
+### The whole application, one command
+
+```sh
+docker compose -f docker-compose.local.yml up --build
+# http://localhost:8080      owner@local.test / password123
+```
+
+Postgres + the Go API + the SPA behind nginx. No Mongo and no Node - this is a preview of life
+after cutover, sharing nothing with the sideways stack or with production. The database is
+seeded from `deploy/postgres`; to re-apply after editing either script, throw the volume away
+with `down -v`.
+
+`VITE_API_URL=/api` and nginx proxies it, so the browser talks to ONE origin and there is no
+CORS configuration anywhere in this stack.
+
+### Frontend on its own
+
+```sh
+cd web && bun run start          # :3000, proxies /api to localhost:5002
+GO_API_URL=http://localhost:5001 bun run start   # ...or to the Node API, which has every route
+```
+
+### Beside the Node API
+
+```sh
+docker compose up --build        # :5002, STORE=mongo, API_STYLE=legacy
+```
+
+### Without Docker
+
+Go is not required on the host, but it works if you have it:
+
+```sh
+go build ./... && go vet ./... && go test ./...
+cd web && npm install --legacy-peer-deps && npx vitest run
+```
 
 ```sh
 # from InvoiceMG-Go/
