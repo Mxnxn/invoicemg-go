@@ -168,6 +168,119 @@ func (h *Handler) Review(w http.ResponseWriter, r *http.Request) {
 		}})
 }
 
+// CreateReview is POST /alert/{job_id}/job/{jobcard_id}/review: the customer leaves their
+// review. Unauthenticated for the same reason the reads are - the person rating the work is a
+// customer with no login - and nothing here trusts the body for identity: the client, company
+// and owner are all read FROM THE JOB, so a crafted request cannot attribute a review to a
+// different customer or move it into another company's analytics.
+func (h *Handler) CreateReview(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("job_id")
+	jobcardID := r.PathValue("jobcard_id")
+	if !objectIDRe.MatchString(jobID) {
+		notValid(w)
+		return
+	}
+
+	ctx := r.Context()
+	job, err := h.store.Job(ctx, store.ID(jobID))
+	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrBadID) {
+		notValid(w)
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	// The card must belong to this job, exactly as the read requires - without it, any valid
+	// job id plus any string would accept a review.
+	row, ok := findRow(job, jobcardID)
+	if !ok {
+		notValid(w)
+		return
+	}
+
+	// Node validates the scores (422) BEFORE checking for an existing review (409); the order is
+	// observable, so it is kept. ReadForm never returns a nil form, so an empty/absent body
+	// simply fails validation with the same 422 Node sends.
+	form, _ := httpx.ReadForm(r)
+	scores, comment, valid, message := parseScores(form)
+	if !valid {
+		httpx.Invalid(w, message)
+		return
+	}
+
+	// One review per job. The unique index is the real guarantee (a refresh is one tap away on
+	// a phone); this read turns a race-free repeat into a readable message rather than relying
+	// on the index to fire. The index still backstops the actual race, below.
+	if _, err := h.store.Review(ctx, store.ID(jobID)); err == nil {
+		alreadyReviewed(w)
+		return
+	} else if !errors.Is(err, store.ErrNotFound) {
+		httpx.Internal(w, err)
+		return
+	}
+
+	// Snapshot the customer's name, as every document here snapshots its parties, so a later
+	// rename or deletion cannot make this review unreadable. firm falls back to name.
+	client, err := h.store.Client(ctx, job.ClientID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		httpx.Internal(w, err)
+		return
+	}
+	clientName := client.Firm
+	if clientName == "" {
+		clientName = client.Name
+	}
+
+	err = h.store.CreateReview(ctx, store.NewReview{
+		JobID:         job.ID,
+		UID:           job.UID,
+		CompanyID:     job.CompanyID, // may be empty; the store falls back to the owner's default
+		ClientID:      job.ClientID,
+		JobcardID:     string(row.ID),
+		ChallanNumber: job.ChallanNumber,
+		ClientName:    clientName,
+		Scores:        scores,
+		Comment:       comment,
+	})
+	switch {
+	case errors.Is(err, store.ErrDuplicate):
+		// The index fired: two submissions raced. That is a duplicate, not a fault, and the
+		// customer is thanked rather than shown an error - the same 409 as the pre-check.
+		alreadyReviewed(w)
+		return
+	case errors.Is(err, store.ErrNotFound):
+		// No company could be resolved for the owner - refusing feedback over an internal gap
+		// would be the wrong way to fail, but there is nowhere to file it, so it is a dead link.
+		notValid(w)
+		return
+	case err != nil:
+		httpx.Internal(w, err)
+		return
+	}
+
+	httpx.Write(w, httpx.Envelope{
+		Code:    200,
+		Message: "Thank you for your feedback.",
+		Status:  httpx.True(),
+		Data: reviewResultDTO{
+			Scores: scoresDTO{
+				Quality:       scores.Quality,
+				Speed:         scores.Speed,
+				Communication: scores.Communication,
+				Satisfaction:  scores.Satisfaction,
+				Overall:       scores.Overall,
+			},
+			Comment: comment,
+		},
+	})
+}
+
+func alreadyReviewed(w http.ResponseWriter) {
+	httpx.Write(w, httpx.Envelope{Code: 409, Message: "You have already reviewed this job. Thank you!", Status: httpx.False()})
+}
+
 // findRow matches by _id first (the common case) then by rowId, so a link built from either
 // identifier resolves - Node's findRow.
 func findRow(job store.AlertJob, jobcardID string) (store.AlertRow, bool) {
@@ -277,6 +390,13 @@ type scoresDTO struct {
 	Communication int `json:"communication"`
 	Satisfaction  int `json:"satisfaction"`
 	Overall       int `json:"overall"`
+}
+
+// reviewResultDTO is what a successful POST returns: {scores, comment}, echoing back what was
+// stored, the same shape routes/Alert.js sends.
+type reviewResultDTO struct {
+	Scores  scoresDTO `json:"scores"`
+	Comment string    `json:"comment"`
 }
 
 type companyDTO struct {

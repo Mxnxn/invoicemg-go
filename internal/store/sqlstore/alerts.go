@@ -120,3 +120,11 @@ func (a *alerts) Review(_ context.Context, _ store.ID) (store.AlertReview, error
 	// it is not a sideways-parity concern because the sideways tenant is Mongo.
 	return store.AlertReview{}, store.ErrNotFound
 }
+
+func (a *alerts) CreateReview(_ context.Context, _ store.NewReview) error {
+	// SCHEMA GAP: no job_reviews table in Postgres yet (see Review/Company above). A review
+	// cannot be stored here until it is migrated, so this fails loudly rather than pretending to
+	// save - the handler renders it as a 500 on the local stack. Not a sideways concern: the
+	// sideways tenant is Mongo.
+	return fmt.Errorf("sqlstore: job_reviews table not migrated yet")
+}

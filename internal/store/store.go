@@ -280,6 +280,21 @@ type AlertReview struct {
 	CreatedAt time.Time
 }
 
+// NewReview is a customer review about to be written. CompanyID may be empty, in which case the
+// store falls back to the owner's default company - the same resolution routes/Alert.js does for
+// a job raised before company stamping.
+type NewReview struct {
+	JobID         ID
+	UID           ID
+	CompanyID     ID
+	ClientID      ID
+	JobcardID     string
+	ChallanNumber string
+	ClientName    string
+	Scores        ReviewScores
+	Comment       string
+}
+
 // Alerts serves the public customer link. Job returns ErrBadID for a non-id and ErrNotFound
 // for an unknown one; Client and Company return ErrNotFound (which the handler renders as
 // blank, matching Node's optional chaining) for an empty or unknown id, because a job's
@@ -290,6 +305,10 @@ type Alerts interface {
 	Company(ctx context.Context, id ID) (AlertCompany, error)
 	// Review returns the job's review, or ErrNotFound when it has none (the page's reviewed:false).
 	Review(ctx context.Context, jobID ID) (AlertReview, error)
+	// CreateReview writes one review. ErrDuplicate if the job already has one (the unique
+	// index is the real guarantee, since the page is unauthenticated and a refresh is one
+	// tap away); ErrNotFound if no company can be resolved for the owner.
+	CreateReview(ctx context.Context, r NewReview) error
 }
 
 // Store is everything together, so main wires one value rather than six.

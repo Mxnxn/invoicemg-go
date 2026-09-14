@@ -208,3 +208,80 @@ func (a *alerts) Review(ctx context.Context, jobID store.ID) (store.AlertReview,
 		CreatedAt: doc.CreatedAt,
 	}, nil
 }
+
+func (a *alerts) CreateReview(ctx context.Context, r store.NewReview) error {
+	uidOID, err := objectID(r.UID)
+	if err != nil {
+		return store.ErrNotFound
+	}
+	jobOID, err := objectID(r.JobID)
+	if err != nil {
+		return store.ErrBadID
+	}
+	clientOID, err := objectID(r.ClientID)
+	if err != nil {
+		return store.ErrNotFound
+	}
+	companyOID, err := a.resolveCompany(ctx, r.CompanyID, uidOID)
+	if err != nil {
+		return err // ErrNotFound when the owner has no company at all
+	}
+
+	now := time.Now().UTC()
+	doc := bson.M{
+		"uid":           uidOID,
+		"company_id":    companyOID,
+		"job_id":        jobOID,
+		"client_id":     clientOID,
+		"jobcard_id":    r.JobcardID,
+		"challanNumber": r.ChallanNumber,
+		"clientName":    r.ClientName,
+		"scores": bson.M{
+			"quality":       r.Scores.Quality,
+			"speed":         r.Scores.Speed,
+			"communication": r.Scores.Communication,
+			"satisfaction":  r.Scores.Satisfaction,
+			"overall":       r.Scores.Overall,
+		},
+		"comment":   r.Comment,
+		"createdAt": now,
+		"updatedAt": now,
+		"__v":       0,
+	}
+	if _, err := a.db.Collection(colJobReviews).InsertOne(ctx, doc); err != nil {
+		if isDuplicate(err) {
+			return store.ErrDuplicate
+		}
+		return fmt.Errorf("creating review: %w", err)
+	}
+	return nil
+}
+
+// resolveCompany is routes/Alert.js's fallback: the job's own company, else the owner's
+// default, else any company they own. The last query is deliberately unsorted, matching Node's
+// natural-order pick so the two agree while they run side by side (see store.go #28).
+func (a *alerts) resolveCompany(ctx context.Context, companyID store.ID, uidOID primitive.ObjectID) (primitive.ObjectID, error) {
+	if companyID != "" {
+		if oid, err := objectID(companyID); err == nil {
+			return oid, nil
+		}
+	}
+	var doc struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	err := a.db.Collection(colCompanies).FindOne(ctx, bson.M{"uid": uidOID, "is_default": true}).Decode(&doc)
+	if err == nil {
+		return doc.ID, nil
+	}
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return primitive.NilObjectID, fmt.Errorf("looking up default company: %w", err)
+	}
+	err = a.db.Collection(colCompanies).FindOne(ctx, bson.M{"uid": uidOID}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return primitive.NilObjectID, store.ErrNotFound
+	}
+	if err != nil {
+		return primitive.NilObjectID, fmt.Errorf("looking up any company: %w", err)
+	}
+	return doc.ID, nil
+}

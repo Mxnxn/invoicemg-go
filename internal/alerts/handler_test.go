@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,10 +26,17 @@ type stubAlerts struct {
 	jobCalls   int
 	review     store.AlertReview
 	reviewErr  error
+	created    *store.NewReview
+	createErr  error
 }
 
 func (s *stubAlerts) Review(_ context.Context, _ store.ID) (store.AlertReview, error) {
 	return s.review, s.reviewErr
+}
+
+func (s *stubAlerts) CreateReview(_ context.Context, r store.NewReview) error {
+	s.created = &r
+	return s.createErr
 }
 
 func (s *stubAlerts) Job(_ context.Context, _ store.ID) (store.AlertJob, error) {
@@ -128,6 +137,108 @@ func TestReview_MalformedID(t *testing.T) {
 	body := serveReview(t, &stubAlerts{}, "nonsense")
 	if code(body) != 404 {
 		t.Fatalf("code = %v, want 404", body["code"])
+	}
+}
+
+func servePost(t *testing.T, s store.Alerts, jobID, jobcardID string, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := url.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", New(s).CreateReview)
+	req := httptest.NewRequest("POST", "/alert/"+jobID+"/job/"+jobcardID+"/review", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("response not json: %v (%s)", err, rec.Body.String())
+	}
+	return body
+}
+
+// A stub set up so the pre-check passes (no existing review) and the write succeeds.
+func writableStore() *stubAlerts {
+	s := successStore()
+	s.reviewErr = store.ErrNotFound // not yet reviewed
+	return s
+}
+
+var fullScores = map[string]string{"quality": "5", "speed": "4", "communication": "5", "satisfaction": "4", "overall": "5", "comment": "Nice"}
+
+func TestCreateReview_MalformedID(t *testing.T) {
+	if code(servePost(t, &stubAlerts{}, "nonsense", "card-1", fullScores)) != 404 {
+		t.Fatal("want 404 for malformed id")
+	}
+}
+
+func TestCreateReview_InvalidScores(t *testing.T) {
+	bad := map[string]string{"quality": "5", "speed": "4", "communication": "5", "satisfaction": "4"} // no overall
+	body := servePost(t, writableStore(), validID, "card-1", bad)
+	if code(body) != 422 {
+		t.Fatalf("code = %v, want 422", body["code"])
+	}
+	if body["message"] != "Please give a rating from 1 to 5 for overall." {
+		t.Errorf("message = %v", body["message"])
+	}
+}
+
+func TestCreateReview_AlreadyReviewed(t *testing.T) {
+	s := successStore()
+	s.reviewErr = nil // Review() returns a found review -> pre-check 409
+	body := servePost(t, s, validID, "card-1", fullScores)
+	if code(body) != 409 {
+		t.Fatalf("code = %v, want 409", body["code"])
+	}
+	if s.created != nil {
+		t.Error("must not attempt a write when already reviewed")
+	}
+}
+
+func TestCreateReview_Success(t *testing.T) {
+	s := writableStore()
+	body := servePost(t, s, validID, "card-1", fullScores)
+	if code(body) != 200 {
+		t.Fatalf("code = %v, want 200", body["code"])
+	}
+	if body["message"] != "Thank you for your feedback." {
+		t.Errorf("message = %v", body["message"])
+	}
+	data := body["data"].(map[string]any)
+	if data["comment"] != "Nice" {
+		t.Errorf("comment = %v", data["comment"])
+	}
+	scores := data["scores"].(map[string]any)
+	if scores["quality"] != float64(5) || scores["speed"] != float64(4) {
+		t.Errorf("scores wrong: %v", scores)
+	}
+	// identity comes from the job, never the body: client/company/jobcard are snapshotted.
+	if s.created == nil {
+		t.Fatal("write was not attempted")
+	}
+	if s.created.JobcardID != "card-1" || s.created.ClientID != "c1" || s.created.CompanyID != "co1" {
+		t.Errorf("snapshot wrong: %+v", *s.created)
+	}
+	if s.created.ClientName != "John Co" { // firm falls back over name
+		t.Errorf("clientName = %q, want firm fallback", s.created.ClientName)
+	}
+}
+
+func TestCreateReview_DuplicateRace(t *testing.T) {
+	s := writableStore()
+	s.createErr = store.ErrDuplicate
+	if code(servePost(t, s, validID, "card-1", fullScores)) != 409 {
+		t.Fatal("want 409 on duplicate race")
+	}
+}
+
+func TestCreateReview_NoCompany(t *testing.T) {
+	s := writableStore()
+	s.createErr = store.ErrNotFound // no company resolvable
+	if code(servePost(t, s, validID, "card-1", fullScores)) != 404 {
+		t.Fatal("want 404 when no company can be resolved")
 	}
 }
 

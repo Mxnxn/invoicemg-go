@@ -175,6 +175,7 @@ func routes(db store.Store) http.Handler {
 	// review GET/POST are not ported yet.
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
+	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)
 
 	mux.HandleFunc("GET /healthz", health(db))
 
