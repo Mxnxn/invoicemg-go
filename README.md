@@ -41,9 +41,12 @@ sends, and a client checking `status` on a route that never sent one gets `undef
 | `internal/auth` | `TokenHelper` + `RoleHelper`, reproduced exactly |
 | `internal/store` | the interfaces — **the Postgres seam** |
 | `internal/store/mongostore` | the only package that imports the mongo driver |
+| `internal/textcase` | the Mongoose setters — `docNumber`, `titleCase`, `sentenceCase` |
 | `internal/days` | first slice: `POST /sheet/only`, `POST /sheet/open-jobs` |
+| `internal/units` | first domain with **writes**: all four `/unit/*` routes |
+| `scripts/parity.js` | the diff harness — what makes 209 routes tractable |
 
-The first slice is two **reads**, on purpose. A strangler's first route should be one where
+The first slice was two **reads**, on purpose. A strangler's first route should be one where
 being wrong costs a wrong number on a screen, not a corrupted invoice — both services are
 live against the same documents, so anything that writes has to be right the first time.
 
@@ -122,7 +125,9 @@ Mint a throwaway token against the dev database rather than using your own sessi
 
 ## Not done yet
 
-- 207 of 209 routes.
-- Writes. Everything here is read-only, which is why it is safe to run against live data.
+- 203 of 209 routes — see `ROUTES.md`.
 - Postgres. See above — it arrives at cutover, behind `internal/store`.
+- File uploads: two routes (`/company/*`, `/userinfo/*`) take real files via `upload.fields`.
+- The XLSX exports. `excelize` covers every feature the current ones use and adds charts and a
+  streaming writer, but the bytes will differ — verify those by opening the file, not by diff.
 - CI. Deliberately absent: this is local until a route actually moves across.
