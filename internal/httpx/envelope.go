@@ -17,16 +17,75 @@ import (
 
 // Envelope is the response shape every route returns.
 //
-// Data is `any` and omitted when nil, because the Node routes are not consistent about it and
-// parity matters more than tidiness: /sheet/only answers {code,data,message} with no `status`,
-// while /sheet/open-jobs answers {code,message,status,data}. Reproducing each route's exact
-// shape is the point - a client that checks `status` on a route that never sent one gets
-// `undefined`, which is falsy, which reads as failure.
+// The Node routes are not consistent about `status`, and parity matters more than tidiness:
+// /sheet/only answers {code,data,message} with no `status`, while /sheet/open-jobs answers
+// {code,message,status,data}. Reproducing each route's exact shape is the point - a client that
+// checks `status` on a route that never sent one gets `undefined`, which is falsy, which reads
+// as failure.
+//
+// Data needs THREE distinct wire outcomes, which a plain `json:",omitempty"` cannot express -
+// see MarshalJSON:
+//
+//   - absent    - the key is not sent at all. Every error envelope, and any route that sends
+//     no data. This is Data left unset (a nil interface).
+//   - null      - the key is sent with the value null. /settings/* send `data: row?…:null` and
+//     lifecycle sends `data: job||null`. This is Data set to the Null sentinel.
+//   - a value   - including `[]` for an empty list. omitempty is the trap here: it drops an
+//     empty slice, so a list route that carefully built a non-nil `[]T{}` (as /sheet/open-jobs
+//     does) would still omit the key and answer a different shape than Node's `data: []`.
 type Envelope struct {
 	Code    int    `json:"code"`
 	Message string `json:"message,omitempty"`
 	Status  *bool  `json:"status,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	// Data's presence and shape are governed by MarshalJSON, not by this tag - the tag is kept
+	// only so the field reads as part of the wire shape at a glance.
+	Data any `json:"data,omitempty"`
+}
+
+// nullData is the one value whose presence in Data means "send data: null" rather than "omit
+// data". A typed marker is the only way to tell an unset Data (nil interface) apart from a
+// deliberate null, since both would otherwise be a nil `any`.
+type nullData struct{}
+
+func (nullData) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
+// Null is what a handler puts in Envelope.Data to send an explicit `data: null` - the shape
+// /settings/* and the lifecycle job||null routes answer. Leaving Data unset omits the key
+// instead; the two are different bytes and the parity harness treats them as different.
+var Null any = nullData{}
+
+// MarshalJSON emits code/message/status the ordinary way and then decides data's presence by
+// hand: a nil interface omits the key, anything else is marshalled as-is (so the Null sentinel
+// becomes null, a non-nil empty slice becomes [], a struct becomes an object). A nil *typed*
+// slice still marshals to null - handlers that mean [] must hand in a non-nil slice, which the
+// list routes already do with make(T, 0, n).
+func (e Envelope) MarshalJSON() ([]byte, error) {
+	// A distinct type so this does not recurse back into MarshalJSON. code/message/status keep
+	// their existing tags, including the omitempty on message and status.
+	type head struct {
+		Code    int    `json:"code"`
+		Message string `json:"message,omitempty"`
+		Status  *bool  `json:"status,omitempty"`
+	}
+	out, err := json.Marshal(head{Code: e.Code, Message: e.Message, Status: e.Status})
+	if err != nil {
+		return nil, err
+	}
+	if e.Data == nil {
+		return out, nil // key absent
+	}
+	data, err := json.Marshal(e.Data)
+	if err != nil {
+		return nil, err
+	}
+	// Splice "data" in before the closing brace. head always has at least "code", so out is
+	// never the empty object "{}" and the comma is always correct.
+	spliced := make([]byte, 0, len(out)+len(data)+len(`,"data":`))
+	spliced = append(spliced, out[:len(out)-1]...)
+	spliced = append(spliced, `,"data":`...)
+	spliced = append(spliced, data...)
+	spliced = append(spliced, '}')
+	return spliced, nil
 }
 
 // True is a helper for the routes that do send `status`.
