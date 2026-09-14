@@ -96,14 +96,10 @@ func (a *alerts) Company(ctx context.Context, id store.ID) (store.AlertCompany, 
 	if id == "" {
 		return store.AlertCompany{}, store.ErrNotFound
 	}
-	// SCHEMA GAP (deploy/postgres/001-schema.sql): the Postgres companies table carries only
-	// `name` so far - the letterhead columns Model/Company.js has (firm, phone, url, address,
-	// gst) are not migrated yet, nor is a job_reviews table. The Mongo tenant returns all of
-	// them; here the extra fields come back blank until the schema is extended. Flagged rather
-	// than silently wrong: on the local Postgres stack the alert page shows the company name
-	// but no logo or GST. Not a sideways-parity concern - the sideways tenant is Mongo.
 	var c store.AlertCompany
-	err := a.pool.QueryRow(ctx, `SELECT name FROM companies WHERE id = $1`, string(id)).Scan(&c.Name)
+	err := a.pool.QueryRow(ctx,
+		`SELECT name, firm, phone, url, address, gst FROM companies WHERE id = $1`, string(id)).
+		Scan(&c.Name, &c.Firm, &c.Phone, &c.URL, &c.Address, &c.Gst)
 	if noRows(err) {
 		return store.AlertCompany{}, store.ErrNotFound
 	}
@@ -113,18 +109,54 @@ func (a *alerts) Company(ctx context.Context, id store.ID) (store.AlertCompany, 
 	return c, nil
 }
 
-func (a *alerts) Review(_ context.Context, _ store.ID) (store.AlertReview, error) {
-	// SCHEMA GAP: there is no job_reviews table in Postgres yet (see Company above). Every job
-	// reads as not-yet-reviewed here, so the page shows an empty form; the Mongo tenant answers
-	// truthfully. Migrating job_reviews is part of finishing the Alert domain on Postgres, and
-	// it is not a sideways-parity concern because the sideways tenant is Mongo.
-	return store.AlertReview{}, store.ErrNotFound
+func (a *alerts) Review(ctx context.Context, jobID store.ID) (store.AlertReview, error) {
+	var r store.AlertReview
+	var s store.ReviewScores
+	err := a.pool.QueryRow(ctx, `
+		SELECT id, quality, speed, communication, satisfaction, overall, comment, created_at
+		  FROM job_reviews
+		 WHERE job_id = $1`, string(jobID)).
+		Scan(&r.ID, &s.Quality, &s.Speed, &s.Communication, &s.Satisfaction, &s.Overall, &r.Comment, &r.CreatedAt)
+	if noRows(err) {
+		return store.AlertReview{}, store.ErrNotFound
+	}
+	if err != nil {
+		return store.AlertReview{}, fmt.Errorf("looking up review: %w", err)
+	}
+	r.Scores = s
+	return r, nil
 }
 
-func (a *alerts) CreateReview(_ context.Context, _ store.NewReview) error {
-	// SCHEMA GAP: no job_reviews table in Postgres yet (see Review/Company above). A review
-	// cannot be stored here until it is migrated, so this fails loudly rather than pretending to
-	// save - the handler renders it as a 500 on the local stack. Not a sideways concern: the
-	// sideways tenant is Mongo.
-	return fmt.Errorf("sqlstore: job_reviews table not migrated yet")
+func (a *alerts) CreateReview(ctx context.Context, r store.NewReview) error {
+	// routes/Alert.js's company fallback: the job's own company, else the owner's default, else
+	// any they own. ORDER BY is_default DESC does in one query what Node does in two; id is the
+	// tiebreak (#19) so the "any" case is deterministic.
+	companyID := string(r.CompanyID)
+	if companyID == "" {
+		err := a.pool.QueryRow(ctx, `
+			SELECT id FROM companies WHERE uid = $1
+			 ORDER BY is_default DESC, created_at ASC, id ASC LIMIT 1`, string(r.UID)).Scan(&companyID)
+		if noRows(err) {
+			return store.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("resolving company: %w", err)
+		}
+	}
+
+	_, err := a.pool.Exec(ctx, `
+		INSERT INTO job_reviews
+		  (uid, company_id, job_id, client_id, jobcard_id, challan_number, client_name,
+		   quality, speed, communication, satisfaction, overall, comment)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		string(r.UID), companyID, string(r.JobID), string(r.ClientID), r.JobcardID, r.ChallanNumber,
+		r.ClientName, r.Scores.Quality, r.Scores.Speed, r.Scores.Communication, r.Scores.Satisfaction,
+		r.Scores.Overall, r.Comment)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return store.ErrDuplicate
+		}
+		return fmt.Errorf("creating review: %w", err)
+	}
+	return nil
 }

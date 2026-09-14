@@ -21,8 +21,10 @@ VALUES (
     'admin'
 );
 
-INSERT INTO companies (id, uid, name, is_default)
-VALUES ('6a8b8c48ae946c0049e824a9', '6a8b8c48ae946c0049e824a8', 'Manan Graphics', true);
+INSERT INTO companies (id, uid, name, firm, phone, gst, address, url, is_default)
+VALUES ('6a8b8c48ae946c0049e824a9', '6a8b8c48ae946c0049e824a8', 'Manan Graphics',
+        'Manan Graphics LLP', '919000000000', '24ABCDE1234F1Z5',
+        '12 Print Street, Ahmedabad 380001', '/uploads/default-logo.png', true);
 
 INSERT INTO clients (id, company_id, uid, client_name, client_firm, client_phone) VALUES
     ('c00000000000000000000001', '6a8b8c48ae946c0049e824a9', '6a8b8c48ae946c0049e824a8', 'Priya',  'Acme Signs',   '919000000001'),
@@ -65,3 +67,11 @@ UPDATE job_rows SET igst = 18 WHERE job_id = 'a00000000000000000000005';
 INSERT INTO sheets (company_id, uid, date) VALUES
     ('6a8b8c48ae946c0049e824a9', '6a8b8c48ae946c0049e824a8', current_date - 9),
     ('6a8b8c48ae946c0049e824a9', '6a8b8c48ae946c0049e824a8', current_date - 5);
+
+-- A review on the fully-Done job-id, so the alert page's reviewed state has something to show
+-- on the local stack.
+INSERT INTO job_reviews (uid, company_id, job_id, client_id, jobcard_id, challan_number,
+                         client_name, quality, speed, communication, satisfaction, overall, comment)
+VALUES ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'a00000000000000000000001',
+        'c00000000000000000000001', 'JOB/26-27/000001-000001', 'JOB/26-27/000001', 'Acme Signs',
+        5, 4, 5, 5, 5, 'Fast and clean work.');

@@ -52,6 +52,12 @@ CREATE TABLE companies (
     id          text PRIMARY KEY DEFAULT gen_ulid(),
     uid         text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name        text NOT NULL,
+    firm        text NOT NULL DEFAULT '',
+    phone       text NOT NULL DEFAULT '',
+    gst         text NOT NULL DEFAULT '',
+    address     text NOT NULL DEFAULT '',
+    -- The logo/letterhead image path, embedded in customer-facing PDFs and the alert page.
+    url         text NOT NULL DEFAULT '',
     is_default  boolean NOT NULL DEFAULT false,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
@@ -166,6 +172,38 @@ CREATE INDEX job_rows_job_idx ON job_rows (job_id);
 -- "Which job-ids still have work on them" is the dashboard's alert, and in Mongo it needs an
 -- $elemMatch over a subdocument array. Here the stage is a column and can be indexed.
 CREATE INDEX job_rows_open_idx ON job_rows (job_id) WHERE queue <> 'Done';
+
+-- ---------------------------------------------------------------------------------------
+-- Customer reviews (routes/Alert.js)
+-- ---------------------------------------------------------------------------------------
+
+-- One review per job, left from the public alert link. company_id and uid are denormalised
+-- onto the row - every report filters by company, and a review reachable only by joining to the
+-- job would be the one collection that cannot be. The parties are snapshotted, like every
+-- document here, so a rename or deletion cannot make an old review unreadable. Scores are flat
+-- columns with a CHECK rather than a nested object: 1-5 is enforced by the database, not hoped
+-- for. The unique index on job_id is the real guard - the page is unauthenticated, so a second
+-- submit is a refresh away.
+CREATE TABLE job_reviews (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    uid            text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id     text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    job_id         text NOT NULL UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+    client_id      text NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    jobcard_id     text NOT NULL DEFAULT '',
+    challan_number text NOT NULL DEFAULT '',
+    client_name    text NOT NULL DEFAULT '',
+    quality        smallint NOT NULL CHECK (quality       BETWEEN 1 AND 5),
+    speed          smallint NOT NULL CHECK (speed         BETWEEN 1 AND 5),
+    communication  smallint NOT NULL CHECK (communication BETWEEN 1 AND 5),
+    satisfaction   smallint NOT NULL CHECK (satisfaction  BETWEEN 1 AND 5),
+    overall        smallint NOT NULL CHECK (overall       BETWEEN 1 AND 5),
+    comment        text NOT NULL DEFAULT '',
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX job_reviews_company_created_idx ON job_reviews (company_id, created_at DESC);
+CREATE INDEX job_reviews_client_idx ON job_reviews (client_id);
 
 -- A day that work was collected under. Historically the only thing that made a day exist;
 -- now days come from jobs.received_date and this survives for days that predate that.
