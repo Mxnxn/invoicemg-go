@@ -94,7 +94,10 @@ func (h *Handler) Only(w http.ResponseWriter, r *http.Request) {
 	}
 	// Newest first. The dates are YYYY-MM-DD, so string order IS date order - which is the
 	// whole reason this app stores them that way rather than as Date objects.
-	sort.Slice(out, func(i, j int) bool { return out[i].Date > out[j].Date })
+	// SliceStable, not Slice (#19): the convention is a deterministic order, and though these
+	// dates are unique today (one entry per date), a stable sort keeps the list reproducible
+	// if that ever stops holding.
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Date > out[j].Date })
 
 	// This route sends {code, data, message} with NO `status` field. Matching Node exactly,
 	// quirk and all - see internal/httpx for why that matters.

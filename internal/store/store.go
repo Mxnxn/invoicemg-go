@@ -110,6 +110,15 @@ type OpenJob struct {
 	HasClient     bool
 }
 
+// Ordering convention (#19): every method that returns a list gives a TOTAL order, so the
+// same query cannot return the same rows in two arrangements - parity.js compares array
+// order, and a LIMIT makes the boundary set itself turn on ties. The mongostore keeps Node's
+// exact sort and relies on Mongo's natural order for ties, which is what makes it match the
+// live Node service; the sqlstore makes that tiebreak explicit with a trailing id, because
+// Postgres leaves ties arbitrary. ids sort ascending by creation time in both stores
+// (ObjectID hex, and ULIDs for new rows), so the two agree. Handlers never re-sort a list the
+// store already ordered; where one must sort in memory it uses a stable sort.
+//
 // Days answers the questions the dashboard asks.
 type Days interface {
 	// CountsByDate groups job-ids by the date an admin put on them (receivedDate).

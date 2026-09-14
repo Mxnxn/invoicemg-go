@@ -54,7 +54,7 @@ func (d *days) SheetDates(ctx context.Context, companyID store.ID) (map[string]s
 		SELECT DISTINCT ON (date) `+fmt.Sprintf(dateFormat, "date")+`, id
 		  FROM sheets
 		 WHERE company_id = $1
-		 ORDER BY date, created_at ASC`, string(companyID))
+		 ORDER BY date, created_at ASC, id ASC`, string(companyID))
 	if err != nil {
 		return nil, fmt.Errorf("listing sheets: %w", err)
 	}
@@ -95,7 +95,7 @@ func (d *days) OpenJobs(ctx context.Context, companyID store.ID, limit int) ([]s
 		 -- Oldest first: the job-id sitting open the longest is the one worth looking at,
 		 -- which is the opposite of how every other list here is sorted. NULLS FIRST matches
 		 -- Mongo, where a missing receivedDate sorts before every date.
-		 ORDER BY j.received_date ASC NULLS FIRST
+		 ORDER BY j.received_date ASC NULLS FIRST, j.id ASC
 		 LIMIT $2`, string(companyID), limit)
 	if err != nil {
 		return nil, fmt.Errorf("listing open jobs: %w", err)

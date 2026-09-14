@@ -50,7 +50,7 @@ func scanUnit(row interface {
 
 func (u *units) List(ctx context.Context, companyID store.ID) ([]store.Unit, error) {
 	rows, err := u.pool.Query(ctx,
-		`SELECT `+unitColumns+` FROM units WHERE company_id = $1 ORDER BY name ASC`, string(companyID))
+		`SELECT `+unitColumns+` FROM units WHERE company_id = $1 ORDER BY name ASC, id ASC`, string(companyID))
 	if err != nil {
 		return nil, fmt.Errorf("listing units: %w", err)
 	}

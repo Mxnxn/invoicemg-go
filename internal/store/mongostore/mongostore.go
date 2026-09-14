@@ -274,6 +274,10 @@ func (d *days) OpenJobs(ctx context.Context, companyID store.ID, limit int) ([]s
 	}
 	// Oldest first: the job-id sitting open the longest is the one worth looking at, which is
 	// the opposite of how every other list here is sorted.
+	// No explicit tiebreak, on purpose: Node sorts the same way (routes/Sheet.js), so relying
+	// on Mongo's natural order for equal receivedDates keeps this list identical to the live
+	// service. The sqlstore adds `id ASC` to reproduce that order once Postgres, which has no
+	// natural order, is the tenant - see internal/store/store.go (#19).
 	opts := options.Find().SetSort(bson.D{{Key: "receivedDate", Value: 1}}).SetLimit(int64(limit))
 
 	cur, err := d.db.Collection(colJobs).Find(ctx, filter, opts)
