@@ -204,12 +204,80 @@ type Users interface {
 	CreateSession(ctx context.Context, s NewSession) (Session, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Alert - the public customer link (routes/Alert.js)
+// ---------------------------------------------------------------------------------------
+
+// AlertJob is one job and its rows, for the page a customer opens from a WhatsApp link. It
+// carries only this job: never another job, never an account balance - see routes/Alert.js.
+type AlertJob struct {
+	ID            ID
+	ChallanNumber string
+	ReceivedDate  string
+	Queue         string
+	ClientID      ID
+	CompanyID     ID
+	UID           ID
+	// CreatedAt is the fallback receivedDate for a job raised before that field existed, the
+	// same substitution Model/Job.js's toJSON makes. nil when unknown.
+	CreatedAt *time.Time
+	Rows      []AlertRow
+}
+
+// AlertRow is one line item. The pricing fields feed jobmath; the rest are shown as-is.
+// HasDimensions is a pointer because absent means by-dimension (a pre-existing row), not false.
+type AlertRow struct {
+	ID            ID
+	RowID         string
+	Description   string
+	Material      string
+	Qty           float64
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Rate          float64
+	Cgst          float64
+	Sgst          float64
+	Igst          float64
+	Discount      float64
+	Charges       float64
+	Queue         string
+	Progress      string
+}
+
+// AlertClient is the customer's display names, the only client fields the page shows.
+type AlertClient struct {
+	Name string
+	Firm string
+}
+
+// AlertCompany is the letterhead - the lines every document in this app prints.
+type AlertCompany struct {
+	Name    string
+	Firm    string
+	Phone   string
+	URL     string
+	Address string
+	Gst     string
+}
+
+// Alerts serves the public customer link. Job returns ErrBadID for a non-id and ErrNotFound
+// for an unknown one; Client and Company return ErrNotFound (which the handler renders as
+// blank, matching Node's optional chaining) for an empty or unknown id, because a job's
+// company_id is nullable and a missing party is normal here, not an error.
+type Alerts interface {
+	Job(ctx context.Context, id ID) (AlertJob, error)
+	Client(ctx context.Context, id ID) (AlertClient, error)
+	Company(ctx context.Context, id ID) (AlertCompany, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
 	Days() Days
 	Units() Units
 	Users() Users
+	Alerts() Alerts
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

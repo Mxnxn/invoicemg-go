@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mxnxn/invoicemg-go/internal/alerts"
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
@@ -125,6 +126,7 @@ func routes(db store.Store) http.Handler {
 	dayHandler := days.New(db.Days())
 	unitHandler := units.New(db.Units())
 	userHandler := users.New(db.Users())
+	alertHandler := alerts.New(db.Alerts())
 
 	// Every route is registered TWICE, under two surfaces.
 	//
@@ -165,6 +167,13 @@ func routes(db store.Store) http.Handler {
 
 	mux.Handle("POST /unit/delete", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
 	mux.Handle("DELETE /units/{id}", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
+
+	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
+	// the recipient is a customer with no login; the pair of ids is what authorises it, since
+	// both must resolve to the same job. This is the exact path baked into links already
+	// sent, so it is served as-is rather than under a REST alias nothing would call. The
+	// review GET/POST are not ported yet.
+	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 
 	mux.HandleFunc("GET /healthz", health(db))
 
