@@ -19,6 +19,11 @@
 -- the queue stage can finally be indexed. This is the single biggest reason to want SQL for
 -- this application - the reports all count rows, and rows were never addressable.
 
+-- gen_ulid() below needs gen_random_bytes(), which lives in pgcrypto - not in core, and not
+-- enabled by default on the postgres image. Without this the whole schema aborts on the
+-- function definition and NOTHING is created.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- A sortable, ObjectID-shaped identifier: 4-byte seconds + 8 random bytes, hex. Same 24
 -- characters and the same "sorts by creation time" property, so a mixed table of imported and
 -- new ids still orders correctly.

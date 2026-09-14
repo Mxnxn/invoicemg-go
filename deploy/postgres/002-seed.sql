@@ -15,7 +15,7 @@ INSERT INTO users (id, email, password, name, firm, role)
 VALUES (
     '6a8b8c48ae946c0049e824a8',
     'owner@local.test',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    '$2a$10$.KybhKt.pYOwK0ptMK5bRu4en0jUKH2PC1fKI6DSKqR8Qw0RFwRg2',
     'Local Owner',
     'Manan Graphics',
     'admin'
