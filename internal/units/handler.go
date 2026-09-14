@@ -121,7 +121,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.Invalid(w, "")
 		return
 	}
-	unitID, name := form.String("unit_id"), form.String("name")
+	// PATCH /unit/{id} puts the id in the path; POST /unit/update puts it in the form. One
+	// handler serves both - the id is the id, however it arrived.
+	unitID := r.PathValue("id")
+	if unitID == "" {
+		unitID = form.String("unit_id")
+	}
+	name := form.String("name")
 	if unitID == "" || name == "" {
 		httpx.Invalid(w, "")
 		return
@@ -155,12 +161,13 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	sess := auth.MustFrom(ctx)
 
-	form, err := httpx.ReadForm(r)
-	if err != nil {
-		httpx.Invalid(w, "")
-		return
+	// DELETE /unit/{id} carries no body at all, so a parse failure is not an error here - the
+	// id came from the path. Only the legacy POST form needs this to succeed.
+	form, _ := httpx.ReadForm(r)
+	unitID := r.PathValue("id")
+	if unitID == "" {
+		unitID = form.String("unit_id")
 	}
-	unitID := form.String("unit_id")
 	if unitID == "" {
 		httpx.Invalid(w, "")
 		return

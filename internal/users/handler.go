@@ -1,0 +1,202 @@
+// Package users is signing in.
+//
+// It is here because nothing else in the application can be reached without it: the React
+// client gates every route on a uid in localStorage, which only a successful login writes. The
+// local all-in-one stack needs this to be usable at all.
+package users
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"net/http"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/store"
+)
+
+type Handler struct {
+	Users store.Users
+	Now   func() time.Time
+}
+
+func New(users store.Users) *Handler { return &Handler{Users: users, Now: time.Now} }
+
+// Session lifetimes, from Helpers/SessionLifetime.js.
+const (
+	defaultHours   = 12
+	rememberedDays = 30
+)
+
+func lifetime(remembered bool) time.Duration {
+	if remembered {
+		return time.Duration(rememberedDays) * 24 * time.Hour
+	}
+	return time.Duration(defaultHours) * time.Hour
+}
+
+// normaliseEmail is Helpers/NormalizeEmail.js: lowercase and trimmed. It lives on the caller's
+// side of the store so both backends cannot disagree about what "the same address" means.
+func normaliseEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+// flags are the capability booleans the client reads instead of inferring authorisation from
+// the role string - Helpers/SessionFlags.js. UI hints only: every endpoint still enforces its
+// own rules, so a tampered flag buys nothing.
+type flags struct {
+	IsOwner           bool     `json:"isOwner"`
+	IsSuperadmin      bool     `json:"isSuperadmin"`
+	IsEmployee        bool     `json:"isEmployee"`
+	CanManageCompanies bool    `json:"canManageCompanies"`
+	CanManageAccount  bool     `json:"canManageAccount"`
+	CanManagePeople   bool     `json:"canManagePeople"`
+	CanOpenDevPanel   bool     `json:"canOpenDevPanel"`
+	Permissions       []string `json:"permissions"`
+}
+
+func sessionFlags(role string, permissions []string) flags {
+	isSuperadmin := role == "superadmin"
+	isOwner := role == "admin" || isSuperadmin
+	if permissions == nil {
+		permissions = []string{}
+	}
+	return flags{
+		IsOwner:            isOwner,
+		IsSuperadmin:       isSuperadmin,
+		IsEmployee:         role == "employee",
+		CanManageCompanies: isOwner,
+		CanManageAccount:   isOwner,
+		CanManagePeople:    isOwner,
+		CanOpenDevPanel:    isSuperadmin,
+		Permissions:        permissions,
+	}
+}
+
+type loginData struct {
+	Token     string      `json:"token"`
+	Email     string      `json:"email"`
+	UID       string      `json:"uid"`
+	Role      string      `json:"role"`
+	Flags     flags       `json:"flags"`
+	ExpiresAt *httpx.Time `json:"expiresAt"`
+}
+
+// newToken is the session key.
+//
+// The Node route signs a JWT carrying a random uuid. That signature is never verified by
+// anything: TokenHelper looks the string up in the sessions collection, so the JWT was doing
+// no work beyond being unique and opaque. 32 random bytes are both, without a signing key to
+// configure or leak. The client treats it as an opaque string either way.
+func newToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// Login is POST /user/login.
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	form, err := httpx.ReadForm(r)
+	if err != nil {
+		httpx.Invalid(w, "")
+		return
+	}
+	email, password := form.String("email"), form.String("password")
+	if email == "" || password == "" {
+		httpx.Invalid(w, "")
+		return
+	}
+
+	user, err := h.Users.FindByEmail(ctx, normaliseEmail(email))
+	if errors.Is(err, store.ErrNotFound) {
+		// The SAME message a wrong password gets, deliberately. Saying "that email doesn't
+		// exist" turns the login form into a directory: anyone can submit addresses and learn
+		// which ones hold accounts here. The person who genuinely mistyped is no worse off -
+		// they retype it either way.
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid credential.", Status: httpx.False()})
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	// bcrypt.CompareHashAndPassword is constant-time and reads the cost and salt out of the
+	// stored hash, so hashes written by bcryptjs ($2a$) verify here unchanged.
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid credential.", Status: httpx.False()})
+		return
+	}
+
+	// Second factor, when the account has one. Checked AFTER the password, so a wrong password
+	// never reveals whether an account has 2FA - and no session exists until both have passed.
+	if user.TotpEnabled {
+		// Not implemented in this service yet. Refusing is the only safe answer: quietly
+		// signing someone in without their second factor would be worse than not signing them
+		// in at all.
+		httpx.Write(w, httpx.Envelope{
+			Code:    422,
+			Message: "This account uses two-factor sign-in, which this service does not support yet.",
+			Status:  httpx.False(),
+		})
+		return
+	}
+
+	// What actually locks a login out, checked before a session is created rather than after.
+	if user.ActiveUntil != nil && !user.ActiveUntil.After(h.Now()) {
+		httpx.Write(w, httpx.Envelope{
+			Code:    403,
+			Message: "This account is inactive. Please contact support.",
+			Status:  httpx.False(),
+		})
+		return
+	}
+
+	token, err := newToken()
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	role := user.Role
+	if role == "" {
+		role = "admin"
+	}
+	remembered := form.Bool("remember")
+	expires := h.Now().Add(lifetime(remembered))
+
+	created, err := h.Users.CreateSession(ctx, store.NewSession{
+		Token:      token,
+		UID:        user.ID,
+		Role:       role,
+		Remembered: remembered,
+		ExpiresAt:  &expires,
+	})
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	httpx.Write(w, httpx.Envelope{
+		Code:   200,
+		Status: httpx.True(),
+		Data: loginData{
+			Token: token,
+			Email: user.Email,
+			UID:   user.ID.String(),
+			// The client stores this to gate the sidebar. When it was absent, localStorage
+			// held the literal string "undefined".
+			Role:      role,
+			Flags:     sessionFlags(role, created.Permissions),
+			ExpiresAt: httpx.NewTimePtr(created.ExpiresAt),
+		},
+	})
+}

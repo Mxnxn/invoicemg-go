@@ -157,11 +157,50 @@ type Units interface {
 	SeedDefaults(ctx context.Context, uid, companyID ID) error
 }
 
+// ---------------------------------------------------------------------------------------
+// Users and signing in
+// ---------------------------------------------------------------------------------------
+
+// User is an account, as far as signing in is concerned.
+type User struct {
+	ID           ID
+	Email        string
+	PasswordHash string
+	Name         string
+	Firm         string
+	Role         string
+	// ActiveUntil is what actually locks a login out. nil means no expiry.
+	ActiveUntil *time.Time
+	TotpEnabled bool
+	TotpSecret  string
+}
+
+// NewSession is a session about to be written. Separate from Session because the caller
+// supplies some fields and the store supplies the rest.
+type NewSession struct {
+	Token       string
+	UID         ID
+	Role        string
+	PersonID    ID
+	Permissions []string
+	Remembered  bool
+	ExpiresAt   *time.Time
+}
+
+type Users interface {
+	// FindByEmail returns the account for a NORMALISED email, or ErrNotFound. Normalisation
+	// belongs to the caller so both backends cannot disagree about what "the same address"
+	// means.
+	FindByEmail(ctx context.Context, email string) (User, error)
+	CreateSession(ctx context.Context, s NewSession) (Session, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
 	Days() Days
 	Units() Units
+	Users() Users
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

@@ -1,11 +1,12 @@
-// Package httpx holds the wire contract this service shares with the Node API.
+// Package httpx holds the wire contract, in both the shapes this service has to speak.
 //
-// That contract is unusual and deliberately preserved: business errors come back as HTTP 200
-// with a `code` inside the body. The React client branches on `data.code` and never on the
-// HTTP status (its global axios interceptor raises a toast for any code != 200), so a Go
-// handler that answered a real 401 would be read by the frontend as a SUCCESSFUL request
-// carrying no data - a blank screen with no error. Everything here exists to make that
-// impossible to get wrong by accident.
+// The Node API answers every request with HTTP 200 and puts the real outcome in a `code`
+// inside the body. The React client branches on `data.code` and never on the HTTP status, so
+// while the two services run side by side a Go handler that answered a real 401 would be read
+// by the frontend as a SUCCESSFUL request carrying no data - a blank screen with no error.
+//
+// That is preserved as StyleLegacy, and StyleREST puts the outcome back in the status line
+// where it belongs. One handler serves both; see style.go.
 package httpx
 
 import (
@@ -34,10 +35,18 @@ func True() *bool { b := true; return &b }
 // False is a helper for the routes that do send `status`.
 func False() *bool { b := false; return &b }
 
-// Write sends an envelope. Always HTTP 200 - see the package comment.
+// Write sends an envelope, with the HTTP status the configured style calls for.
+//
+// In legacy style that is always 200 and the outcome lives in the body; in rest style the
+// status carries the outcome and the body keeps `code` as well, so a client can be moved
+// across one call at a time rather than all at once. See style.go for why both exist.
 func Write(w http.ResponseWriter, env Envelope) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+	status := http.StatusOK
+	if Style() == StyleREST {
+		status = httpStatusFor(env.Code)
+	}
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(env); err != nil {
 		// The status line is already sent, so there is nothing to tell the client. Log it:
 		// a serialisation failure here means a handler built something json cannot encode.

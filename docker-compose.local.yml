@@ -1,0 +1,90 @@
+# The whole application, locally, in one command.
+#
+#   docker compose -f docker-compose.local.yml up --build
+#   open http://localhost:8080     owner@local.test / password123
+#
+# Three containers: Postgres, the Go API, and the SPA behind nginx. No Mongo and no Node -
+# this is a preview of life AFTER cutover, and it shares nothing with the sideways stack in
+# docker-compose.yml or with anything in production.
+#
+# Port 8080 rather than 80, so it cannot collide with the Node stack's web container or with
+# anything else already listening.
+#
+# THE DATA HERE IS FAKE. deploy/postgres/002-seed.sql publishes a password in plain text on
+# purpose. Never point this file at a real database.
+
+name: invoicemg-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: invoicemg
+      POSTGRES_PASSWORD: invoicemg
+      POSTGRES_DB: invoicemg
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs every .sql in here once, in filename order, on an EMPTY data directory - which is
+      # why the schema is 001 and the seed is 002. To re-apply after changing either, throw the
+      # volume away: docker compose -f docker-compose.local.yml down -v
+      - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
+    # Not published. Only the api container needs it, over the compose network - publishing it
+    # would put a database with a guessable password on your LAN.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoicemg -d invoicemg"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  go-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ADDR: ":5002"
+      STORE: postgres
+      POSTGRES_URL: postgres://invoicemg:invoicemg@postgres:5432/invoicemg?sslmode=disable
+    depends_on:
+      postgres:
+        # Waits for pg_isready, not merely for the container to exist - Postgres runs the init
+        # scripts before it accepts connections, and starting the API first means it fails on
+        # a database that has no tables yet.
+        condition: service_healthy
+    # Published so the parity harness and curl can reach it directly, without going through
+    # nginx. The browser does not use this - it talks to /api on port 8080.
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # The same ceiling the Node API runs under in production, so the comparison is
+          # honest. It has been observed using about 12MB of it.
+          memory: 400M
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        # Relative on purpose - nginx inside this container proxies /api to go-api, so the
+        # bundle carries no hostname and there is no CORS anywhere in this stack.
+        VITE_API_URL: /api
+    depends_on:
+      - go-api
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+
+volumes:
+  postgres-data:

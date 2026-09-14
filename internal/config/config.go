@@ -11,15 +11,42 @@ import (
 	"time"
 )
 
+const (
+	StoreMongo    = "mongo"
+	StorePostgres = "postgres"
+)
+
 type Config struct {
 	// Where to listen. ":5002" by default, deliberately NOT 5000/5001 - the Node API owns
 	// those, and this service is meant to run beside it, not instead of it.
 	Addr string
 
-	// The same MongoDB the Node API uses. During the sideways phase both services read the
-	// same documents; see README.md for why that rules out Postgres until cutover.
+	// Which backend to talk to: "mongo" or "postgres".
+	//
+	// Two modes, and the choice is not a preference - it decides what this service IS.
+	//
+	//   mongo     the sideways stack. Same documents as the live Node API, so both can answer
+	//             the same request and be diffed against each other.
+	//   postgres  the all-in-one local stack. Its OWN database, seeded from deploy/postgres -
+	//             a preview of life after cutover, sharing nothing with the Node app.
+	//
+	// Pointing the postgres mode at anything real would give you two services writing two
+	// databases that disagree, which is exactly what the sideways phase exists to avoid.
+	Store string
+
+	// The same MongoDB the Node API uses, when Store is "mongo".
 	MongoURI string
 	MongoDB  string
+
+	// Where Postgres is, when Store is "postgres".
+	PostgresURL string
+
+	// "legacy" or "rest" - see internal/httpx/style.go.
+	//
+	// Defaults to legacy, because the default deployment of this service is beside the Node
+	// API, where answering a real HTTP status would break the client. The all-in-one stack
+	// sets rest explicitly.
+	APIStyle string
 
 	// How long to wait for Mongo before giving up at startup.
 	ConnectTimeout time.Duration
@@ -28,6 +55,9 @@ type Config struct {
 func Load() (Config, error) {
 	c := Config{
 		Addr:           env("ADDR", ":5002"),
+		Store:          env("STORE", StoreMongo),
+		APIStyle:       env("API_STYLE", "legacy"),
+		PostgresURL:    env("POSTGRES_URL", ""),
 		MongoURI:       env("MONGO_URI", "mongodb://127.0.0.1:27018"),
 		MongoDB:        env("MONGO_DB", "invoicemg_new"),
 		ConnectTimeout: 10 * time.Second,
@@ -41,8 +71,21 @@ func Load() (Config, error) {
 		c.ConnectTimeout = time.Duration(secs) * time.Second
 	}
 
-	if c.MongoURI == "" {
-		return Config{}, fmt.Errorf("MONGO_URI must be set")
+	if c.APIStyle != "legacy" && c.APIStyle != "rest" {
+		return Config{}, fmt.Errorf(`API_STYLE must be "legacy" or "rest", got %q`, c.APIStyle)
+	}
+
+	switch c.Store {
+	case StoreMongo:
+		if c.MongoURI == "" {
+			return Config{}, fmt.Errorf("MONGO_URI must be set when STORE=mongo")
+		}
+	case StorePostgres:
+		if c.PostgresURL == "" {
+			return Config{}, fmt.Errorf("POSTGRES_URL must be set when STORE=postgres")
+		}
+	default:
+		return Config{}, fmt.Errorf("STORE must be %q or %q, got %q", StoreMongo, StorePostgres, c.Store)
 	}
 	return c, nil
 }

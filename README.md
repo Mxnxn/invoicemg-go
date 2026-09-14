@@ -69,7 +69,7 @@ curl localhost:5002/healthz
 ### Tests
 
 ```sh
-docker run --rm -v "$PWD":/src -w /src golang:1.22-alpine go test ./...
+docker run --rm -v "$PWD":/src -w /src golang:1.25-alpine go test ./...
 ```
 
 ## Comparing an answer against Node
@@ -99,16 +99,12 @@ would have noticed.
 
 ## The frontend copy (`web/`)
 
-`web/` is a copy of `InvoiceMG-Mxnxn/Invoice-mg`, taken so this repository can eventually be
-the whole application. Until cutover it is **not** the source of truth, and the risk is not
-staleness - it is that both copies get hand-edited and quietly diverge.
+`web/` was imported once from `InvoiceMG-Mxnxn/Invoice-mg` and is now **the source of truth**.
+All work happens in this repository; the old one is read-only reference.
 
-> Edit the frontend in `InvoiceMG-Mxnxn/Invoice-mg`. Bring this copy forward with
-> `pwsh scripts/sync-web.ps1 -Apply`. Never hand-edit `web/`.
-
-At cutover that reverses: `web/` becomes the source of truth, the sync script is deleted, and
-the old repo is archived. The client needs no change either way - it talks to whatever nginx
-points it at.
+`scripts/sync-web.ps1` was the importer and is kept only in case something was left behind. It
+MIRRORS, so `-Apply` would delete every change made here since — it defaults to a dry run for
+that reason.
 
 ## Progress
 

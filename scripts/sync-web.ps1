@@ -1,16 +1,14 @@
 # Refresh web/ from the Node repo's frontend.
 #
-# web/ is a COPY. The original in InvoiceMG-Mxnxn/Invoice-mg is still the source of truth and
-# is still being edited - so the danger is not that this copy is stale, it is that someone
-# edits BOTH and the two quietly diverge into a merge nobody wants to do by hand.
+# ONE-TIME IMPORT, NOT AN ONGOING SYNC.
 #
-# The rule while the migration is sideways:
+# web/ was seeded from InvoiceMG-Mxnxn/Invoice-mg and is now THE SOURCE OF TRUTH: all work
+# happens in this repository. This script exists only to pull across anything that was left
+# behind in the original before the switch.
 #
-#   Edit the frontend in InvoiceMG-Mxnxn/Invoice-mg. Run this to bring the copy forward.
-#   Never hand-edit web/.
-#
-# At cutover that reverses: web/ becomes the source of truth, this script is deleted, and the
-# old repo is archived.
+# It MIRRORS (/MIR), so running it would DELETE every change made in web/ since the import.
+# That is why it defaults to a dry run and why -Apply has to be typed deliberately. If you are
+# not certain you want the old repo to win, do not pass it.
 #
 #   pwsh scripts/sync-web.ps1            # show what would change
 #   pwsh scripts/sync-web.ps1 -Apply     # actually copy
@@ -39,7 +37,7 @@ $common = @(
 )
 
 if (-not $Apply) {
-    Write-Host "Dry run. Files that differ (pass -Apply to copy):`n"
+    Write-Host "Dry run. -Apply would OVERWRITE web/ with the listed files and delete anything not in the source:`n"
     & robocopy @common /L
     Write-Host "`nNothing was changed."
     exit 0

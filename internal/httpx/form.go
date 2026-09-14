@@ -22,16 +22,25 @@ type Form struct {
 // any field this API takes; the two upload routes that accept real files set their own.
 const maxMemory = 8 << 20
 
+// ReadForm never returns a nil Form, even when parsing fails.
+//
+// A DELETE carries no body at all, so parsing it "fails" in the ordinary course of events -
+// and a handler that reads the id from the path and only falls back to the form would
+// nil-pointer panic on the error path. r.FormValue is safe to call on an unparsed request
+// (it returns ""), so an empty Form is a perfectly good answer; the error is there for the
+// callers that genuinely require a body.
 func ReadForm(r *http.Request) (*Form, error) {
+	form := &Form{r: r}
+
 	contentType := r.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(maxMemory); err != nil {
-			return nil, err
+			return form, err
 		}
 	} else if err := r.ParseForm(); err != nil {
-		return nil, err
+		return form, err
 	}
-	return &Form{r: r}, nil
+	return form, nil
 }
 
 // String returns a field, trimmed. Missing and empty are the same thing here, which matches

@@ -1,8 +1,13 @@
-// Command api is the Go service that runs BESIDE the Node API, not instead of it.
+// Command api serves the InvoiceMG API in Go.
 //
-// Local only for now: it listens on :5002 while Node keeps :5001, reads the same MongoDB, and
-// nothing in this repository touches the production compose file or the deploy workflow. See
-// README.md for how a route moves across.
+// It runs in one of two modes, chosen by STORE:
+//
+//	mongo     beside the Node API, against the same documents, so the two can be diffed
+//	          request for request. :5002 while Node keeps :5001.
+//	postgres  the all-in-one local stack (docker-compose.local.yml), against its own
+//	          database - a preview of life after cutover, sharing nothing with the Node app.
+//
+// Nothing in this repository touches the production compose file or the deploy workflow.
 package main
 
 import (
@@ -19,8 +24,11 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
+	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
 	"github.com/mxnxn/invoicemg-go/internal/units"
+	"github.com/mxnxn/invoicemg-go/internal/users"
 )
 
 func main() {
@@ -38,7 +46,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	db, err := mongostore.Open(ctx, cfg.MongoURI, cfg.MongoDB, cfg.ConnectTimeout)
+	db, err := openStore(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -46,15 +54,18 @@ func run() error {
 		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := db.Close(closeCtx); err != nil {
-			log.Printf("closing mongo: %v", err)
+			log.Printf("closing the database: %v", err)
 		}
 	}()
+
+	// Set once, before anything can serve a request. See internal/httpx/style.go.
+	httpx.SetStyle(cfg.APIStyle)
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
 		Handler: routes(db),
 		// A request that has not finished in this long is not going to. The Node app has no
-		// equivalent, which is why one slow Mongo query there can hold a connection open
+		// equivalent, which is why one slow query there can hold a connection open
 		// indefinitely.
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -64,7 +75,7 @@ func run() error {
 
 	errs := make(chan error, 1)
 	go func() {
-		log.Printf("invoicemg-go listening on %s, mongo %s/%s", cfg.Addr, cfg.MongoURI, cfg.MongoDB)
+		log.Printf("invoicemg-go listening on %s, store=%s, api-style=%s", cfg.Addr, cfg.Store, httpx.Style())
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errs <- err
 		}
@@ -74,7 +85,7 @@ func run() error {
 	case err := <-errs:
 		return err
 	case <-ctx.Done():
-		// Finish what is in flight before exiting, so a deploy or a Ctrl-C does not cut a
+		// Finish what is in flight before exiting, so a restart or a Ctrl-C does not cut a
 		// response in half.
 		log.Print("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -83,27 +94,26 @@ func run() error {
 	}
 }
 
-type pinger interface {
-	Ping(ctx context.Context) error
+// openStore is the ONLY place either backend is named. Everything below it takes a
+// store.Store, which is why adding Postgres changed no handler.
+func openStore(ctx context.Context, cfg config.Config) (store.Store, error) {
+	switch cfg.Store {
+	case config.StorePostgres:
+		log.Printf("using postgres")
+		return sqlstore.Open(ctx, cfg.PostgresURL, cfg.ConnectTimeout)
+	default:
+		log.Printf("using mongo at %s/%s", cfg.MongoURI, cfg.MongoDB)
+		return mongostore.Open(ctx, cfg.MongoURI, cfg.MongoDB, cfg.ConnectTimeout)
+	}
 }
 
-func routes(db *mongostore.Store) http.Handler {
+func routes(db store.Store) http.Handler {
 	mux := http.NewServeMux()
 
 	guard := auth.New(db.Sessions())
 	admin := func(h http.HandlerFunc) http.Handler {
 		return auth.Chain(h, guard.Require, auth.RequireAdmin)
 	}
-
-	dayHandler := days.New(db.Days())
-	unitHandler := units.New(db.Units())
-
-	// Method and path together, which Go 1.22's mux understands. The Node app mounts
-	// everything as POST, including reads, and that is preserved: the frontend posts FormData
-	// to all of these, and changing a verb would mean changing the client.
-	mux.Handle("POST /sheet/only", admin(dayHandler.Only))
-	mux.Handle("POST /sheet/open-jobs", admin(dayHandler.OpenJobs))
-
 	// Units live inside the Products manager, so they carry the products permission - and the
 	// write routes carry the write-level gate ON TOP of it, exactly as routes/Unit.js layers
 	// requireCreate and requireDelete under its router-wide requireFeature.
@@ -111,21 +121,64 @@ func routes(db *mongostore.Store) http.Handler {
 		mw := append([]func(http.Handler) http.Handler{guard.Require, auth.RequireFeature(key)}, extra...)
 		return auth.Chain(h, mw...)
 	}
+
+	dayHandler := days.New(db.Days())
+	unitHandler := units.New(db.Units())
+	userHandler := users.New(db.Users())
+
+	// Every route is registered TWICE, under two surfaces.
+	//
+	// The legacy surface is what the Node API exposes and what the React client calls today:
+	// POST for everything, including reads, with the outcome in the body. It is preserved
+	// exactly, because while both services are live the same client must be able to call
+	// either one.
+	//
+	// The REST surface is the same handlers under the verb that actually describes what they
+	// do, with the id in the path. It is what the all-in-one stack is for - there the frontend
+	// is ours to move, one call at a time, with the legacy path still answering until it has.
+	//
+	// Registering both costs one line each and means the client migration is not a flag day.
+
+	// Unauthenticated - this is what issues a session. A login CREATES a session, so POST is
+	// right under either surface; only the path shape differs.
+	mux.HandleFunc("POST /user/login", userHandler.Login)
+	mux.HandleFunc("POST /sessions", userHandler.Login)
+
+	// Reads. GET under REST, so they are cacheable, safe to retry, and visible as reads in
+	// any log - none of which is true of a POST.
+	mux.Handle("POST /sheet/only", admin(dayHandler.Only))
+	mux.Handle("GET /days", admin(dayHandler.Only))
+	mux.Handle("POST /sheet/open-jobs", admin(dayHandler.OpenJobs))
+	mux.Handle("GET /jobs/open", admin(dayHandler.OpenJobs))
+
 	mux.Handle("POST /unit/list", feature("products", unitHandler.List))
+	mux.Handle("GET /units", feature("products", unitHandler.List))
+
 	mux.Handle("POST /unit/create", feature("products", unitHandler.Create, auth.RequireCreate("products")))
+	mux.Handle("POST /units", feature("products", unitHandler.Create, auth.RequireCreate("products")))
+
+	// PATCH rather than PUT: the request carries the fields to change, not a whole
+	// replacement unit. PUT would promise that anything omitted is cleared, which is not what
+	// this does.
 	mux.Handle("POST /unit/update", feature("products", unitHandler.Update))
+	mux.Handle("PATCH /units/{id}", feature("products", unitHandler.Update))
+
 	mux.Handle("POST /unit/delete", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
+	mux.Handle("DELETE /units/{id}", feature("products", unitHandler.Delete, auth.RequireDelete("products")))
 
 	mux.HandleFunc("GET /healthz", health(db))
 
-	// Anything this service has not taken over yet. Returning a clear signal rather than a
-	// bare 404 page matters while both services are live: if nginx sends a path here by
-	// mistake, this says so in the log instead of looking like an application error.
+	// Anything this service has not taken over yet.
+	//
+	// In the sideways stack nginx should never send these here, so the log line is how a
+	// misrouted path announces itself. In the all-in-one stack there is no Node to fall back
+	// to, so this is ALSO what the frontend gets for a screen that has not been ported - the
+	// message says which, rather than leaving a blank panel with no explanation.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("not handled here: %s %s", r.Method, r.URL.Path)
+		log.Printf("not implemented here: %s %s", r.Method, r.URL.Path)
 		httpx.Write(w, httpx.Envelope{
 			Code:    404,
-			Message: "This route is still served by the Node API.",
+			Message: "This route has not been ported to the Go service yet.",
 			Status:  httpx.False(),
 		})
 	})
@@ -133,7 +186,7 @@ func routes(db *mongostore.Store) http.Handler {
 	return logging(mux)
 }
 
-func health(db pinger) http.HandlerFunc {
+func health(db store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()

@@ -4,7 +4,7 @@
 # 150MB for the Node image it sits beside. That difference is most of the memory argument for
 # doing this at all, so it is worth not giving it away with a fat base image.
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Dependencies first, as their own layer: they change far less often than the code, so a
