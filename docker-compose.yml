@@ -1,0 +1,33 @@
+# LOCAL ONLY.
+#
+# This file starts the Go service beside the Node stack on your machine. It deliberately does
+# NOT define mongo: it connects to the one the InvoiceMG-Mxnxn stack already publishes on
+# host port 27018, so both services read the same documents and you can compare their answers
+# request for request.
+#
+# Nothing here is wired into production. The droplet still runs InvoiceMG-Mxnxn's
+# docker-compose.prod.yml and knows nothing about this service.
+
+services:
+  go-api:
+    build: .
+    # 5002, because the Node API owns 5001 and this runs beside it, not instead of it.
+    ports:
+      - "5002:5002"
+    environment:
+      - ADDR=:5002
+      # host.docker.internal reaches the host from inside the container, which is where the
+      # other stack publishes mongo. Using the other compose network instead would couple the
+      # two stacks together and make this one unable to start on its own.
+      - MONGO_URI=mongodb://host.docker.internal:27018
+      - MONGO_DB=invoicemg_new
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    # The same ceiling the Node API runs under, so the comparison is honest. If Go needs less
+    # - and it should need far less - that shows up as headroom under an identical limit
+    # rather than as a number from a different setup.
+    deploy:
+      resources:
+        limits:
+          memory: 400M
