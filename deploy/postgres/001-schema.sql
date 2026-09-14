@@ -108,6 +108,10 @@ CREATE TABLE clients (
     client_phone text NOT NULL DEFAULT '',
     client_gst   text NOT NULL DEFAULT '',
     client_address text NOT NULL DEFAULT '',
+    opening_balance numeric(14,2) NOT NULL DEFAULT 0,
+    -- Which companies this record is shared with (Phase 2). A Postgres array mirrors Mongo's
+    -- sharing.companies; a read widens by membership, a write never does (#1).
+    shared_company_ids text[] NOT NULL DEFAULT '{}',
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now()
 );

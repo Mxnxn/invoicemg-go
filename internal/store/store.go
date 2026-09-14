@@ -333,6 +333,34 @@ type Banks interface {
 	List(ctx context.Context, companyID ID) ([]Bank, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Clients
+// ---------------------------------------------------------------------------------------
+
+// Client is a customer as the list reads it. Sharing is a POINTER because nil and empty differ
+// on the wire: Node omits the `sharing` key for a legacy record that never had the field, and
+// sends {companies:[]} for a stamped-but-unshared one. CompanyID is "" for a legacy row whose
+// company_id is null.
+type Client struct {
+	ID             ID
+	UID            ID
+	CompanyID      ID
+	ClientName     string
+	ClientFirm     string
+	ClientPhone    string
+	ClientGST      string
+	ClientAddress  string
+	OpeningBalance float64
+	Sharing        *[]ID
+}
+
+type Clients interface {
+	// Visible returns the clients (uid) may READ from company companyID: its own, legacy rows
+	// with a null company, and rows shared with it. This is the read side of #1 - reads widen;
+	// a write path uses company-only scope and never calls this.
+	Visible(ctx context.Context, uid, companyID ID) ([]Client, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -341,6 +369,7 @@ type Store interface {
 	Users() Users
 	Alerts() Alerts
 	Banks() Banks
+	Clients() Clients
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

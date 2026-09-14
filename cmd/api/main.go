@@ -23,6 +23,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/alerts"
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/bank"
+	"github.com/mxnxn/invoicemg-go/internal/client"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
@@ -130,6 +131,7 @@ func routes(db store.Store) http.Handler {
 	userHandler := users.New(db.Users())
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
+	clientHandler := client.New(db.Clients())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
 
 	// Every route is registered TWICE, under two surfaces.
@@ -176,6 +178,13 @@ func routes(db store.Store) http.Handler {
 	// ported; create/update/remove/report are not.
 	mux.Handle("POST /bank/list", feature("batch_receive", bankHandler.List))
 	mux.Handle("GET /banks", feature("batch_receive", bankHandler.List))
+
+	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes
+	// (add/update/remove) and the populate-heavy /client/get are not ported.
+	mux.Handle("POST /client/getall", feature("customers", clientHandler.Getall))
+	mux.Handle("GET /clients", feature("customers", clientHandler.Getall))
+	mux.Handle("POST /client/only", feature("customers", clientHandler.Only))
+	mux.Handle("GET /clients/only", feature("customers", clientHandler.Only))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since
