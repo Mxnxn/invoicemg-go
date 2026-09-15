@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (54 of 209)
+## Routes ready (57 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -41,6 +41,9 @@ the 209 routes the Node API declares.
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
+| `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |
+| `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |
+| `POST /material/remove` | hard delete, company-scoped; a miss still answers 200 (matches Node) | Live · Unit |
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
 | `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |

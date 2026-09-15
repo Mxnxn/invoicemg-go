@@ -80,3 +80,99 @@ func (m *materials) Visible(ctx context.Context, companyID store.ID) ([]store.Ma
 	}
 	return out, hRows.Err()
 }
+
+func (m *materials) Create(ctx context.Context, companyID, uid store.ID, in store.MaterialWrite) (store.Material, error) {
+	var out store.Material
+	var companyCol *string
+	err := m.pool.QueryRow(ctx, `
+		INSERT INTO materials (uid, company_id, material_name, material_rate, purchase_rate, hsn, tax)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, uid, company_id, material_name, material_rate, purchase_rate, unit, hsn, tax, created_at, updated_at`,
+		string(uid), string(companyID), in.MaterialName, in.MaterialRate, in.PurchaseRate, in.Hsn, in.Tax).
+		Scan(&out.ID, &out.UID, &companyCol, &out.MaterialName, &out.MaterialRate, &out.PurchaseRate,
+			&out.Unit, &out.Hsn, &out.Tax, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.Material{}, fmt.Errorf("insert material: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	out.PriceHistory = make([]store.PriceHistoryEntry, 0)
+	return out, nil
+}
+
+func (m *materials) Update(ctx context.Context, companyID, materialID store.ID, in store.MaterialWrite) (store.Material, bool, error) {
+	// Read the current rates first, to decide whether a history row is needed and with what old
+	// values. Scoped to the company so a shared-in product can't be edited through this path.
+	var oldMat, oldPur float64
+	err := m.pool.QueryRow(ctx, `SELECT material_rate, purchase_rate FROM materials WHERE id=$1 AND company_id=$2`,
+		string(materialID), string(companyID)).Scan(&oldMat, &oldPur)
+	if noRows(err) {
+		return store.Material{}, false, nil
+	}
+	if err != nil {
+		return store.Material{}, false, fmt.Errorf("read material: %w", err)
+	}
+	priceChanged := oldMat != in.MaterialRate || oldPur != in.PurchaseRate
+
+	if priceChanged {
+		if _, err := m.pool.Exec(ctx, `
+			INSERT INTO material_price_history (material_id, material_rate, purchase_rate)
+			VALUES ($1, $2, $3)`, string(materialID), oldMat, oldPur); err != nil {
+			return store.Material{}, false, fmt.Errorf("push price history: %w", err)
+		}
+	}
+
+	if _, err := m.pool.Exec(ctx, `
+		UPDATE materials SET material_name=$3, material_rate=$4, purchase_rate=$5, hsn=$6, tax=$7, updated_at=now()
+		 WHERE id=$1 AND company_id=$2`,
+		string(materialID), string(companyID), in.MaterialName, in.MaterialRate, in.PurchaseRate, in.Hsn, in.Tax); err != nil {
+		return store.Material{}, false, fmt.Errorf("update material: %w", err)
+	}
+
+	out, err := m.one(ctx, companyID, materialID)
+	if err != nil {
+		return store.Material{}, false, err
+	}
+	return out, true, nil
+}
+
+func (m *materials) Delete(ctx context.Context, companyID, materialID store.ID) error {
+	if _, err := m.pool.Exec(ctx, `DELETE FROM materials WHERE id=$1 AND company_id=$2`, string(materialID), string(companyID)); err != nil {
+		return fmt.Errorf("delete material: %w", err)
+	}
+	return nil
+}
+
+// one reads a single company-scoped product with its price history (oldest-first).
+func (m *materials) one(ctx context.Context, companyID, materialID store.ID) (store.Material, error) {
+	var out store.Material
+	var companyCol *string
+	err := m.pool.QueryRow(ctx, `
+		SELECT id, uid, company_id, material_name, material_rate, purchase_rate, unit, hsn, tax, created_at, updated_at
+		  FROM materials WHERE id=$1 AND company_id=$2`, string(materialID), string(companyID)).
+		Scan(&out.ID, &out.UID, &companyCol, &out.MaterialName, &out.MaterialRate, &out.PurchaseRate,
+			&out.Unit, &out.Hsn, &out.Tax, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.Material{}, fmt.Errorf("read material: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	out.PriceHistory = make([]store.PriceHistoryEntry, 0)
+	hRows, err := m.pool.Query(ctx, `
+		SELECT material_rate, purchase_rate, changed_at FROM material_price_history
+		 WHERE material_id=$1 ORDER BY changed_at ASC, id ASC`, string(materialID))
+	if err != nil {
+		return store.Material{}, fmt.Errorf("read price history: %w", err)
+	}
+	defer hRows.Close()
+	for hRows.Next() {
+		var e store.PriceHistoryEntry
+		if err := hRows.Scan(&e.MaterialRate, &e.PurchaseRate, &e.ChangedAt); err != nil {
+			return store.Material{}, err
+		}
+		out.PriceHistory = append(out.PriceHistory, e)
+	}
+	return out, hRows.Err()
+}

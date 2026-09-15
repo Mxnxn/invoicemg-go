@@ -243,6 +243,9 @@ func routes(db store.Store) http.Handler {
 	// (#1); the writes and /material/get are not ported.
 	mux.Handle("POST /material/getall", feature("products", materialHandler.Getall))
 	mux.Handle("GET /materials", feature("products", materialHandler.Getall))
+	mux.Handle("POST /material/add", feature("products", materialHandler.Add, auth.RequireCreate("products")))
+	mux.Handle("POST /material/update", feature("products", materialHandler.Update))
+	mux.Handle("POST /material/remove", feature("products", materialHandler.Remove, auth.RequireDelete("products")))
 
 	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
 	mux.Handle("POST /person/list", admin(personHandler.List))

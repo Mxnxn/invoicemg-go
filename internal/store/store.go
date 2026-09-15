@@ -457,10 +457,27 @@ type Material struct {
 	Version      int
 }
 
+// MaterialWrite is the writable field set of /material/add and /material/update.
+type MaterialWrite struct {
+	MaterialName string
+	MaterialRate float64
+	PurchaseRate float64
+	Hsn          string
+	Tax          float64
+}
+
 type Materials interface {
 	// Visible returns the products company companyID may READ: its own plus any shared with it.
 	// The read half of #1 (Helpers/SharedRecords.visibleScope) - a write path would not widen.
 	Visible(ctx context.Context, companyID ID) ([]Material, error)
+	// Create inserts a company-scoped product owned by uid, returning the stored record.
+	Create(ctx context.Context, companyID, uid ID, in MaterialWrite) (Material, error)
+	// Update mutates a company-scoped product; found is false on a miss. When either rate
+	// changes it appends a PriceHistory entry holding the OLD rates (routes/Material.js).
+	Update(ctx context.Context, companyID, materialID ID, in MaterialWrite) (m Material, found bool, err error)
+	// Delete hard-deletes a company-scoped product (Node's findOneAndDelete; a miss is not an
+	// error - /material/remove answers 200 regardless).
+	Delete(ctx context.Context, companyID, materialID ID) error
 }
 
 // ---------------------------------------------------------------------------------------
