@@ -489,3 +489,21 @@ func (a *analytics) Reviews(ctx context.Context, companyID store.ID, from, to st
 	}
 	return out, nil
 }
+
+func (a *analytics) Receipts(ctx context.Context, companyID store.ID) ([]store.DatedAmount, error) {
+	rec, err := a.series(ctx, colInvoiceReceived, bson.M{"company_id": mustOID(companyID)}, func(r revRow) float64 { return r.Amount })
+	if err != nil {
+		return nil, err
+	}
+	batch, err := a.series(ctx, "batchreceives", bson.M{"company_id": mustOID(companyID)}, func(r revRow) float64 { return r.Amount })
+	if err != nil {
+		return nil, err
+	}
+	return append(rec, batch...), nil
+}
+
+// mustOID converts for the internal Receipts filter; companyID is server-derived so it is valid.
+func mustOID(id store.ID) primitive.ObjectID {
+	oid, _ := objectID(id)
+	return oid
+}

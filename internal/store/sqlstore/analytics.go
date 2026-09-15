@@ -266,3 +266,15 @@ func (a *analytics) Reviews(ctx context.Context, companyID store.ID, from, to st
 	}
 	return out, rows.Err()
 }
+
+func (a *analytics) Receipts(ctx context.Context, companyID store.ID) ([]store.DatedAmount, error) {
+	rec, err := a.datedSeries(ctx, `SELECT created_at, date, amount FROM invoice_received WHERE company_id = $1`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	batch, err := a.datedSeries(ctx, `SELECT created_at, date, amount FROM batch_receives WHERE company_id = $1`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	return append(rec, batch...), nil
+}

@@ -884,6 +884,9 @@ type Analytics interface {
 	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
 	// Reviews returns a company's job reviews (newest first), optionally within [from,to] dates.
 	Reviews(ctx context.Context, companyID ID, from, to string) ([]ReviewRow, error)
+	// Receipts returns every money-in event (invoice_received + batch_receives) with its
+	// effective date and amount, for the payout-by-weekday chart.
+	Receipts(ctx context.Context, companyID ID) ([]DatedAmount, error)
 	// OutstandingInvoices returns each unpaid invoice's due amount and billed date (due>0).
 	OutstandingInvoices(ctx context.Context, companyID ID) ([]DatedAmount, error)
 	// UnbilledEntries returns entries not yet invoiced (has_issued false), for the billing-lag report.

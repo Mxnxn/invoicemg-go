@@ -403,3 +403,63 @@ func (h *Handler) Reviews(w http.ResponseWriter, r *http.Request) {
 }
 
 func itoa(n int) string { return string(rune('0' + n)) }
+
+var weekdayLabels = []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+var monthNames = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+
+// PayoutWeekday is POST /analytics/payout-weekday - money received per weekday within a month.
+func (h *Handler) PayoutWeekday(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	if !form.Has("year") || !form.Has("month") {
+		httpx.Invalid(w, "")
+		return
+	}
+	year := form.Int("year", 0)
+	month := form.Int("month", 0) // 0-indexed, as the client sends it
+	start := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0)
+
+	receipts, err := h.store.Receipts(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	sums := make([]float64, 7)
+	for _, rc := range receipts {
+		if rc.Date.Before(start) || !rc.Date.Before(end) {
+			continue
+		}
+		idx := (int(rc.Date.Weekday()) + 6) % 7 // Sun(0)->6, Mon(1)->0
+		sums[idx] += rc.Amount
+	}
+	data := make([]map[string]any, 7)
+	for i, label := range weekdayLabels {
+		data[i] = map[string]any{"label": label, "amount": round2(sums[i])}
+	}
+	label := ""
+	if month >= 0 && month < 12 {
+		label = monthNames[month] + " " + itoa2(year)
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "message": "Operation successful.", "data": data, "periodLabel": label})
+}
+
+func itoa2(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var b []byte
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+	if neg {
+		b = append([]byte{'-'}, b...)
+	}
+	return string(b)
+}
