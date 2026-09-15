@@ -23,12 +23,54 @@ func New(u store.Users, c store.Companies) *Handler { return &Handler{users: u, 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	sess := auth.MustFrom(r.Context())
 	user, _ := h.users.FindByID(r.Context(), sess.UID)
-
 	var company store.Company
 	if sess.CompanyID != "" {
 		company, _ = h.companies.Active(r.Context(), sess.CompanyID, sess.UID)
 	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: buildProfile(user, company)})
+}
 
+// Add is POST /userinfo/add: save the acting company's letterhead (phone/firm/address/gst and
+// optionally the bank fields) and return the refreshed profile. The letterhead lives on the
+// Company in this port, so this is a company update. Node answers 422 "Invalid GST number."
+// (with status:true) when a required field is blank, and 404 when the company is missing.
+func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	if !form.Has("phone") || !form.Has("firm") || !form.Has("address") || !form.Has("gst") {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid GST number.", Status: httpx.True()})
+		return
+	}
+	phone, firm, address, gst := form.String("phone"), form.String("firm"), form.String("address"), form.String("gst")
+	patch := store.CompanyPatch{Phone: &phone, Firm: &firm, Address: &address, Gst: &gst}
+	if form.Present("account_no") {
+		v := form.String("account_no")
+		patch.AccountNo = &v
+	}
+	if form.Present("ifsc") {
+		v := form.String("ifsc")
+		patch.Ifsc = &v
+	}
+	if form.Present("bank_name") {
+		v := form.String("bank_name")
+		patch.BankName = &v
+	}
+	company, found, err := h.companies.Update(r.Context(), sess.UID, sess.CompanyID, patch)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Company not found.", Status: httpx.False()})
+		return
+	}
+	user, _ := h.users.FindByID(r.Context(), sess.UID)
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: buildProfile(user, company)})
+}
+
+// buildProfile is Node's buildProfile plus the extra fields this port's shell reads (role,
+// activeUntil, upiQr, templates, font, scale) - the same shape /userinfo/get answers.
+func buildProfile(user store.User, company store.Company) profileDTO {
 	role := "admin"
 	if user.Role != "" {
 		role = user.Role
@@ -38,30 +80,27 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		s := string(company.ID)
 		companyID = &s
 	}
-
-	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: profileDTO{
-		Name:        user.Name,
-		Email:       user.Email,
-		Role:        role,
-		ActiveUntil: httpx.NewTimePtr(user.ActiveUntil),
-		Phone:       company.Phone,
-		Firm:        company.Firm,
-		Address:     company.Address,
-		Gst:         company.Gst,
-		URL:         company.URL,
-		UpiQr:       company.UpiQr,
-		Account:     company.AccountNo,
-		Ifsc:        company.Ifsc,
-		BankName:    company.BankName,
-		CompanyID:   companyID,
-		// Not stored/edited here yet, so the Mongoose defaults - which is what an untouched
-		// company renders with.
+	return profileDTO{
+		Name:              user.Name,
+		Email:             user.Email,
+		Role:              role,
+		ActiveUntil:       httpx.NewTimePtr(user.ActiveUntil),
+		Phone:             company.Phone,
+		Firm:              company.Firm,
+		Address:           company.Address,
+		Gst:               company.Gst,
+		URL:               company.URL,
+		UpiQr:             company.UpiQr,
+		Account:           company.AccountNo,
+		Ifsc:              company.Ifsc,
+		BankName:          company.BankName,
+		CompanyID:         companyID,
 		InvoiceTemplate:   "classic",
 		QuotationTemplate: "classic",
 		LedgerTemplate:    "classic",
 		DocumentFont:      "open-sans",
 		DocumentScale:     "normal",
-	}})
+	}
 }
 
 type profileDTO struct {

@@ -253,6 +253,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /company/switch", authed(companyHandler.Switch))
 	mux.Handle("POST /company/deactivate", admin(companyHandler.Deactivate))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
+	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 
 	// Products, behind the products feature as routes/Material.js is. Read widens by sharing
 	// (#1); the writes and /material/get are not ported.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
@@ -20,7 +21,12 @@ func (s *stubUsers) CreateSession(_ context.Context, _ store.NewSession) (store.
 	return store.Session{}, nil
 }
 
-type stubCompanies struct{ company store.Company }
+type stubCompanies struct {
+	company     store.Company
+	updated     store.Company
+	updateFound bool
+	gotPatch    store.CompanyPatch
+}
 
 func (s *stubCompanies) List(_ context.Context, _ store.ID) ([]store.Company, error) { return nil, nil }
 func (s *stubCompanies) Active(_ context.Context, _, _ store.ID) (store.Company, error) {
@@ -30,8 +36,9 @@ func (s *stubCompanies) Count(_ context.Context, _ store.ID) (int, error) { retu
 func (s *stubCompanies) Create(_ context.Context, _ store.ID, _ store.CompanyWrite) (store.Company, error) {
 	return store.Company{}, nil
 }
-func (s *stubCompanies) Update(_ context.Context, _, _ store.ID, _ store.CompanyPatch) (store.Company, bool, error) {
-	return store.Company{}, false, nil
+func (s *stubCompanies) Update(_ context.Context, _, _ store.ID, patch store.CompanyPatch) (store.Company, bool, error) {
+	s.gotPatch = patch
+	return s.updated, s.updateFound, nil
 }
 func (s *stubCompanies) FindActive(_ context.Context, _, _ store.ID) (store.Company, bool, error) {
 	return store.Company{}, false, nil
@@ -82,5 +89,43 @@ func TestProfile_NoCompanyNullId(t *testing.T) {
 	}
 	if data["activeUntil"] != nil {
 		t.Errorf("activeUntil = %v, want null", data["activeUntil"])
+	}
+}
+
+func postForm(t *testing.T, u store.Users, c store.Companies, form string) map[string]any {
+	t.Helper()
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(u, c).Add(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	return body
+}
+
+func TestAdd(t *testing.T) {
+	u := &stubUsers{user: store.User{Name: "Owner", Email: "o@x.test", Role: "admin"}}
+	c := &stubCompanies{updateFound: true, updated: store.Company{ID: "co1", Firm: "New LLP", Phone: "111", Gst: "G2", AccountNo: "AC"}}
+	body := postForm(t, u, c, "phone=111&firm=New+LLP&address=Road&gst=G2&account_no=AC")
+	if body["code"] != float64(200) || body["message"] != "Operation successful." {
+		t.Fatalf("add: %v", body)
+	}
+	if c.gotPatch.Firm == nil || *c.gotPatch.Firm != "New LLP" || c.gotPatch.AccountNo == nil {
+		t.Errorf("patch not built: %+v", c.gotPatch)
+	}
+	data := body["data"].(map[string]any)
+	if data["firm"] != "New LLP" || data["name"] != "Owner" {
+		t.Errorf("profile: %v", data)
+	}
+	// missing gst -> 422 status true
+	body = postForm(t, u, c, "phone=111&firm=X&address=Y")
+	if body["code"] != float64(422) || body["message"] != "Invalid GST number." || body["status"] != true {
+		t.Errorf("missing gst: %v", body)
+	}
+	// company not found -> 404
+	body = postForm(t, u, &stubCompanies{updateFound: false}, "phone=1&firm=X&address=Y&gst=G")
+	if body["code"] != float64(404) || body["message"] != "Company not found." {
+		t.Errorf("not found: %v", body)
 	}
 }
