@@ -301,6 +301,9 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /batch-receive/create", feature("batch_receive", batchReceiveHandler.Create, auth.RequireCreate("batch_receive")))
 	mux.Handle("POST /batch-receive/delete", feature("batch_receive", batchReceiveHandler.Delete, auth.RequireDelete("batch_receive")))
 	mux.Handle("POST /supplier-payment/list", feature("purchase_invoices", supplierPaymentHandler.List))
+	mux.Handle("POST /supplier-payment/lookups/open-invoices", feature("purchase_invoices", supplierPaymentHandler.OpenInvoices))
+	mux.Handle("POST /supplier-payment/create", feature("purchase_invoices", supplierPaymentHandler.Create, auth.RequireCreate("purchase_invoices")))
+	mux.Handle("POST /supplier-payment/delete", feature("purchase_invoices", supplierPaymentHandler.Delete, auth.RequireDelete("purchase_invoices")))
 	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
 	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
 

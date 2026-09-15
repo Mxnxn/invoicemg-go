@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (78 of 209)
+## Routes ready (81 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -64,6 +64,9 @@ the 209 routes the Node API declares.
 | `POST /purchase-invoice/create` | rows coerced; total = Σ(qty·rate−disc+chg)·(1+gst/100); ≥1 row required | Live · Unit |
 | `POST /purchase-invoice/update` | partial edit; row change recomputes total, refused if below amount paid; 404 | Live · Unit |
 | `POST /purchase-invoice/delete` | blocked while a supplier payment allocates to it (JSONB `@>`); 404 on miss | Live · Unit |
+| `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
+| `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
+| `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
 | `POST /lifecycle/lookups/clients` | name picker; uid+company scoped (not sharing-widened) | Live · Unit |
 | `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |

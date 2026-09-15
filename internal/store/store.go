@@ -1363,8 +1363,62 @@ type SupplierPayment struct {
 	Version       int
 }
 
+// SupplierOpenInvoice is one not-fully-paid purchase invoice for the manual picker / auto preview.
+type SupplierOpenInvoice struct {
+	ID            ID
+	InvoiceNumber string
+	Date          string
+	Total         float64
+	Amount        float64
+	Due           float64
+}
+
+// SupplierAllocInput is one manual purchase-invoice allocation submitted with a payment.
+type SupplierAllocInput struct {
+	InvoiceID ID
+	Amount    float64
+}
+
+// SupplierPaymentWrite is the field set of /supplier-payment/create.
+type SupplierPaymentWrite struct {
+	SupplierID  ID
+	Amount      float64
+	Mode        string // "auto" | "manual"
+	Note        string
+	BankID      ID
+	Date        string
+	Allocations []SupplierAllocInput
+}
+
+// SupplierPayStatus is the outcome of a supplier-payment create.
+type SupplierPayStatus int
+
+const (
+	SupplierPayOK              SupplierPayStatus = iota
+	SupplierPayAutoUnallocated                   // auto: payment exceeds total outstanding
+	SupplierPayInvoiceNotFound                   // manual: a named invoice is gone
+	SupplierPayOverInvoice                       // manual: an allocation exceeds that invoice's due
+)
+
+// SupplierPayResult carries the status plus the amounts a refusal message needs.
+type SupplierPayResult struct {
+	Status    SupplierPayStatus
+	Remaining float64 // AutoUnallocated
+	Applied   float64 // OverInvoice
+	Due       float64 // OverInvoice
+}
+
 type SupplierPayments interface {
 	List(ctx context.Context, uid, companyID ID) ([]SupplierPayment, error)
+	// OpenInvoices returns a supplier's not-fully-paid purchase invoices (amount < total), oldest first.
+	OpenInvoices(ctx context.Context, uid, companyID, supplierID ID) ([]SupplierOpenInvoice, error)
+	// Create records a payment to a supplier, applying it to their purchase invoices per the mode
+	// (auto = oldest-first, refusing an unallocatable excess; manual = the submitted allocations,
+	// each capped at that invoice's due), and returns the resolved record.
+	Create(ctx context.Context, uid, companyID ID, in SupplierPaymentWrite) (SupplierPayment, SupplierPayResult, error)
+	// Delete reverses each allocation on the paid invoices (never below zero) and removes the
+	// record. found is false on a miss.
+	Delete(ctx context.Context, uid, companyID, paymentID ID) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
