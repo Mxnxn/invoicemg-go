@@ -28,6 +28,13 @@ type stubJobs struct {
 	updateDup    bool
 	updateEmpty  bool
 	gotUpdate    store.JobUpdateInput
+	txJob        store.Job
+	txStatus     store.JobTxStatus
+	gotTx        string
+	gotKind      string
+	gotArg       string
+	gotPerson    store.ID
+	gotOrder     []string
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
@@ -47,6 +54,44 @@ func (s *stubJobs) Create(_ context.Context, in store.JobCreateInput) (store.Job
 func (s *stubJobs) Update(_ context.Context, in store.JobUpdateInput) (store.Job, bool, bool, bool, error) {
 	s.gotUpdate = in
 	return s.updated, s.updateFound, s.updateDup, s.updateEmpty, nil
+}
+
+// tx captures the last transition call and returns the stub's tx result.
+func (s *stubJobs) tx(kind string) (store.Job, store.JobTxStatus, error) {
+	s.gotTx = kind
+	return s.txJob, s.txStatus, nil
+}
+func (s *stubJobs) Assign(_ context.Context, _, _, _ store.ID, _ store.NoteActor, kind string, personID store.ID) (store.Job, store.JobTxStatus, error) {
+	s.gotKind, s.gotPerson = kind, personID
+	return s.tx("assign")
+}
+func (s *stubJobs) Progress(_ context.Context, _, _, _ store.ID, _ store.NoteActor, progress string) (store.Job, store.JobTxStatus, error) {
+	s.gotArg = progress
+	return s.tx("progress")
+}
+func (s *stubJobs) SetQueue(_ context.Context, _, _, _ store.ID, _ store.NoteActor, queue string) (store.Job, store.JobTxStatus, error) {
+	s.gotArg = queue
+	return s.tx("set-queue")
+}
+func (s *stubJobs) QueueOrder(_ context.Context, _, _, _ store.ID, _ store.NoteActor, order []string) (store.Job, store.JobTxStatus, error) {
+	s.gotOrder = order
+	return s.tx("queue")
+}
+func (s *stubJobs) RowAssign(_ context.Context, _, _, _, _ store.ID, _ store.NoteActor, employeeID store.ID) (store.Job, store.JobTxStatus, error) {
+	s.gotPerson = employeeID
+	return s.tx("row-assign")
+}
+func (s *stubJobs) RowSetQueue(_ context.Context, _, _, _, _ store.ID, _ store.NoteActor, queue string) (store.Job, store.JobTxStatus, error) {
+	s.gotArg = queue
+	return s.tx("row-queue")
+}
+func (s *stubJobs) RowQueueOrder(_ context.Context, _, _, _, _ store.ID, _ store.NoteActor, order []string) (store.Job, store.JobTxStatus, error) {
+	s.gotOrder = order
+	return s.tx("row-queue-order")
+}
+func (s *stubJobs) RowProgress(_ context.Context, _, _, _, _ store.ID, _ store.NoteActor, progress string) (store.Job, store.JobTxStatus, error) {
+	s.gotArg = progress
+	return s.tx("row-progress")
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -392,5 +437,72 @@ func TestJobUpdate(t *testing.T) {
 	body = postNotesJob(t, &stubJobs{updateFound: false}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{"job_id": "j9"})
 	if body["code"] != float64(404) {
 		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestTransitions(t *testing.T) {
+	okJob := store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001"}
+
+	// assign employee → 200 with populated job, kind+person passed through
+	s := &stubJobs{txJob: okJob, txStatus: store.JobTxOK}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Assign },
+		map[string]string{"job_id": "j1", "type": "employee", "person_id": "p1"})
+	if body["code"] != float64(200) || body["message"] != "Job updated." {
+		t.Fatalf("assign: %v", body)
+	}
+	if s.gotKind != "employee" || s.gotPerson != "p1" {
+		t.Errorf("assign args: kind=%q person=%q", s.gotKind, s.gotPerson)
+	}
+	// bad type
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Assign },
+		map[string]string{"job_id": "j1", "type": "boss"})
+	if body["message"] != "type must be 'employee' or 'vendor'." {
+		t.Errorf("bad type: %v", body)
+	}
+
+	// progress needs-assignee → 422 with the job-level message
+	s = &stubJobs{txStatus: store.JobTxNeedsAssignee}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Progress },
+		map[string]string{"job_id": "j1", "progress": "Printing"})
+	if body["code"] != float64(422) || body["message"] != "Assign an employee or vendor before changing progress." {
+		t.Errorf("progress needs assignee: %v", body)
+	}
+
+	// job not found on set-queue → 404
+	s = &stubJobs{txStatus: store.JobTxJobNotFound}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.SetQueue },
+		map[string]string{"job_id": "j9", "queue": "Done"})
+	if body["code"] != float64(404) || body["message"] != "Job not found." {
+		t.Errorf("set-queue 404: %v", body)
+	}
+
+	// queue reorder passes the parsed array
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK}
+	postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Queue },
+		map[string]string{"job_id": "j1", "queueOrder": `["Created","Printing","Done"]`})
+	if len(s.gotOrder) != 3 || s.gotOrder[2] != "Done" {
+		t.Errorf("queue order: %v", s.gotOrder)
+	}
+
+	// row not found → 404
+	s = &stubJobs{txStatus: store.JobTxRowNotFound}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowAssign },
+		map[string]string{"job_id": "j1", "row_id": "r9", "employee_id": "p1"})
+	if body["code"] != float64(404) || body["message"] != "Row not found." {
+		t.Errorf("row 404: %v", body)
+	}
+
+	// row/progress invalid value → 422 before hitting the store
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowProgress },
+		map[string]string{"job_id": "j1", "row_id": "r1", "progress": "Nope"})
+	if body["message"] != "Invalid progress value." {
+		t.Errorf("row progress invalid: %v", body)
+	}
+	// row/progress needs-assignee message
+	s = &stubJobs{txStatus: store.JobTxNeedsAssignee}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowProgress },
+		map[string]string{"job_id": "j1", "row_id": "r1", "progress": "Complete"})
+	if body["message"] != "Assign an employee before changing progress." {
+		t.Errorf("row progress needs assignee: %v", body)
 	}
 }

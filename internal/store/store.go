@@ -1086,6 +1086,26 @@ type Jobs interface {
 	// "Updated" history entry, and returns the populated job. found is false on a miss; dupChallan
 	// on a number collision; emptyRows when the submitted row set would leave the job with none.
 	Update(ctx context.Context, in JobUpdateInput) (j Job, found, dupChallan, emptyRows bool, err error)
+
+	// The lifecycle-board transitions. Each mutates the job (or one row), logs its history
+	// entries, and returns the populated job with a JobTxStatus (OK / not-found / needs-assignee).
+	// Assign sets an employee OR vendor (clearing the other) and recomputes progress.
+	Assign(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, kind string, personID ID) (Job, JobTxStatus, error)
+	// Progress moves the job's progress; "Unassigned" clears the assignee, "Complete" advances the
+	// queue stage (clearing the assignee for the next stage); other values just set progress.
+	Progress(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, progress string) (Job, JobTxStatus, error)
+	// SetQueue jumps the job to a given stage (clearing the assignee); a no-op when already there.
+	SetQueue(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, queue string) (Job, JobTxStatus, error)
+	// QueueOrder persists the job's drag-reordered stage list.
+	QueueOrder(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, order []string) (Job, JobTxStatus, error)
+	// RowAssign sets one row's employee and recomputes its progress.
+	RowAssign(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, employeeID ID) (Job, JobTxStatus, error)
+	// RowSetQueue jumps one row to a stage (clearing its employee, progress→Assign).
+	RowSetQueue(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, queue string) (Job, JobTxStatus, error)
+	// RowQueueOrder persists one row's drag-reordered stage list.
+	RowQueueOrder(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, order []string) (Job, JobTxStatus, error)
+	// RowProgress moves one row's progress; "Complete" advances its stage (clearing its employee).
+	RowProgress(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, progress string) (Job, JobTxStatus, error)
 }
 
 // JobRowPatch is one row submitted to /lifecycle/jobs/update. ID (the existing row's id) matches
