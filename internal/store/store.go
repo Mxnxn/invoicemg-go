@@ -861,6 +861,23 @@ type UnbilledEntry struct {
 	ClientFirm string
 }
 
+// GstLine is one taxable line (amount + the three GST percentages).
+type GstLine struct {
+	Amount float64
+	Cgst   float64
+	Sgst   float64
+	Igst   float64
+}
+
+// GstDoc is one invoice or purchase invoice for the GST report.
+type GstDoc struct {
+	InvoiceNo string
+	Date      string // YYYY-MM-DD (already normalised)
+	PartyName string
+	GstNo     string
+	Lines     []GstLine
+}
+
 // SupplierDue is one supplier's outstanding payable.
 type SupplierDue struct {
 	Name string
@@ -884,6 +901,10 @@ type Analytics interface {
 	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
 	// Reviews returns a company's job reviews (newest first), optionally within [from,to] dates.
 	Reviews(ctx context.Context, companyID ID, from, to string) ([]ReviewRow, error)
+	// GstSales/GstPurchases return the GST report's documents (invoices / purchase invoices)
+	// with their taxable lines and party details.
+	GstSales(ctx context.Context, companyID ID) ([]GstDoc, error)
+	GstPurchases(ctx context.Context, companyID ID) ([]GstDoc, error)
 	// Receipts returns every money-in event (invoice_received + batch_receives) with its
 	// effective date and amount, for the payout-by-weekday chart.
 	Receipts(ctx context.Context, companyID ID) ([]DatedAmount, error)

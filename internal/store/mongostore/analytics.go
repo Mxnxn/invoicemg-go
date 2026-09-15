@@ -507,3 +507,195 @@ func mustOID(id store.ID) primitive.ObjectID {
 	oid, _ := objectID(id)
 	return oid
 }
+
+func (a *analytics) GstSales(ctx context.Context, companyID store.ID) ([]store.GstDoc, error) {
+	oid, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	// invoices with entries populated (amount + gst%) and client (firm/name/gst).
+	cur, err := a.db.Collection(colInvoices).Find(ctx, bson.M{"company_id": oid},
+		options.Find().SetProjection(bson.M{"invoiceId": 1, "date": 1, "client": 1, "entries": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("gst sales: %w", err)
+	}
+	defer cur.Close(ctx)
+	var invs []struct {
+		InvoiceID string               `bson:"invoiceId"`
+		Date      string               `bson:"date"`
+		Client    *primitive.ObjectID  `bson:"client"`
+		Entries   []primitive.ObjectID `bson:"entries"`
+	}
+	if err := cur.All(ctx, &invs); err != nil {
+		return nil, err
+	}
+	// batch client + entry lookups
+	cids := map[primitive.ObjectID]struct{}{}
+	eids := map[primitive.ObjectID]struct{}{}
+	for _, iv := range invs {
+		addID(cids, iv.Client)
+		for _, e := range iv.Entries {
+			eids[e] = struct{}{}
+		}
+	}
+	clients, err := a.gstClients(ctx, keys(cids))
+	if err != nil {
+		return nil, err
+	}
+	entries, err := a.gstEntryLines(ctx, keys(eids))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]store.GstDoc, 0, len(invs))
+	for _, iv := range invs {
+		doc := store.GstDoc{InvoiceNo: iv.InvoiceID, Date: normalizeGstDate(iv.Date)}
+		if iv.Client != nil {
+			c := clients[*iv.Client]
+			doc.PartyName = c.firm
+			if doc.PartyName == "" {
+				doc.PartyName = c.name
+			}
+			doc.GstNo = c.gst
+		}
+		for _, eid := range iv.Entries {
+			if l, ok := entries[eid]; ok {
+				doc.Lines = append(doc.Lines, l)
+			}
+		}
+		out = append(out, doc)
+	}
+	return out, nil
+}
+
+func (a *analytics) GstPurchases(ctx context.Context, companyID store.ID) ([]store.GstDoc, error) {
+	oid, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	cur, err := a.db.Collection(colPurchaseInvoices).Find(ctx, bson.M{"company_id": oid},
+		options.Find().SetProjection(bson.M{"invoiceNumber": 1, "date": 1, "supplier_id": 1, "rows": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("gst purchases: %w", err)
+	}
+	defer cur.Close(ctx)
+	var invs []struct {
+		InvoiceNumber string              `bson:"invoiceNumber"`
+		Date          string              `bson:"date"`
+		SupplierID    *primitive.ObjectID `bson:"supplier_id"`
+		Rows          []struct {
+			Rate     float64 `bson:"rate"`
+			Qty      float64 `bson:"qty"`
+			Discount float64 `bson:"discount"`
+			Charges  float64 `bson:"charges"`
+			Gst      float64 `bson:"gst"`
+		} `bson:"rows"`
+	}
+	if err := cur.All(ctx, &invs); err != nil {
+		return nil, err
+	}
+	sids := map[primitive.ObjectID]struct{}{}
+	for _, iv := range invs {
+		addID(sids, iv.SupplierID)
+	}
+	sups, err := a.gstSuppliers(ctx, keys(sids))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]store.GstDoc, 0, len(invs))
+	for _, iv := range invs {
+		doc := store.GstDoc{InvoiceNo: iv.InvoiceNumber, Date: normalizeGstDate(iv.Date)}
+		if iv.SupplierID != nil {
+			s := sups[*iv.SupplierID]
+			doc.PartyName = s.name
+			doc.GstNo = s.gst
+		}
+		for _, r := range iv.Rows {
+			gross := r.Rate*r.Qty - r.Discount + r.Charges
+			doc.Lines = append(doc.Lines, store.GstLine{Amount: gross, Cgst: r.Gst / 2, Sgst: r.Gst / 2})
+		}
+		out = append(out, doc)
+	}
+	return out, nil
+}
+
+type gstClient struct{ name, firm, gst string }
+type gstSupplier struct{ name, gst string }
+
+func (a *analytics) gstClients(ctx context.Context, ids []primitive.ObjectID) (map[primitive.ObjectID]gstClient, error) {
+	out := map[primitive.ObjectID]gstClient{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cur, err := a.db.Collection(colClients).Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"clientName": 1, "clientFirm": 1, "clientGST": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var rows []struct {
+		ID   primitive.ObjectID `bson:"_id"`
+		Name string             `bson:"clientName"`
+		Firm string             `bson:"clientFirm"`
+		Gst  string             `bson:"clientGST"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ID] = gstClient{r.Name, r.Firm, r.Gst}
+	}
+	return out, nil
+}
+
+func (a *analytics) gstSuppliers(ctx context.Context, ids []primitive.ObjectID) (map[primitive.ObjectID]gstSupplier, error) {
+	out := map[primitive.ObjectID]gstSupplier{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cur, err := a.db.Collection(colPersons).Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"name": 1, "gst": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var rows []struct {
+		ID   primitive.ObjectID `bson:"_id"`
+		Name string             `bson:"name"`
+		Gst  string             `bson:"gst"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ID] = gstSupplier{r.Name, r.Gst}
+	}
+	return out, nil
+}
+
+func (a *analytics) gstEntryLines(ctx context.Context, ids []primitive.ObjectID) (map[primitive.ObjectID]store.GstLine, error) {
+	out := map[primitive.ObjectID]store.GstLine{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	cur, err := a.db.Collection(colEntries).Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"amount": 1, "cgst": 1, "sgst": 1, "igst": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var rows []struct {
+		ID     primitive.ObjectID `bson:"_id"`
+		Amount float64            `bson:"amount"`
+		Cgst   float64            `bson:"cgst"`
+		Sgst   float64            `bson:"sgst"`
+		Igst   float64            `bson:"igst"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ID] = store.GstLine{Amount: r.Amount, Cgst: r.Cgst, Sgst: r.Sgst, Igst: r.Igst}
+	}
+	return out, nil
+}
+
+// normalizeGstDate is Helpers/NormalizeDate.normalizeDate: passes YYYY-MM-DD through, converts
+// a "Wkd Mon DD YYYY" toString form, else returns as-is.
+func normalizeGstDate(raw string) string { return store.NormalizeDate(raw) }

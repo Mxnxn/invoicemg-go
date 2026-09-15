@@ -31,6 +31,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/expense"
+	"github.com/mxnxn/invoicemg-go/internal/gstreport"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/invoice"
 	"github.com/mxnxn/invoicemg-go/internal/lifecycle"
@@ -154,6 +155,7 @@ func routes(db store.Store) http.Handler {
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
 	analyticsHandler := analytics.New(db.Analytics())
+	gstHandler := gstreport.New(db.Analytics())
 	wastageHandler := wastage.New(db.Wastages())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
@@ -281,6 +283,8 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /analytics/unbilled", feature("analytics", analyticsHandler.Unbilled))
 	mux.Handle("POST /analytics/reviews", feature("analytics", analyticsHandler.Reviews))
 	mux.Handle("POST /analytics/payout-weekday", feature("analytics", analyticsHandler.PayoutWeekday))
+
+	mux.Handle("POST /gst-report", feature("gst_report", gstHandler.Report))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 

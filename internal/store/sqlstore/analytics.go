@@ -278,3 +278,97 @@ func (a *analytics) Receipts(ctx context.Context, companyID store.ID) ([]store.D
 	}
 	return append(rec, batch...), nil
 }
+
+func (a *analytics) GstSales(ctx context.Context, companyID store.ID) ([]store.GstDoc, error) {
+	rows, err := a.pool.Query(ctx, `
+		SELECT iv.id, iv.invoice_id, iv.date, COALESCE(NULLIF(c.client_firm,''), c.client_name, ''), COALESCE(c.client_gst,'')
+		  FROM invoices iv LEFT JOIN clients c ON c.id = iv.client_id
+		 WHERE iv.company_id = $1 ORDER BY iv.created_at ASC, iv.id ASC`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("gst sales: %w", err)
+	}
+	defer rows.Close()
+	docs := []store.GstDoc{}
+	ids := []string{}
+	byID := map[string]int{}
+	for rows.Next() {
+		var id string
+		var doc store.GstDoc
+		if err := rows.Scan(&id, &doc.InvoiceNo, &doc.Date, &doc.PartyName, &doc.GstNo); err != nil {
+			return nil, err
+		}
+		doc.Date = store.NormalizeDate(doc.Date)
+		byID[id] = len(docs)
+		ids = append(ids, id)
+		docs = append(docs, doc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return docs, nil
+	}
+	er, err := a.pool.Query(ctx, `SELECT invoice_id, amount, cgst, sgst, igst FROM entries WHERE invoice_id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer er.Close()
+	for er.Next() {
+		var iid string
+		var l store.GstLine
+		if err := er.Scan(&iid, &l.Amount, &l.Cgst, &l.Sgst, &l.Igst); err != nil {
+			return nil, err
+		}
+		if i, ok := byID[iid]; ok {
+			docs[i].Lines = append(docs[i].Lines, l)
+		}
+	}
+	return docs, er.Err()
+}
+
+func (a *analytics) GstPurchases(ctx context.Context, companyID store.ID) ([]store.GstDoc, error) {
+	rows, err := a.pool.Query(ctx, `
+		SELECT pi.id, pi.invoice_number, pi.date, COALESCE(s.name,''), COALESCE(s.gst,'')
+		  FROM purchase_invoices pi LEFT JOIN persons s ON s.id = pi.supplier_id
+		 WHERE pi.company_id = $1 ORDER BY pi.created_at ASC, pi.id ASC`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("gst purchases: %w", err)
+	}
+	defer rows.Close()
+	docs := []store.GstDoc{}
+	ids := []string{}
+	byID := map[string]int{}
+	for rows.Next() {
+		var id string
+		var doc store.GstDoc
+		if err := rows.Scan(&id, &doc.InvoiceNo, &doc.Date, &doc.PartyName, &doc.GstNo); err != nil {
+			return nil, err
+		}
+		doc.Date = store.NormalizeDate(doc.Date)
+		byID[id] = len(docs)
+		ids = append(ids, id)
+		docs = append(docs, doc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return docs, nil
+	}
+	pr, err := a.pool.Query(ctx, `SELECT invoice_id, rate, qty, discount, charges, gst FROM purchase_invoice_rows WHERE invoice_id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer pr.Close()
+	for pr.Next() {
+		var iid string
+		var rate, qty, disc, charges, gst float64
+		if err := pr.Scan(&iid, &rate, &qty, &disc, &charges, &gst); err != nil {
+			return nil, err
+		}
+		if i, ok := byID[iid]; ok {
+			docs[i].Lines = append(docs[i].Lines, store.GstLine{Amount: rate*qty - disc + charges, Cgst: gst / 2, Sgst: gst / 2})
+		}
+	}
+	return docs, pr.Err()
+}
