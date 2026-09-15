@@ -56,7 +56,7 @@ func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, err)
 		return
 	}
-	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Entry saved successfully.", Data: entryDTO(e)})
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Entry saved successfully.", Data: EntryJSON(e)})
 }
 
 // Update is POST /entry/update (admin): rewrite a line item, moving it between day-sheets when
@@ -80,7 +80,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.Write(w, httpx.Envelope{Code: 200, Data: httpx.Null, Status: httpx.False()})
 		return
 	}
-	httpx.Write(w, httpx.Envelope{Code: 200, Data: entryDTO(e), Status: httpx.False()})
+	httpx.Write(w, httpx.Envelope{Code: 200, Data: EntryJSON(e), Status: httpx.False()})
 }
 
 // Get is POST /entry/get (admin): one entry by id, scoped to the company.
@@ -102,7 +102,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		httpx.Write(w, httpx.Envelope{Code: 200, Data: httpx.Null})
 		return
 	}
-	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: entryDTO(e)})
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: EntryJSON(e)})
 }
 
 // GetAll is POST /entry/getall (admin): every entry in the company.
@@ -115,7 +115,7 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, e := range list {
-		out = append(out, entryDTO(e))
+		out = append(out, EntryJSON(e))
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
 }

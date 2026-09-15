@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (108 of 209)
+## Routes ready (109 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -105,6 +105,7 @@ the 209 routes the Node API declares.
 | `POST /entry/update` | admin; rewrite a line item, move it between day-sheets on a date change (old sheet kept); Node status:false quirk preserved | Live · Unit |
 | `POST /entry/get` | admin; one entry by id, company-scoped; 422 on missing id | Live · Unit |
 | `POST /entry/getall` | admin; every entry in the company | Live · Unit |
+| `POST /sheet/get` | admin; a day-sheet's entries grouped into one card per client, top-level `date`; 404/422; update/remove/getall are empty Node stubs, not ported | Live · Unit |
 | `POST /wastage/add` | log an offcut; numeric casts; purchase_rate/cost_total default 0; whole record echoed | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |

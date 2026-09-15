@@ -5,10 +5,10 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-// entryDTO renders one entry in the shape routes/Entry.js returns: the raw Mongo document,
+// EntryJSON renders one entry in the shape routes/Entry.js returns: the raw Mongo document,
 // with client_id either a raw id string or - when the store populated it (entry/add) - the
 // nested client object.
-func entryDTO(e store.Entry) map[string]any {
+func EntryJSON(e store.Entry) map[string]any {
 	m := map[string]any{
 		"_id":         string(e.ID),
 		"uid":         idOrNil(e.UID),

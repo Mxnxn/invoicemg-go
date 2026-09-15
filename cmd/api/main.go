@@ -43,6 +43,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
+	"github.com/mxnxn/invoicemg-go/internal/sheet"
 	"github.com/mxnxn/invoicemg-go/internal/statistics"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
@@ -167,6 +168,7 @@ func routes(db store.Store) http.Handler {
 	gstHandler := gstreport.New(db.Analytics())
 	wastageHandler := wastage.New(db.Wastages())
 	entryHandler := entry.New(db.Entries())
+	sheetHandler := sheet.New(db.Sheets())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
@@ -206,6 +208,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /entry/update", admin(entryHandler.Update))
 	mux.Handle("POST /entry/get", admin(entryHandler.Get))
 	mux.Handle("POST /entry/getall", admin(entryHandler.GetAll))
+	mux.Handle("POST /sheet/get", admin(sheetHandler.Get))
 	mux.Handle("GET /jobs/open", admin(dayHandler.OpenJobs))
 
 	mux.Handle("POST /unit/list", feature("products", unitHandler.List))

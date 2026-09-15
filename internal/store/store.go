@@ -924,6 +924,14 @@ type Entries interface {
 	List(ctx context.Context, uid, companyID ID) ([]Entry, error)
 }
 
+// Sheets is the /sheet domain. Only /sheet/get is real (update/remove/getall are empty Node
+// stubs); it returns a day-sheet's entries, each with its client populated, for the handler to
+// group by client. Membership is by date: an entry belongs to the sheet with the same
+// company and (normalized) date.
+type Sheets interface {
+	Get(ctx context.Context, companyID, sheetID ID) (date string, entries []Entry, found bool, err error)
+}
+
 // Invoice is one invoice with its client populated and its entries loaded.
 type Invoice struct {
 	ID          ID
@@ -1851,6 +1859,7 @@ type Store interface {
 	PurchaseInvoices() PurchaseInvoices
 	Invoices() Invoices
 	Entries() Entries
+	Sheets() Sheets
 	Lookups() Lookups
 	Jobs() Jobs
 	JobNotes() JobNotes
