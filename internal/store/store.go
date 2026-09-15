@@ -846,6 +846,31 @@ type Analytics interface {
 	RevenueSeries(ctx context.Context, companyID ID, source string) (billed, collected []DatedAmount, err error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Wastage
+// ---------------------------------------------------------------------------------------
+
+type Wastage struct {
+	ID           ID
+	UID          ID
+	CompanyID    ID
+	MaterialName string
+	Rate         float64
+	PurchaseRate float64
+	CostTotal    float64
+	Length       float64
+	Height       float64
+	Total        float64
+	Date         string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Version      int
+}
+
+type Wastages interface {
+	List(ctx context.Context, companyID ID) ([]Wastage, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -866,6 +891,7 @@ type Store interface {
 	Challans() Challans
 	Expenses() Expenses
 	Analytics() Analytics
+	Wastages() Wastages
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

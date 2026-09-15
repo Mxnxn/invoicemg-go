@@ -134,3 +134,8 @@ INSERT INTO expenses (uid, company_id, bank_id, date, amount, notes) VALUES
 -- A payment received against the seeded invoice, so revenue's collected series is non-zero.
 INSERT INTO invoice_received (uid, company_id, client_id, invoice_id, date, amount) VALUES
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','c00000000000000000000001','20000000000000000000000a','2026-09-13',5000);
+
+-- Wastage rows.
+INSERT INTO wastages (uid, company_id, material_name, rate, purchase_rate, cost_total, length, height, total, date) VALUES
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Vinyl Sticker',45,30,90,2,1,2,'2026-09-11'),
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Flex Banner',25,15,45,3,1,3,'2026-09-12');

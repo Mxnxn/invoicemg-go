@@ -412,6 +412,24 @@ CREATE TABLE challans (
 );
 CREATE INDEX challans_company_idx ON challans (company_id);
 
+-- Wastage (offcuts/scrap log).
+CREATE TABLE wastages (
+    id            text PRIMARY KEY DEFAULT gen_ulid(),
+    uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id    text REFERENCES companies(id) ON DELETE CASCADE,
+    material_name text NOT NULL DEFAULT '',
+    rate          numeric(14,2) NOT NULL DEFAULT 0,
+    purchase_rate numeric(14,2) NOT NULL DEFAULT 0,
+    cost_total    numeric(14,2) NOT NULL DEFAULT 0,
+    length        numeric(14,3) NOT NULL DEFAULT 0,
+    height        numeric(14,3) NOT NULL DEFAULT 0,
+    total         numeric(14,3) NOT NULL DEFAULT 0,
+    date          text NOT NULL DEFAULT '',
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX wastages_company_idx ON wastages (company_id);
+
 CREATE TABLE entries (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
