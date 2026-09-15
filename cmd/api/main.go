@@ -173,7 +173,7 @@ func routes(db store.Store) http.Handler {
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs())
-	companyHandler := company.New(db.Companies(), db.Users())
+	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
 
@@ -238,6 +238,10 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /company/list", authed(companyHandler.List))
 	mux.Handle("GET /companies", authed(companyHandler.List))
 	mux.Handle("POST /company/active", authed(companyHandler.Active))
+	mux.Handle("POST /company/create", admin(companyHandler.Create))
+	mux.Handle("POST /company/update", admin(companyHandler.Update))
+	mux.Handle("POST /company/switch", authed(companyHandler.Switch))
+	mux.Handle("POST /company/deactivate", admin(companyHandler.Deactivate))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 
 	// Products, behind the products feature as routes/Material.js is. Read widens by sharing

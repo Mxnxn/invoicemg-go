@@ -15,9 +15,12 @@ import (
 type Handler struct {
 	companies store.Companies
 	users     store.Users
+	sessions  store.Sessions
 }
 
-func New(c store.Companies, u store.Users) *Handler { return &Handler{companies: c, users: u} }
+func New(c store.Companies, u store.Users, s store.Sessions) *Handler {
+	return &Handler{companies: c, users: u, sessions: s}
+}
 
 // List is POST /company/list: the switcher's companies plus the add-control's limit flags.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {

@@ -50,12 +50,12 @@ func Open(ctx context.Context, url string, timeout time.Duration) (*Store, error
 	return &Store{pool: pool}, nil
 }
 
-func (s *Store) Ping(ctx context.Context) error  { return s.pool.Ping(ctx) }
-func (s *Store) Close(_ context.Context) error   { s.pool.Close(); return nil }
-func (s *Store) Sessions() store.Sessions        { return &sessions{pool: s.pool} }
-func (s *Store) Days() store.Days                { return &days{pool: s.pool} }
-func (s *Store) Units() store.Units              { return &units{pool: s.pool} }
-func (s *Store) Users() store.Users              { return &users{pool: s.pool} }
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+func (s *Store) Close(_ context.Context) error  { s.pool.Close(); return nil }
+func (s *Store) Sessions() store.Sessions       { return &sessions{pool: s.pool} }
+func (s *Store) Days() store.Days               { return &days{pool: s.pool} }
+func (s *Store) Units() store.Units             { return &units{pool: s.pool} }
+func (s *Store) Users() store.Users             { return &users{pool: s.pool} }
 
 // isUniqueViolation recognises SQLSTATE 23505, the Postgres equivalent of Mongo's E11000.
 // Both are translated to store.ErrDuplicate so the handler that turns it into "That unit
@@ -148,4 +148,16 @@ func (s *sessions) ResolveCompany(ctx context.Context, token, tabID string, uid 
 		}
 	}
 	return store.ID(companyID), nil
+}
+
+func (s *sessions) BindCompany(ctx context.Context, token, tabID string, uid, companyID store.ID) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO company_sessions (token, tab_id, uid, company_id)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (token, tab_id) DO UPDATE SET company_id = EXCLUDED.company_id`,
+		token, tabID, string(uid), string(companyID))
+	if err != nil {
+		return fmt.Errorf("binding tab to company: %w", err)
+	}
+	return nil
 }

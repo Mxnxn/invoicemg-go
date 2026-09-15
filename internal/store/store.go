@@ -80,6 +80,9 @@ type Sessions interface {
 	// resolveCompanyId in Helpers/TokenHelper.js exactly, including the persistence - without
 	// it a reload moves the tab to a different company.
 	ResolveCompany(ctx context.Context, token, tabID string, uid ID) (ID, error)
+
+	// BindCompany points this (token, tabID) tab at companyID (upsert), for /company/switch.
+	BindCompany(ctx context.Context, token, tabID string, uid, companyID ID) error
 }
 
 // ---------------------------------------------------------------------------------------
@@ -423,11 +426,57 @@ type Company struct {
 	IsActive  bool
 }
 
+// CompanyWrite is the field set of /company/create.
+type CompanyWrite struct {
+	Name      string
+	Firm      string
+	Address   string
+	Phone     string
+	Gst       string
+	AccountNo string
+	Ifsc      string
+	BankName  string
+}
+
+// CompanyPatch is /company/update's partial edit: a nil field is not submitted (left as-is).
+type CompanyPatch struct {
+	Name      *string
+	Firm      *string
+	Address   *string
+	Phone     *string
+	Gst       *string
+	AccountNo *string
+	Ifsc      *string
+	BankName  *string
+}
+
+// DeactivateResult is the outcome of /company/deactivate's guard rules.
+type DeactivateResult int
+
+const (
+	DeactivateOK          DeactivateResult = iota // deactivated
+	DeactivateNotFound                            // no such company for this owner
+	DeactivateMustKeepOne                         // this is the owner's last active company
+	DeactivateIsDefault                           // the default must be reassigned first
+)
+
 type Companies interface {
 	// List returns the admin's ACTIVE companies for the switcher, default first.
 	List(ctx context.Context, uid ID) ([]Company, error)
 	// Active returns one company the admin owns, for the letterhead. ErrNotFound if missing.
 	Active(ctx context.Context, companyID, uid ID) (Company, error)
+	// Count returns how many companies the owner has (any state), for the first-company default.
+	Count(ctx context.Context, uid ID) (int, error)
+	// Create inserts a company owned by uid; the owner's first company becomes the default.
+	Create(ctx context.Context, uid ID, in CompanyWrite) (Company, error)
+	// Update applies a partial patch to an owner-scoped company; found is false on a miss.
+	Update(ctx context.Context, uid, companyID ID, patch CompanyPatch) (c Company, found bool, err error)
+	// FindActive returns an owner-scoped ACTIVE company (for /company/switch). found is false on
+	// a miss or an inactive company.
+	FindActive(ctx context.Context, uid, companyID ID) (c Company, found bool, err error)
+	// Deactivate flips is_active off on an owner-scoped company, enforcing the keep-one and
+	// not-the-default guards, and clears any tab bindings that pointed at it.
+	Deactivate(ctx context.Context, uid, companyID ID) (DeactivateResult, error)
 }
 
 // ---------------------------------------------------------------------------------------

@@ -23,6 +23,19 @@ func (s *stubCompanies) List(_ context.Context, _ store.ID) ([]store.Company, er
 func (s *stubCompanies) Active(_ context.Context, _, _ store.ID) (store.Company, error) {
 	return s.c, nil
 }
+func (s *stubCompanies) Count(_ context.Context, _ store.ID) (int, error) { return 0, nil }
+func (s *stubCompanies) Create(_ context.Context, _ store.ID, _ store.CompanyWrite) (store.Company, error) {
+	return store.Company{}, nil
+}
+func (s *stubCompanies) Update(_ context.Context, _, _ store.ID, _ store.CompanyPatch) (store.Company, bool, error) {
+	return store.Company{}, false, nil
+}
+func (s *stubCompanies) FindActive(_ context.Context, _, _ store.ID) (store.Company, bool, error) {
+	return store.Company{}, false, nil
+}
+func (s *stubCompanies) Deactivate(_ context.Context, _, _ store.ID) (store.DeactivateResult, error) {
+	return store.DeactivateOK, nil
+}
 
 type stubUsers struct{ u store.User }
 

@@ -41,6 +41,8 @@ func (f *fakeSessions) ResolveCompany(_ context.Context, _ string, tabID string,
 	return f.companyID, f.companyErr
 }
 
+func (f *fakeSessions) BindCompany(_ context.Context, _, _ string, _, _ store.ID) error { return nil }
+
 func decode(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 	t.Helper()
 	var body map[string]any

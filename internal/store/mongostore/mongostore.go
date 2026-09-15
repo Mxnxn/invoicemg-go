@@ -376,3 +376,22 @@ func (d *days) clientNames(ctx context.Context, ids []primitive.ObjectID) (map[p
 	}
 	return out, nil
 }
+
+func (s *sessions) BindCompany(ctx context.Context, token, tabID string, uid, companyID store.ID) error {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return err
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Collection(colCompanySessions).UpdateOne(ctx,
+		bson.M{"token": token, "tab_id": tabID},
+		bson.M{"$set": bson.M{"token": token, "tab_id": tabID, "uid": uidOID, "company_id": companyOID}},
+		options.Update().SetUpsert(true))
+	if err != nil {
+		return fmt.Errorf("binding tab to company: %w", err)
+	}
+	return nil
+}

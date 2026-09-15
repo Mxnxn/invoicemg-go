@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -85,4 +86,141 @@ func (c *companies) Active(ctx context.Context, companyID, uid store.ID) (store.
 		return store.Company{}, fmt.Errorf("looking up company: %w", err)
 	}
 	return doc.toStore(), nil
+}
+
+func (c *companies) Count(ctx context.Context, uid store.ID) (int, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return 0, err
+	}
+	n, err := c.db.Collection(colCompanies).CountDocuments(ctx, bson.M{"uid": uidOID})
+	if err != nil {
+		return 0, fmt.Errorf("counting companies: %w", err)
+	}
+	return int(n), nil
+}
+
+func (c *companies) Create(ctx context.Context, uid store.ID, in store.CompanyWrite) (store.Company, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Company{}, err
+	}
+	n, err := c.Count(ctx, uid)
+	if err != nil {
+		return store.Company{}, err
+	}
+	firm := in.Firm
+	if firm == "" {
+		firm = in.Name
+	}
+	isDefault := n == 0
+	doc := bson.M{
+		"uid": uidOID, "name": in.Name, "firm": firm, "address": in.Address, "phone": in.Phone,
+		"gst": in.Gst, "account_no": in.AccountNo, "ifsc": in.Ifsc, "bank_name": in.BankName,
+		"is_default": isDefault, "is_active": true,
+	}
+	res, err := c.db.Collection(colCompanies).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Company{}, fmt.Errorf("insert company: %w", err)
+	}
+	out := store.Company{
+		Name: in.Name, Firm: firm, Address: in.Address, Phone: in.Phone, Gst: in.Gst,
+		AccountNo: in.AccountNo, Ifsc: in.Ifsc, BankName: in.BankName, IsDefault: isDefault, IsActive: true,
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		out.ID = idOf(oid)
+	}
+	return out, nil
+}
+
+func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch store.CompanyPatch) (store.Company, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Company{}, false, err
+	}
+	cOID, err := objectID(companyID)
+	if err != nil {
+		return store.Company{}, false, nil
+	}
+	set := bson.M{}
+	for key, p := range map[string]*string{
+		"name": patch.Name, "firm": patch.Firm, "address": patch.Address, "phone": patch.Phone,
+		"gst": patch.Gst, "account_no": patch.AccountNo, "ifsc": patch.Ifsc, "bank_name": patch.BankName,
+	} {
+		if p != nil {
+			set[key] = *p
+		}
+	}
+	update := bson.M{}
+	if len(set) > 0 {
+		update["$set"] = set
+	} else {
+		update["$set"] = bson.M{"updatedAt": time.Now().UTC()}
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var doc companyDoc
+	err = c.db.Collection(colCompanies).FindOneAndUpdate(ctx, bson.M{"_id": cOID, "uid": uidOID}, update, opts).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.Company{}, false, nil
+	}
+	if err != nil {
+		return store.Company{}, false, fmt.Errorf("update company: %w", err)
+	}
+	return doc.toStore(), true, nil
+}
+
+func (c *companies) FindActive(ctx context.Context, uid, companyID store.ID) (store.Company, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Company{}, false, err
+	}
+	cOID, err := objectID(companyID)
+	if err != nil {
+		return store.Company{}, false, nil
+	}
+	var doc companyDoc
+	err = c.db.Collection(colCompanies).FindOne(ctx, bson.M{"_id": cOID, "uid": uidOID, "is_active": true}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.Company{}, false, nil
+	}
+	if err != nil {
+		return store.Company{}, false, fmt.Errorf("finding active company: %w", err)
+	}
+	return doc.toStore(), true, nil
+}
+
+func (c *companies) Deactivate(ctx context.Context, uid, companyID store.ID) (store.DeactivateResult, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.DeactivateNotFound, err
+	}
+	cOID, err := objectID(companyID)
+	if err != nil {
+		return store.DeactivateNotFound, nil
+	}
+	active, err := c.db.Collection(colCompanies).CountDocuments(ctx, bson.M{"uid": uidOID, "is_active": true})
+	if err != nil {
+		return store.DeactivateNotFound, fmt.Errorf("counting active companies: %w", err)
+	}
+	if active <= 1 {
+		return store.DeactivateMustKeepOne, nil
+	}
+	var doc companyDoc
+	err = c.db.Collection(colCompanies).FindOne(ctx, bson.M{"_id": cOID, "uid": uidOID}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.DeactivateNotFound, nil
+	}
+	if err != nil {
+		return store.DeactivateNotFound, fmt.Errorf("looking up company: %w", err)
+	}
+	if doc.IsDefault {
+		return store.DeactivateIsDefault, nil
+	}
+	if _, err := c.db.Collection(colCompanies).UpdateOne(ctx, bson.M{"_id": cOID, "uid": uidOID}, bson.M{"$set": bson.M{"is_active": false}}); err != nil {
+		return store.DeactivateNotFound, fmt.Errorf("deactivating company: %w", err)
+	}
+	if _, err := c.db.Collection(colCompanySessions).DeleteMany(ctx, bson.M{"company_id": cOID}); err != nil {
+		return store.DeactivateNotFound, fmt.Errorf("clearing tab bindings: %w", err)
+	}
+	return store.DeactivateOK, nil
 }

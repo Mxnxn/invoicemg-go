@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (62 of 209)
+## Routes ready (66 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -40,6 +40,10 @@ the 209 routes the Node API declares.
 | `POST /client/remove` | hard delete (not via Trash), company-scoped; 404 on miss | Live · Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
+| `POST /company/create` | admin; first company becomes default; firm falls back to name | Live · Unit |
+| `POST /company/update` | admin; partial edit (present-key); 404 on miss | Live · Unit |
+| `POST /company/switch` | any user; binds this TAB-ID to an owned active company; 422 without TAB-ID | Live · Unit |
+| `POST /company/deactivate` | admin; keep-one + not-the-default guards; clears tab bindings; never deletes | Live · Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
 | `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |
