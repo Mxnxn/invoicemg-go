@@ -29,6 +29,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/invoice"
+	"github.com/mxnxn/invoicemg-go/internal/lookups"
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
@@ -147,6 +148,7 @@ func routes(db store.Store) http.Handler {
 	quotationHandler := quotation.New(db.Quotations())
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
+	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -232,6 +234,12 @@ func routes(db store.Store) http.Handler {
 	// the populated entries and computed totals. Only /getAll is ported.
 	mux.Handle("POST /invoice/getAll", feature("invoices", invoiceHandler.List))
 	mux.Handle("GET /invoices", feature("invoices", invoiceHandler.List))
+
+	// Lifecycle name/rate lookups for the Job and Quotation forms. Authenticated only (no
+	// feature gate), as routes/Lifecycle.js registers them before its feature guard.
+	mux.Handle("POST /lifecycle/lookups/clients", authed(lookupHandler.Clients))
+	mux.Handle("POST /lifecycle/lookups/materials", authed(lookupHandler.Materials))
+	mux.Handle("POST /lifecycle/lookups/people", authed(lookupHandler.People))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

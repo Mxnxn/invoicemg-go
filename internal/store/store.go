@@ -630,6 +630,41 @@ type Invoices interface {
 	List(ctx context.Context, companyID ID) ([]Invoice, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Lifecycle lookups (name/rate pickers for the Job and Quotation forms)
+// ---------------------------------------------------------------------------------------
+
+// LookupClient/Material/Person are the projected rows the form dropdowns need - narrow,
+// uid+company scoped, and (unlike the sharing-widened list reads) never widened.
+type LookupClient struct {
+	ID          ID
+	ClientName  string
+	ClientFirm  string
+	ClientPhone string
+}
+
+type LookupMaterial struct {
+	ID           ID
+	MaterialName string
+	MaterialRate float64
+	Hsn          string
+	Tax          float64
+}
+
+type LookupPerson struct {
+	ID   ID
+	Name string
+	Type string
+}
+
+type Lookups interface {
+	Clients(ctx context.Context, uid, companyID ID) ([]LookupClient, error)
+	Materials(ctx context.Context, companyID ID) ([]LookupMaterial, error)
+	// People returns the owner's ACTIVE people (name+type). The owner-as-Admin row is prepended
+	// by the handler, not here.
+	People(ctx context.Context, uid ID) ([]LookupPerson, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -645,6 +680,7 @@ type Store interface {
 	Quotations() Quotations
 	PurchaseInvoices() PurchaseInvoices
 	Invoices() Invoices
+	Lookups() Lookups
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

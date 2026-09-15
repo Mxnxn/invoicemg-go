@@ -14,7 +14,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (22 of 209)
+## Routes ready (25 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -40,6 +40,9 @@ the 209 routes the Node API declares.
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
 | `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
+| `POST /lifecycle/lookups/clients` | name picker; uid+company scoped (not sharing-widened) | Live · Unit |
+| `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |
+| `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
