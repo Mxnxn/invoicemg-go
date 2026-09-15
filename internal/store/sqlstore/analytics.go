@@ -232,3 +232,37 @@ func (a *analytics) UnbilledEntries(ctx context.Context, companyID store.ID) ([]
 	}
 	return out, rows.Err()
 }
+
+func (a *analytics) Reviews(ctx context.Context, companyID store.ID, from, to string) ([]store.ReviewRow, error) {
+	rows, err := a.pool.Query(ctx, `
+		SELECT id, challan_number, job_id, client_id, client_name, comment, created_at,
+		       quality, speed, communication, satisfaction, overall
+		  FROM job_reviews
+		 WHERE company_id = $1
+		   AND ($2 = '' OR created_at >= to_timestamp($2,'YYYY-MM-DD'))
+		   AND ($3 = '' OR created_at < to_timestamp($3,'YYYY-MM-DD') + interval '1 day')
+		 ORDER BY created_at DESC, id DESC`, string(companyID), from, to)
+	if err != nil {
+		return nil, fmt.Errorf("reviews: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.ReviewRow, 0)
+	for rows.Next() {
+		var r store.ReviewRow
+		var jobID, clientID *string
+		var s store.ReviewScores
+		if err := rows.Scan(&r.ID, &r.ChallanNumber, &jobID, &clientID, &r.ClientName, &r.Comment, &r.CreatedAt,
+			&s.Quality, &s.Speed, &s.Communication, &s.Satisfaction, &s.Overall); err != nil {
+			return nil, err
+		}
+		if jobID != nil {
+			r.JobID = store.ID(*jobID)
+		}
+		if clientID != nil {
+			r.ClientID = store.ID(*clientID)
+		}
+		r.Scores = s
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

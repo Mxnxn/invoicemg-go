@@ -330,3 +330,76 @@ type unbilledAcc struct {
 func sortAcc(xs []*unbilledAcc) {
 	sort.SliceStable(xs, func(i, j int) bool { return xs[i].value > xs[j].value })
 }
+
+// Reviews is POST /analytics/reviews - aggregate scores + the 20 most recent.
+func (h *Handler) Reviews(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	list, err := h.store.Reviews(r.Context(), sess.CompanyID, form.String("from"), form.String("to"))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	dims := []string{"quality", "speed", "communication", "satisfaction", "overall"}
+	val := func(s store.ReviewScores, dim string) int {
+		switch dim {
+		case "quality":
+			return s.Quality
+		case "speed":
+			return s.Speed
+		case "communication":
+			return s.Communication
+		case "satisfaction":
+			return s.Satisfaction
+		default:
+			return s.Overall
+		}
+	}
+	totals := map[string]int{}
+	counts := map[string]int{}
+	distribution := map[string]int{"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+	for _, rv := range list {
+		for _, dim := range dims {
+			v := val(rv.Scores, dim)
+			if v >= 1 && v <= 5 { // a score stored before a dimension existed is excluded from it
+				totals[dim] += v
+				counts[dim]++
+			}
+		}
+		if o := rv.Scores.Overall; o >= 1 && o <= 5 {
+			distribution[itoa(o)]++
+		}
+	}
+	averages := map[string]float64{}
+	for _, dim := range dims {
+		if counts[dim] > 0 {
+			averages[dim] = round1(float64(totals[dim]) / float64(counts[dim]))
+		} else {
+			averages[dim] = 0
+		}
+	}
+
+	recent := make([]map[string]any, 0, 20)
+	for i, rv := range list {
+		if i >= 20 {
+			break
+		}
+		recent = append(recent, map[string]any{
+			"_id": string(rv.ID), "job": rv.ChallanNumber, "job_id": string(rv.JobID),
+			"customer": rv.ClientName, "client_id": string(rv.ClientID),
+			"scores":  map[string]int{"quality": rv.Scores.Quality, "speed": rv.Scores.Speed, "communication": rv.Scores.Communication, "satisfaction": rv.Scores.Satisfaction, "overall": rv.Scores.Overall},
+			"comment": rv.Comment, "createdAt": httpx.NewTime(rv.CreatedAt),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": 200, "message": "Operation successful.", "status": true,
+		"data": map[string]any{
+			"count": len(list), "averages": averages, "counts": counts, "distribution": distribution, "recent": recent,
+		},
+	})
+}
+
+func itoa(n int) string { return string(rune('0' + n)) }

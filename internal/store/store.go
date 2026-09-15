@@ -838,6 +838,18 @@ type DatedAmount struct {
 	Amount float64
 }
 
+// ReviewRow is one job review, for the reviews aggregation.
+type ReviewRow struct {
+	ID            ID
+	ChallanNumber string
+	JobID         ID
+	ClientID      ID
+	ClientName    string
+	Scores        ReviewScores
+	Comment       string
+	CreatedAt     time.Time
+}
+
 // UnbilledEntry is one not-yet-invoiced entry, for the unbilled report. HasDate is false when
 // neither createdAt nor date resolved.
 type UnbilledEntry struct {
@@ -870,6 +882,8 @@ type Analytics interface {
 	TopSales(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopCredits(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
+	// Reviews returns a company's job reviews (newest first), optionally within [from,to] dates.
+	Reviews(ctx context.Context, companyID ID, from, to string) ([]ReviewRow, error)
 	// OutstandingInvoices returns each unpaid invoice's due amount and billed date (due>0).
 	OutstandingInvoices(ctx context.Context, companyID ID) ([]DatedAmount, error)
 	// UnbilledEntries returns entries not yet invoiced (has_issued false), for the billing-lag report.

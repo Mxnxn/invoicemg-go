@@ -428,3 +428,64 @@ func (a *analytics) UnbilledEntries(ctx context.Context, companyID store.ID) ([]
 	}
 	return out, nil
 }
+
+func (a *analytics) Reviews(ctx context.Context, companyID store.ID, from, to string) ([]store.ReviewRow, error) {
+	oid, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"company_id": oid}
+	if from != "" || to != "" {
+		dr := bson.M{}
+		if from != "" {
+			if t, err := time.Parse("2006-01-02", from); err == nil {
+				dr["$gte"] = t.UTC()
+			}
+		}
+		if to != "" {
+			if t, err := time.Parse("2006-01-02", to); err == nil {
+				dr["$lte"] = t.UTC().Add(24*time.Hour - time.Nanosecond)
+			}
+		}
+		if len(dr) > 0 {
+			filter["createdAt"] = dr
+		}
+	}
+	cur, err := a.db.Collection(colJobReviews).Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+	if err != nil {
+		return nil, fmt.Errorf("reviews: %w", err)
+	}
+	defer cur.Close(ctx)
+	var docs []struct {
+		ID            primitive.ObjectID  `bson:"_id"`
+		ChallanNumber string              `bson:"challanNumber"`
+		JobID         primitive.ObjectID  `bson:"job_id"`
+		ClientID      *primitive.ObjectID `bson:"client_id"`
+		ClientName    string              `bson:"clientName"`
+		Comment       string              `bson:"comment"`
+		CreatedAt     time.Time           `bson:"createdAt"`
+		Scores        struct {
+			Quality       int `bson:"quality"`
+			Speed         int `bson:"speed"`
+			Communication int `bson:"communication"`
+			Satisfaction  int `bson:"satisfaction"`
+			Overall       int `bson:"overall"`
+		} `bson:"scores"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.ReviewRow, 0, len(docs))
+	for _, d := range docs {
+		r := store.ReviewRow{
+			ID: idOf(d.ID), ChallanNumber: d.ChallanNumber, JobID: idOf(d.JobID), ClientName: d.ClientName,
+			Comment: d.Comment, CreatedAt: d.CreatedAt,
+			Scores: store.ReviewScores{Quality: d.Scores.Quality, Speed: d.Scores.Speed, Communication: d.Scores.Communication, Satisfaction: d.Scores.Satisfaction, Overall: d.Scores.Overall},
+		}
+		if d.ClientID != nil {
+			r.ClientID = idOf(*d.ClientID)
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}

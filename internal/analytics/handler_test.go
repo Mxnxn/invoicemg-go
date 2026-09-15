@@ -34,6 +34,9 @@ func (s *stubAnalytics) OutstandingInvoices(_ context.Context, _ store.ID) ([]st
 func (s *stubAnalytics) UnbilledEntries(_ context.Context, _ store.ID) ([]store.UnbilledEntry, error) {
 	return nil, nil
 }
+func (s *stubAnalytics) Reviews(_ context.Context, _ store.ID, _, _ string) ([]store.ReviewRow, error) {
+	return nil, nil
+}
 func (s *stubAnalytics) PaymentGaps(_ context.Context, _ store.ID) ([]float64, error) {
 	return nil, nil
 }
