@@ -1049,6 +1049,55 @@ type Trash interface {
 	List(ctx context.Context, companyID ID) ([]TrashRecord, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------------------
+
+// InvMaterial/InvPurchaseRow/InvJobRow/InvWastageRow are the raw rows the stock report rolls up
+// (kept store-side so internal/inventorymath stays pure).
+type InvMaterial struct {
+	ID           string
+	MaterialName string
+	Unit         string
+	PurchaseRate float64
+}
+type InvPurchaseRow struct {
+	ID        string
+	Material  string
+	Qty       float64
+	Rate      float64
+	CompanyID string
+}
+type InvJobRow struct {
+	ID            string
+	Material      string
+	Length        string
+	Width         string
+	Qty           float64
+	HasDimensions *bool
+	CompanyID     string
+}
+type InvWastageRow struct {
+	ID           string
+	MaterialName string
+	Length       float64
+	Height       float64
+	CompanyID    string
+}
+
+// InventoryData is everything the stock report reads, for one company (report sharing across an
+// owner's companies is a Postgres follow-up; this fails closed to the acting company).
+type InventoryData struct {
+	Materials    []InvMaterial
+	PurchaseRows []InvPurchaseRow
+	JobRows      []InvJobRow
+	WastageRows  []InvWastageRow
+}
+
+type Inventory interface {
+	Data(ctx context.Context, companyID ID, from, to string) (InventoryData, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -1073,6 +1122,7 @@ type Store interface {
 	BatchReceives() BatchReceives
 	SupplierPayments() SupplierPayments
 	Trash() Trash
+	Inventory() Inventory
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

@@ -33,6 +33,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/expense"
 	"github.com/mxnxn/invoicemg-go/internal/gstreport"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/inventory"
 	"github.com/mxnxn/invoicemg-go/internal/invoice"
 	"github.com/mxnxn/invoicemg-go/internal/lifecycle"
 	"github.com/mxnxn/invoicemg-go/internal/lookups"
@@ -154,6 +155,7 @@ func routes(db store.Store) http.Handler {
 	batchReceiveHandler := batchreceive.New(db.BatchReceives())
 	supplierPaymentHandler := supplierpayment.New(db.SupplierPayments())
 	trashHandler := trash.New(db.Trash())
+	inventoryHandler := inventory.New(db.Inventory(), db.Companies())
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
 	analyticsHandler := analytics.New(db.Analytics())
@@ -290,6 +292,8 @@ func routes(db store.Store) http.Handler {
 
 	mux.Handle("POST /trash/get", feature("trash", trashHandler.Get))
 	mux.Handle("POST /trash/setPassword", feature("trash", trashHandler.SetPassword))
+
+	mux.Handle("POST /inventory/report", feature("products", inventoryHandler.Report))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 
