@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (27 of 209)
+## Routes ready (28 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -47,6 +47,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
+| `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -77,6 +78,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
 | jobs/job_rows extended | employee/vendor/queue_order/alert channels + row employee/quotation/queue_order, for `/lifecycle/jobs/list` |
 | `challans` | added for `/challan/getAll` |
+| `expenses` | added for `/expense/list` (bank populate; string date range) |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.

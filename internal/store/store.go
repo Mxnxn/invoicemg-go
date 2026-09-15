@@ -792,6 +792,41 @@ type Challans interface {
 	List(ctx context.Context, companyID ID) ([]Challan, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------------------------
+
+// ExpenseBank is the populated bank_id (name only).
+type ExpenseBank struct {
+	ID   ID
+	Name string
+}
+
+// Expense is money out, tied to a bank. bank_id is populated into Bank.
+type Expense struct {
+	ID        ID
+	CompanyID ID
+	UID       ID
+	Bank      *ExpenseBank
+	Date      string
+	Amount    float64
+	Notes     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Version   int
+}
+
+// ExpenseFilter narrows a list: an empty field means no filter on it.
+type ExpenseFilter struct {
+	BankID ID
+	From   string
+	To     string
+}
+
+type Expenses interface {
+	List(ctx context.Context, companyID ID, f ExpenseFilter) ([]Expense, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -810,6 +845,7 @@ type Store interface {
 	Lookups() Lookups
 	Jobs() Jobs
 	Challans() Challans
+	Expenses() Expenses
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

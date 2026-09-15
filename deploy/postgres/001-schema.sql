@@ -464,3 +464,18 @@ CREATE TABLE banks (
     updated_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX banks_company_idx ON banks (company_id);
+
+-- Expenses (money out, always tied to a bank). date is a string (YYYY-MM-DD) to match the
+-- Mongo model and keep range filters string-comparable across the cashflow reports.
+CREATE TABLE expenses (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    uid         text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id  text REFERENCES companies(id) ON DELETE CASCADE,
+    bank_id     text REFERENCES banks(id) ON DELETE SET NULL,
+    date        text NOT NULL DEFAULT '',
+    amount      numeric(14,2) NOT NULL DEFAULT 0,
+    notes       text NOT NULL DEFAULT '',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX expenses_company_date_idx ON expenses (company_id, date);

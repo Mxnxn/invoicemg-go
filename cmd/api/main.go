@@ -28,6 +28,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/company"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
+	"github.com/mxnxn/invoicemg-go/internal/expense"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/invoice"
 	"github.com/mxnxn/invoicemg-go/internal/lifecycle"
@@ -145,6 +146,7 @@ func routes(db store.Store) http.Handler {
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	challanHandler := challan.New(db.Challans())
+	expenseHandler := expense.New(db.Expenses())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
@@ -251,6 +253,10 @@ func routes(db store.Store) http.Handler {
 
 	// Delivery challans, behind the challan feature. Only /getAll is ported.
 	mux.Handle("POST /challan/getAll", feature("challan", challanHandler.GetAll))
+
+	// Expenses, behind the batch_receive feature. Only /list is ported.
+	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
+	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

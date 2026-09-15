@@ -77,9 +77,9 @@ VALUES ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'a00000000000000
         5, 4, 5, 5, 5, 'Fast and clean work.');
 
 -- Bank accounts, so /bank/list has rows on the local stack.
-INSERT INTO banks (uid, company_id, name, opening_balance) VALUES
-    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Cash Drawer',  2500),
-    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'HDFC Current', 50000);
+INSERT INTO banks (id, uid, company_id, name, opening_balance) VALUES
+    ('b0000000000000000000000a', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Cash Drawer',  2500),
+    ('b0000000000000000000000b', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'HDFC Current', 50000);
 
 -- Products, so the Products tab has rows on the local stack.
 INSERT INTO materials (id, uid, company_id, material_name, material_rate, purchase_rate, unit, hsn, tax) VALUES
@@ -125,3 +125,8 @@ INSERT INTO entries (uid, company_id, client_id, invoice_id, description, materi
 INSERT INTO challans (uid, company_id, company_name, description, date, type, quantity, amount) VALUES
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Acme Signs','Delivered banners','2026-09-12','Delivery',5,4500),
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Bolt Print','Returned samples','2026-09-13','Return',2,0);
+
+-- Expenses so the Expenses view has content.
+INSERT INTO expenses (uid, company_id, bank_id, date, amount, notes) VALUES
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','b0000000000000000000000b','2026-09-10',1200,'Ink cartridges'),
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','b0000000000000000000000a','2026-09-12',500,'Courier');
