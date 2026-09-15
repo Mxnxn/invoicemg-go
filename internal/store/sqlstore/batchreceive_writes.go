@@ -351,3 +351,40 @@ func (b *batchReceives) getOne(ctx context.Context, uid, companyID, batchID stor
 	br.Destinations = dests
 	return br, nil
 }
+
+// CreateSimple inserts a plain client receipt (no allocation), after confirming the client
+// belongs to the caller (own company or a legacy null-company row). It is /client/batchUpdate,
+// whose entry auto-apply is disabled in Node.
+func (b *batchReceives) CreateSimple(ctx context.Context, uid, companyID, clientID store.ID, amount float64, date, note string) (store.BatchReceive, bool, error) {
+	var one int
+	err := b.pool.QueryRow(ctx, `
+		SELECT 1 FROM clients
+		 WHERE id = $1 AND uid = $2 AND (company_id = $3 OR company_id IS NULL)`,
+		string(clientID), string(uid), string(companyID)).Scan(&one)
+	if err == pgx.ErrNoRows {
+		return store.BatchReceive{}, false, nil
+	}
+	if err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("verify client: %w", err)
+	}
+
+	var out store.BatchReceive
+	var companyCol, clientCol *string
+	err = b.pool.QueryRow(ctx, `
+		INSERT INTO batch_receives (uid, company_id, client_id, date, amount, note)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, uid, company_id, client_id, date, amount, note, mode, created_at, updated_at`,
+		string(uid), string(companyID), string(clientID), date, amount, note).
+		Scan(&out.ID, &out.UID, &companyCol, &clientCol, &out.Date, &out.Amount, &out.Note, &out.Mode,
+			&out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("insert batch receive: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	if clientCol != nil {
+		out.ClientID = store.ID(*clientCol)
+	}
+	return out, true, nil
+}

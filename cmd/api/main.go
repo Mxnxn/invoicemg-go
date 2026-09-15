@@ -242,6 +242,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /client/update", feature("customers", clientHandler.Update))
 	mux.Handle("POST /client/remove", feature("customers", clientHandler.Remove, auth.RequireDelete("customers")))
 	mux.Handle("POST /client/get", feature("customers", clientHandler.Get))
+	mux.Handle("POST /client/batchUpdate", feature("customers", clientHandler.BatchUpdate))
 
 	// The shell bootstrap: the company switcher, the active-company letterhead, and the admin
 	// profile. /company/* need only a session; /userinfo/get is admin-only.

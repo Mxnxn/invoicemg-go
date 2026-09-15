@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (116 of 209)
+## Routes ready (117 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -39,6 +39,7 @@ the 209 routes the Node API declares.
 | `POST /client/update` | edit; same uniqueness (excludes self); 404 on miss; dup check precedes not-found | Live · Unit |
 | `POST /client/remove` | hard delete (not via Trash), company-scoped; 404 on miss | Live · Unit |
 | `POST /client/get` | one client + entries populated (issued invoice number; quotation link null on Postgres - no column yet) + batchUpdates; 404/422 | Live · Unit |
+| `POST /client/batchUpdate` | plain logged client receipt, no entry allocation (Node's auto-apply is disabled); verifies client ownership; 422/404 | Live · Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /company/create` | admin; first company becomes default; firm falls back to name | Live · Unit |

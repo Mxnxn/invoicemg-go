@@ -41,7 +41,11 @@ func (s *stubClients) Get(context.Context, store.ID, store.ID) (store.ClientDeta
 }
 
 // stubBatches satisfies store.BatchReceives for the client handler; only List is exercised.
-type stubBatches struct{ list []store.BatchReceive }
+type stubBatches struct {
+	list         []store.BatchReceive
+	created      store.BatchReceive
+	createdFound bool
+}
 
 func (b *stubBatches) List(context.Context, store.ID, store.ID, store.ID) ([]store.BatchReceive, error) {
 	return b.list, nil
@@ -51,6 +55,9 @@ func (b *stubBatches) OpenJobs(context.Context, store.ID, store.ID, store.ID) ([
 }
 func (b *stubBatches) Create(context.Context, store.ID, store.ID, store.BatchReceiveWrite) (store.BatchReceive, error) {
 	return store.BatchReceive{}, nil
+}
+func (b *stubBatches) CreateSimple(_ context.Context, _, _, _ store.ID, amount float64, date, note string) (store.BatchReceive, bool, error) {
+	return b.created, b.createdFound, nil
 }
 func (b *stubBatches) Delete(context.Context, store.ID, store.ID, store.ID) (bool, error) {
 	return false, nil
@@ -412,4 +419,47 @@ func TestGetValidationAndNotFound(t *testing.T) {
 	if body["code"] != float64(404) || body["message"] != "Client not found." {
 		t.Errorf("not found: %v", body)
 	}
+}
+
+func TestBatchUpdate(t *testing.T) {
+	b := &stubBatches{createdFound: true, created: store.BatchReceive{ID: "br1", ClientID: "c1", UID: "u1", Amount: 500, Date: "2026-09-15"}}
+	body := serveGet2(t, &stubClients{}, b, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchUpdate },
+		map[string]string{"uid": "u1", "client_id": "c1", "amount": "500"})
+	if body["code"] != float64(200) || body["message"] != "ok" || body["status"] != true {
+		t.Fatalf("batchUpdate: %v", body)
+	}
+	data := body["data"].(map[string]any)
+	if data["amount"] != float64(500) || data["client"] != "c1" {
+		t.Errorf("data: %v", data)
+	}
+	// missing amount -> 422 status true
+	body = serveGet2(t, &stubClients{}, b, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchUpdate },
+		map[string]string{"uid": "u1", "client_id": "c1"})
+	if body["code"] != float64(422) || body["status"] != true {
+		t.Errorf("missing amount: %v", body)
+	}
+	// client not found -> 404
+	body = serveGet2(t, &stubClients{}, &stubBatches{createdFound: false}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchUpdate },
+		map[string]string{"uid": "u1", "client_id": "x", "amount": "5"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
+}
+
+func serveGet2(t *testing.T, c *stubClients, b *stubBatches, fn func(*Handler) func(http.ResponseWriter, *http.Request), form map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range form {
+		vals.Set(k, v)
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	fn(New(c, b))(rec, r)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return body
 }

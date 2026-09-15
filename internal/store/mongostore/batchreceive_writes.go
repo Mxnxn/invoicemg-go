@@ -322,3 +322,44 @@ func (b *batchReceives) getOne(ctx context.Context, uid, companyID, batchID stor
 	}
 	return store.BatchReceive{}, fmt.Errorf("batch receive %s not found after create", batchID)
 }
+
+// CreateSimple is /client/batchUpdate: a plain logged receipt, no allocation, after confirming
+// the client belongs to the caller (own company or a legacy null-company row).
+func (b *batchReceives) CreateSimple(ctx context.Context, uid, companyID, clientID store.ID, amount float64, date, note string) (store.BatchReceive, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.BatchReceive{}, false, nil
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.BatchReceive{}, false, nil
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return store.BatchReceive{}, false, nil
+	}
+	cnt, err := b.db.Collection(colClients).CountDocuments(ctx, bson.M{
+		"_id": clientOID, "uid": uidOID,
+		"$or": bson.A{bson.M{"company_id": companyOID}, bson.M{"company_id": nil}},
+	})
+	if err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("verify client: %w", err)
+	}
+	if cnt == 0 {
+		return store.BatchReceive{}, false, nil
+	}
+
+	now := time.Now().UTC()
+	doc := bson.M{
+		"client": clientOID, "uid": uidOID, "company_id": companyOID,
+		"date": date, "amount": amount, "note": note, "createdAt": now, "updatedAt": now, "__v": 0,
+	}
+	res, err := b.db.Collection(colBatchReceives).InsertOne(ctx, doc)
+	if err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("insert batch receive: %w", err)
+	}
+	return store.BatchReceive{
+		ID: idOf(res.InsertedID.(primitive.ObjectID)), UID: uid, CompanyID: companyID, ClientID: clientID,
+		Date: date, Amount: amount, Note: note, CreatedAt: now, UpdatedAt: now,
+	}, true, nil
+}

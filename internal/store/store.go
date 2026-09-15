@@ -1667,6 +1667,10 @@ type BatchReceives interface {
 	// Delete reverses everything the record applied (job advances, entry/invoice propagation)
 	// and removes it. found is false on a miss.
 	Delete(ctx context.Context, uid, companyID, batchID ID) (found bool, err error)
+	// CreateSimple is /client/batchUpdate: a plain logged receipt with no allocation and no
+	// entry side effects (Node's auto-apply is disabled). found is false when the client is not
+	// the caller's. date defaults to today when blank.
+	CreateSimple(ctx context.Context, uid, companyID, clientID ID, amount float64, date, note string) (b BatchReceive, found bool, err error)
 }
 
 // SupplierPayment is one payment to a supplier, mirror of BatchReceive (supplier/bank

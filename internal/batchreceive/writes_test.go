@@ -31,6 +31,9 @@ func (s *stub) Create(_ context.Context, _, _ store.ID, in store.BatchReceiveWri
 	s.gotCreate = in
 	return s.created, nil
 }
+func (s *stub) CreateSimple(_ context.Context, _, _, _ store.ID, _ float64, _, _ string) (store.BatchReceive, bool, error) {
+	return store.BatchReceive{}, false, nil
+}
 func (s *stub) Delete(_ context.Context, _, _, id store.ID) (bool, error) {
 	s.gotDeleteID = id
 	return s.deleteFound, nil
