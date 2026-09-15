@@ -50,6 +50,10 @@ type Config struct {
 
 	// How long to wait for Mongo before giving up at startup.
 	ConnectTimeout time.Duration
+
+	// Where uploaded company logos are stored and served from (routes/UserInfo /upload and the
+	// public /uploads mount). Defaults to "uploads" beside the binary.
+	UploadsDir string
 }
 
 func Load() (Config, error) {
@@ -57,6 +61,7 @@ func Load() (Config, error) {
 		Addr:           env("ADDR", ":5002"),
 		Store:          env("STORE", StoreMongo),
 		APIStyle:       env("API_STYLE", "legacy"),
+		UploadsDir:     env("UPLOADS_DIR", "uploads"),
 		PostgresURL:    env("POSTGRES_URL", ""),
 		MongoURI:       env("MONGO_URI", "mongodb://127.0.0.1:27018"),
 		MongoDB:        env("MONGO_DB", "invoicemg_new"),

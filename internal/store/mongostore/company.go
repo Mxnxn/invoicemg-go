@@ -155,7 +155,7 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 	set := bson.M{}
 	for key, p := range map[string]*string{
 		"name": patch.Name, "firm": patch.Firm, "address": patch.Address, "phone": patch.Phone,
-		"gst": patch.Gst, "account_no": patch.AccountNo, "ifsc": patch.Ifsc, "bank_name": patch.BankName,
+		"gst": patch.Gst, "url": patch.URL, "account_no": patch.AccountNo, "ifsc": patch.Ifsc, "bank_name": patch.BankName,
 		"invoiceTemplate": patch.InvoiceTemplate, "quotationTemplate": patch.QuotationTemplate, "ledgerTemplate": patch.LedgerTemplate,
 		"whatsapp.phoneNumberId": patch.WaPhoneNumberID, "whatsapp.businessAccountId": patch.WaBusinessAccountID, "whatsapp.apiToken": patch.WaAPIToken,
 	} {

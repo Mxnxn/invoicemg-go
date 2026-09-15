@@ -57,7 +57,7 @@ func getBody(t *testing.T, u store.Users, c store.Companies, sess store.Session)
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), sess))
 	rec := httptest.NewRecorder()
-	New(u, c).Get(rec, r)
+	New(u, c, "").Get(rec, r)
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("not json: %v", err)
@@ -103,7 +103,7 @@ func postForm(t *testing.T, u store.Users, c store.Companies, form string) map[s
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	New(u, c).Add(rec, r)
+	New(u, c, "").Add(rec, r)
 	var body map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	return body
@@ -142,7 +142,7 @@ func TestUpdate(t *testing.T) {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	New(u, c).Update(rec, r)
+	New(u, c, "").Update(rec, r)
 	var body map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	data, _ := body["data"].(map[string]any)
@@ -154,7 +154,7 @@ func TestUpdate(t *testing.T) {
 	r2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec2 := httptest.NewRecorder()
-	New(u, c).Update(rec2, r2)
+	New(u, c, "").Update(rec2, r2)
 	json.Unmarshal(rec2.Body.Bytes(), &body)
 	if body["code"] != float64(422) {
 		t.Errorf("missing name should 422: %v", body)
@@ -192,7 +192,7 @@ func postForm2(t *testing.T, u store.Users, c store.Companies, form string, fn f
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	fn(New(u, c))(rec, r)
+	fn(New(u, c, ""))(rec, r)
 	var body map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	return body

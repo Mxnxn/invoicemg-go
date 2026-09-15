@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (128 of 209)
+## Routes ready (129 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -57,6 +57,7 @@ the 209 routes the Node API declares.
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/update` | admin; save company letterhead + the user's own email/name; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/set-template` | admin; choose the PDF template (invoice/quotation/ledger) on the company; 422 unknown docType/blank, 404 | Live · Unit |
+| `POST /userinfo/upload` | admin; store the company logo (png/jpg/jpeg under userDP), replace the old one, update company.url; served publicly at `GET /uploads/{fname}`; non-image → 200 "Invalid request." | Live · Unit |
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
 | `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |
 | `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |

@@ -484,6 +484,7 @@ type CompanyPatch struct {
 	Address             *string
 	Phone               *string
 	Gst                 *string
+	URL                 *string
 	AccountNo           *string
 	Ifsc                *string
 	BankName            *string

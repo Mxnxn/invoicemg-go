@@ -107,6 +107,7 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 	address := orElse(patch.Address, cur.Address)
 	phone := orElse(patch.Phone, cur.Phone)
 	gst := orElse(patch.Gst, cur.Gst)
+	url := orElse(patch.URL, cur.URL)
 	accountNo := orElse(patch.AccountNo, cur.AccountNo)
 	ifsc := orElse(patch.Ifsc, cur.Ifsc)
 	bankName := orElse(patch.BankName, cur.BankName)
@@ -118,12 +119,12 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 	waToken := orElse(patch.WaAPIToken, cur.WaAPIToken)
 
 	company, err := scanCompany(c.pool.QueryRow(ctx, `
-		UPDATE companies SET name=$3, firm=$4, address=$5, phone=$6, gst=$7, account_no=$8, ifsc=$9, bank_name=$10,
+		UPDATE companies SET name=$3, firm=$4, address=$5, phone=$6, gst=$7, url=$17, account_no=$8, ifsc=$9, bank_name=$10,
 			invoice_template=$11, quotation_template=$12, ledger_template=$13,
 			wa_phone_number_id=$14, wa_business_account_id=$15, wa_api_token=$16, updated_at=now()
 		 WHERE id=$1 AND uid=$2 RETURNING `+companyColumns,
 		string(companyID), string(uid), name, firm, address, phone, gst, accountNo, ifsc, bankName,
-		invoiceTpl, quotationTpl, ledgerTpl, waPhone, waBiz, waToken))
+		invoiceTpl, quotationTpl, ledgerTpl, waPhone, waBiz, waToken, url))
 	if noRows(err) {
 		return store.Company{}, false, nil
 	}

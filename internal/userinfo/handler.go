@@ -12,11 +12,14 @@ import (
 )
 
 type Handler struct {
-	users     store.Users
-	companies store.Companies
+	users      store.Users
+	companies  store.Companies
+	uploadsDir string
 }
 
-func New(u store.Users, c store.Companies) *Handler { return &Handler{users: u, companies: c} }
+func New(u store.Users, c store.Companies, uploadsDir string) *Handler {
+	return &Handler{users: u, companies: c, uploadsDir: uploadsDir}
+}
 
 // Get is POST /userinfo/get. buildProfile tolerates a missing user or company (Node uses
 // ternaries), so a not-found on either just leaves its fields blank rather than erroring.

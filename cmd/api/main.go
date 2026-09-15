@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,7 +92,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: routes(db),
+		Handler: routes(db, cfg.UploadsDir),
 		// A request that has not finished in this long is not going to. The Node app has no
 		// equivalent, which is why one slow query there can hold a connection open
 		// indefinitely.
@@ -134,7 +136,8 @@ func openStore(ctx context.Context, cfg config.Config) (store.Store, error) {
 	}
 }
 
-func routes(db store.Store) http.Handler {
+func routes(db store.Store, uploadsDir string) http.Handler {
+	_ = os.MkdirAll(uploadsDir, 0o755)
 	mux := http.NewServeMux()
 
 	guard := auth.New(db.Sessions())
@@ -180,7 +183,7 @@ func routes(db store.Store) http.Handler {
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
-	userinfoHandler := userinfo.New(db.Users(), db.Companies())
+	userinfoHandler := userinfo.New(db.Users(), db.Companies(), uploadsDir)
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"), db.Companies())
 
 	// Every route is registered TWICE, under two surfaces.
@@ -263,6 +266,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 	mux.Handle("POST /userinfo/update", admin(userinfoHandler.Update))
 	mux.Handle("POST /userinfo/set-template", admin(userinfoHandler.SetTemplate))
+	mux.Handle("POST /userinfo/upload", admin(userinfoHandler.Upload))
 
 	// Products, behind the products feature as routes/Material.js is. Read widens by sharing
 	// (#1); the writes and /material/get are not ported.
@@ -401,6 +405,18 @@ func routes(db store.Store) http.Handler {
 	// it answers with a real status and a bare body, not the envelope (#23). The POST callback
 	// (HMAC over the raw body) is not ported yet.
 	mux.HandleFunc("GET /whatsapp/webhook", whatsappHandler.Verify)
+
+	// Public company-logo serving, the Go side of Node's `app.use("/uploads", express.static(...))`.
+	// Deliberately unauthenticated (logos are embedded in customer-facing PDFs), basename-only so
+	// a crafted name cannot escape the directory, and dotfiles are denied.
+	mux.HandleFunc("GET /uploads/{fname}", func(w http.ResponseWriter, r *http.Request) {
+		name := filepath.Base(r.PathValue("fname"))
+		if name == "" || name == "." || strings.HasPrefix(name, ".") {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(uploadsDir, name))
+	})
 	mux.Handle("POST /whatsapp/config", feature("whatsapp", whatsappHandler.Config))
 	mux.Handle("POST /whatsapp/config/update", feature("whatsapp", whatsappHandler.ConfigUpdate, auth.RequireAdmin))
 	mux.Handle("POST /whatsapp/send", feature("whatsapp", whatsappHandler.Send))
