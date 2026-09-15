@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (121 of 209)
+## Routes ready (122 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -61,6 +61,7 @@ the 209 routes the Node API declares.
 | `POST /person/update` | partial edit (present-key semantics); password kept unless resupplied; email cleared to NULL when blank; 404 on miss | Live · Unit |
 | `POST /person/delete` | hard delete, owner-scoped; 404 on miss | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
+| `POST /quotation/row/add-to-job` | convert a quotation row into a job row: new job or append to the quotation's existing job; stamps row.job_id; System note + "Created"/"Updated" history; 404/422 | Live · Unit |
 | `POST /quotation/next-quotation-number` | next MG/FY/QT- number (docnumber) | Live · Unit |
 | `POST /quotation/get` | one quotation, populated; 404 on miss | Live · Unit |
 | `POST /quotation/create` | rows parsed/coerced; length/width default "1"; dup number 422 | Live · Unit |

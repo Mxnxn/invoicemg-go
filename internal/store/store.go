@@ -737,6 +737,30 @@ type Quotations interface {
 	// RowDelete removes one row from a quotation and returns the re-populated quotation. found is
 	// false when the quotation is missing (a missing row is a no-op, matching Node's `?.deleteOne`).
 	RowDelete(ctx context.Context, uid, companyID, quotationID, rowID ID) (q Quotation, found bool, err error)
+	// AddRowToJob converts one quotation row into a job row: it appends to the job already built
+	// from this quotation, or creates a new job when there is none, then stamps the row's job_id
+	// and logs a System note + history entry. See QuotationRowToJobResult for the outcomes.
+	AddRowToJob(ctx context.Context, uid, companyID, quotationID, rowID ID) (QuotationRowToJobResult, error)
+}
+
+// QuotationRowToJobStatus is the outcome of AddRowToJob.
+type QuotationRowToJobStatus int
+
+const (
+	QRJOk               QuotationRowToJobStatus = iota // converted
+	QRJQuotationNotFound                               // no such quotation for this owner/company
+	QRJRowNotFound                                     // no such row in the quotation
+	QRJAlreadyAdded                                    // the row is already on a job
+	QRJDupChallan                                      // a challan-number collision (retryable)
+)
+
+// QuotationRowToJobResult carries the converted quotation and job (both populated) plus whether
+// a new job was created (which decides the message and the "Created" vs "Updated" history).
+type QuotationRowToJobResult struct {
+	Status    QuotationRowToJobStatus
+	IsNew     bool
+	Quotation Quotation
+	Job       Job
 }
 
 // ---------------------------------------------------------------------------------------

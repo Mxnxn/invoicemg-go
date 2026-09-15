@@ -15,6 +15,7 @@ import (
 )
 
 type stubQuotations struct {
+	addResult   store.QuotationRowToJobResult
 	list        []store.Quotation
 	gotClientID store.ID
 
@@ -51,6 +52,9 @@ func (s *stubQuotations) Update(_ context.Context, _, _, _ store.ID, in store.Qu
 }
 func (s *stubQuotations) Delete(_ context.Context, _, _, _ store.ID) (bool, error) {
 	return s.deleteFound, nil
+}
+func (s *stubQuotations) AddRowToJob(_ context.Context, _, _, _, _ store.ID) (store.QuotationRowToJobResult, error) {
+	return s.addResult, nil
 }
 func (s *stubQuotations) RowDelete(_ context.Context, _, _, _, rowID store.ID) (store.Quotation, bool, error) {
 	s.gotRowID = rowID
@@ -244,5 +248,51 @@ func TestDeleteAndRowDelete(t *testing.T) {
 	body = postQ(t, &stubQuotations{}, func(h *Handler) http.HandlerFunc { return h.RowDelete }, map[string]string{"quotation_id": "q1"})
 	if body["code"] != float64(422) {
 		t.Errorf("row delete missing row_id: %v", body)
+	}
+}
+
+func TestAddRowToJob(t *testing.T) {
+	s := &stubQuotations{addResult: store.QuotationRowToJobResult{
+		Status: store.QRJOk, IsNew: true,
+		Quotation: store.Quotation{ID: "q1", QuotationNumber: "MG/Q/1"},
+		Job:       store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001", Total: 708, Queue: "Created", Progress: "Unassigned"},
+	}}
+	body := postQ(t, s, func(h *Handler) http.HandlerFunc { return h.AddRowToJob },
+		map[string]string{"quotation_id": "q1", "row_id": "r1"})
+	if body["code"] != float64(200) || body["message"] != "Job created from quotation row." {
+		t.Fatalf("new job: %v", body)
+	}
+	data := body["data"].(map[string]any)
+	if data["job"].(map[string]any)["challanNumber"] != "MG/26-27/00001" {
+		t.Errorf("job shape: %v", data["job"])
+	}
+	// existing job -> different message
+	s.addResult.IsNew = false
+	body = postQ(t, s, func(h *Handler) http.HandlerFunc { return h.AddRowToJob }, map[string]string{"quotation_id": "q1", "row_id": "r1"})
+	if body["message"] != "Row added to the quotation's existing job." {
+		t.Errorf("existing job msg: %v", body)
+	}
+	// status mappings
+	cases := []struct {
+		st   store.QuotationRowToJobStatus
+		code float64
+		msg  string
+	}{
+		{store.QRJQuotationNotFound, 404, "Quotation not found."},
+		{store.QRJRowNotFound, 404, "Row not found."},
+		{store.QRJAlreadyAdded, 422, "This row has already been added to a job."},
+		{store.QRJDupChallan, 422, "Job number collision - try again."},
+	}
+	for _, c := range cases {
+		body = postQ(t, &stubQuotations{addResult: store.QuotationRowToJobResult{Status: c.st}},
+			func(h *Handler) http.HandlerFunc { return h.AddRowToJob }, map[string]string{"quotation_id": "q1", "row_id": "r1"})
+		if body["code"] != c.code || body["message"] != c.msg {
+			t.Errorf("status %v -> %v", c.st, body)
+		}
+	}
+	// missing ids -> 422
+	body = postQ(t, s, func(h *Handler) http.HandlerFunc { return h.AddRowToJob }, map[string]string{"quotation_id": "q1"})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing row_id: %v", body)
 	}
 }

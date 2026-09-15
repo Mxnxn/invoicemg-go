@@ -279,6 +279,7 @@ func routes(db store.Store) http.Handler {
 
 	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
 	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))
+	mux.Handle("POST /quotation/row/add-to-job", feature("quotations", quotationHandler.AddRowToJob))
 	mux.Handle("GET /quotations", feature("quotations", quotationHandler.List))
 	mux.Handle("POST /quotation/next-quotation-number", feature("quotations", quotationHandler.NextNumber))
 	mux.Handle("POST /quotation/get", feature("quotations", quotationHandler.Get))
