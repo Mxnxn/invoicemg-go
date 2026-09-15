@@ -32,6 +32,28 @@ func (h *Handler) Getall(w http.ResponseWriter, r *http.Request) {
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
 }
 
+// Get is POST /material/get: one product by id, company-scoped (never the widened read). A
+// miss answers 200 with data:null, exactly as Node's findOne returning null does.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	id := form.String("material_id")
+	if id == "" {
+		httpx.Invalid(w, "")
+		return
+	}
+	m, found, err := h.store.Get(r.Context(), sess.CompanyID, store.ID(id))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: httpx.Null})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: toDTO(m, sess.CompanyID)})
+}
+
 // borrowed is isBorrowed: owned elsewhere but shared in - the same rule as clients.
 func borrowed(m store.Material, companyID store.ID) bool {
 	if m.CompanyID == companyID || m.Sharing == nil {

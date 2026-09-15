@@ -365,6 +365,32 @@ type Client struct {
 	Sharing        *[]ID
 }
 
+// ClientEntryView is one of a client's entries as /client/get populates it: the entry, plus
+// its issued-invoice link (invoiceId is the human number) and its quotation link. On the
+// relational store there is no entries.quotation_id column yet, so Quotation* stay empty there.
+type ClientEntryView struct {
+	Entry
+	IssuedID        ID
+	IssuedInvoiceID string
+	QuotationID     ID
+	QuotationNumber string
+}
+
+// ClientDetail is the /client/get payload: a client's raw fields with its entries populated
+// (newest first). batchUpdates are attached by the handler from BatchReceives.
+type ClientDetail struct {
+	ID            ID
+	UID           ID
+	CompanyID     ID
+	LegacyID      *int64
+	ClientName    string
+	ClientFirm    string
+	ClientPhone   string
+	ClientGST     string
+	ClientAddress string
+	Entries       []ClientEntryView
+}
+
 // ClientWrite is the writable field set of /client/add and /client/update.
 type ClientWrite struct {
 	ClientName    string
@@ -400,6 +426,9 @@ type Clients interface {
 	// EnsureSupplier creates a Supplier person for uid from these client details, unless one
 	// already matches on GST (or on phone when the GST is empty). Reports whether it created one.
 	EnsureSupplier(ctx context.Context, uid ID, in ClientWrite) (created bool, err error)
+	// Get is /client/get: one company-scoped client with its entries populated (issued invoice
+	// number and quotation number); found is false on a miss or another company's row.
+	Get(ctx context.Context, companyID, clientID ID) (ClientDetail, bool, error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -530,6 +559,8 @@ type Materials interface {
 	// Delete hard-deletes a company-scoped product (Node's findOneAndDelete; a miss is not an
 	// error - /material/remove answers 200 regardless).
 	Delete(ctx context.Context, companyID, materialID ID) error
+	// Get reads one company-scoped product by id (/material/get); found is false on a miss.
+	Get(ctx context.Context, companyID, materialID ID) (Material, bool, error)
 }
 
 // ---------------------------------------------------------------------------------------

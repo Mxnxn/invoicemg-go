@@ -15,8 +15,10 @@ import (
 )
 
 type stubMaterials struct {
-	list []store.Material
-	got  store.ID
+	one      store.Material
+	oneFound bool
+	list     []store.Material
+	got      store.ID
 }
 
 func (s *stubMaterials) Visible(_ context.Context, companyID store.ID) ([]store.Material, error) {
@@ -32,6 +34,9 @@ func (s *stubMaterials) Update(context.Context, store.ID, store.ID, store.Materi
 	return store.Material{}, false, nil
 }
 func (s *stubMaterials) Delete(context.Context, store.ID, store.ID) error { return nil }
+func (s *stubMaterials) Get(context.Context, store.ID, store.ID) (store.Material, bool, error) {
+	return s.one, s.oneFound, nil
+}
 
 // writeStub drives the write-path tests.
 type writeStub struct {
@@ -45,6 +50,9 @@ type writeStub struct {
 }
 
 func (s *writeStub) Visible(context.Context, store.ID) ([]store.Material, error) { return nil, nil }
+func (s *writeStub) Get(context.Context, store.ID, store.ID) (store.Material, bool, error) {
+	return store.Material{}, false, nil
+}
 func (s *writeStub) Create(_ context.Context, _, _ store.ID, in store.MaterialWrite) (store.Material, error) {
 	s.gotCreate = in
 	return s.created, nil
@@ -214,5 +222,38 @@ func TestRemove(t *testing.T) {
 	body = postForm(t, &writeStub{}, func(h *Handler) http.HandlerFunc { return h.Remove }, map[string]string{})
 	if body["code"] != float64(422) {
 		t.Errorf("remove no id: %v", body)
+	}
+}
+
+func TestGet(t *testing.T) {
+	s := &stubMaterials{oneFound: true, one: store.Material{ID: "m1", CompanyID: "co1", MaterialName: "Vinyl", MaterialRate: 45}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader("material_id=m1"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Get(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if body["code"] != float64(200) || body["data"].(map[string]any)["material_name"] != "Vinyl" {
+		t.Fatalf("get: %v", body)
+	}
+	// missing id -> 422
+	r2 := httptest.NewRequest("POST", "/", nil)
+	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec2 := httptest.NewRecorder()
+	New(s).Get(rec2, r2)
+	json.Unmarshal(rec2.Body.Bytes(), &body)
+	if body["code"] != float64(422) {
+		t.Errorf("missing id should 422: %v", body)
+	}
+	// not found -> 200 data null
+	r3 := httptest.NewRequest("POST", "/", strings.NewReader("material_id=x"))
+	r3.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r3 = r3.WithContext(auth.WithSession(r3.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec3 := httptest.NewRecorder()
+	New(&stubMaterials{oneFound: false}).Get(rec3, r3)
+	json.Unmarshal(rec3.Body.Bytes(), &body)
+	if body["data"] != nil {
+		t.Errorf("not found should be data null: %v", body)
 	}
 }

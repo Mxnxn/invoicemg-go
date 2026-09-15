@@ -187,3 +187,23 @@ func (m *materials) Delete(ctx context.Context, companyID, materialID store.ID) 
 	}
 	return nil
 }
+
+func (m *materials) Get(ctx context.Context, companyID, materialID store.ID) (store.Material, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Material{}, false, err
+	}
+	materialOID, err := objectID(materialID)
+	if err != nil {
+		return store.Material{}, false, err
+	}
+	var doc materialDoc
+	err = m.db.Collection(colMaterials).FindOne(ctx, bson.M{"_id": materialOID, "company_id": companyOID}).Decode(&doc)
+	if err == mongo.ErrNoDocuments {
+		return store.Material{}, false, nil
+	}
+	if err != nil {
+		return store.Material{}, false, err
+	}
+	return doc.toStore(), true, nil
+}

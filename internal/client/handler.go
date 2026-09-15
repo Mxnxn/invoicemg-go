@@ -13,9 +13,14 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type Handler struct{ store store.Clients }
+type Handler struct {
+	store   store.Clients
+	batches store.BatchReceives
+}
 
-func New(s store.Clients) *Handler { return &Handler{store: s} }
+func New(s store.Clients, batches store.BatchReceives) *Handler {
+	return &Handler{store: s, batches: batches}
+}
 
 // Getall is POST /client/getall: the full customer list for the picker, each row flagged
 // `borrowed` when it is shared in from another of the owner's companies. Note the message is

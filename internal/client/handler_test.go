@@ -14,10 +14,12 @@ import (
 )
 
 type stubClients struct {
-	list       []store.Client
-	err        error
-	gotUID     store.ID
-	gotCompany store.ID
+	detail      store.ClientDetail
+	detailFound bool
+	list        []store.Client
+	err         error
+	gotUID      store.ID
+	gotCompany  store.ID
 }
 
 func (s *stubClients) Visible(_ context.Context, uid, companyID store.ID) ([]store.Client, error) {
@@ -34,6 +36,26 @@ func (s *stubClients) Update(context.Context, store.ID, store.ID, store.ClientWr
 	return store.Client{}, store.DupNone, false, nil
 }
 func (s *stubClients) Delete(context.Context, store.ID, store.ID) (bool, error) { return false, nil }
+func (s *stubClients) Get(context.Context, store.ID, store.ID) (store.ClientDetail, bool, error) {
+	return s.detail, s.detailFound, nil
+}
+
+// stubBatches satisfies store.BatchReceives for the client handler; only List is exercised.
+type stubBatches struct{ list []store.BatchReceive }
+
+func (b *stubBatches) List(context.Context, store.ID, store.ID, store.ID) ([]store.BatchReceive, error) {
+	return b.list, nil
+}
+func (b *stubBatches) OpenJobs(context.Context, store.ID, store.ID, store.ID) ([]store.BatchOpenJob, error) {
+	return nil, nil
+}
+func (b *stubBatches) Create(context.Context, store.ID, store.ID, store.BatchReceiveWrite) (store.BatchReceive, error) {
+	return store.BatchReceive{}, nil
+}
+func (b *stubBatches) Delete(context.Context, store.ID, store.ID, store.ID) (bool, error) {
+	return false, nil
+}
+
 func (s *stubClients) EnsureSupplier(context.Context, store.ID, store.ClientWrite) (bool, error) {
 	return false, nil
 }
@@ -89,7 +111,7 @@ func serve(t *testing.T, s store.Clients, fn func(*Handler) func(http.ResponseWr
 	req := httptest.NewRequest("POST", "/", nil)
 	req = req.WithContext(auth.WithSession(req.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	fn(New(s))(rec, req)
+	fn(New(s, &stubBatches{}))(rec, req)
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -188,7 +210,7 @@ func postForm(t *testing.T, s store.Clients, fn func(*Handler) http.HandlerFunc,
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req = req.WithContext(auth.WithSession(req.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	fn(New(s))(rec, req)
+	fn(New(s, &stubBatches{}))(rec, req)
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -322,5 +344,72 @@ func TestRemove(t *testing.T) {
 	body = postForm(t, &writeStub{}, func(h *Handler) http.HandlerFunc { return h.Remove }, map[string]string{})
 	if body["code"] != float64(422) {
 		t.Errorf("remove no id 422: %v", body)
+	}
+}
+
+func serveGet(t *testing.T, c *stubClients, b *stubBatches, form map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range form {
+		vals.Set(k, v)
+	}
+	req := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(c, b).Get(rec, req)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return body
+}
+
+func TestGet(t *testing.T) {
+	c := &stubClients{detailFound: true, detail: store.ClientDetail{
+		ID: "cl1", UID: "u1", CompanyID: "co1", ClientName: "Priya", ClientFirm: "Acme",
+		Entries: []store.ClientEntryView{
+			{Entry: store.Entry{ID: "e1", ClientID: "cl1", Material: "Vinyl"}, IssuedID: "inv1", IssuedInvoiceID: "MG/1"},
+			{Entry: store.Entry{ID: "e2", ClientID: "cl1", Material: "Flex"}},
+		},
+	}}
+	b := &stubBatches{list: []store.BatchReceive{{ID: "b1", Amount: 500, Date: "2026-09-15"}}}
+	body := serveGet(t, c, b, map[string]string{"client_id": "cl1"})
+	if body["code"] != float64(200) || body["message"] != "Operation successful." {
+		t.Fatalf("envelope: %v", body)
+	}
+	data := body["data"].(map[string]any)
+	if data["clientName"] != "Priya" {
+		t.Errorf("clientName: %v", data["clientName"])
+	}
+	ents := data["entries"].([]any)
+	if len(ents) != 2 {
+		t.Fatalf("want 2 entries, got %d", len(ents))
+	}
+	e0 := ents[0].(map[string]any)
+	issued, ok := e0["issued"].(map[string]any)
+	if !ok || issued["invoiceId"] != "MG/1" {
+		t.Errorf("entry issued populate wrong: %v", e0["issued"])
+	}
+	if e0["quotation_id"] != nil {
+		t.Errorf("quotation_id should be null (no column): %v", e0["quotation_id"])
+	}
+	e1 := ents[1].(map[string]any)
+	if _, has := e1["issued"]; has {
+		t.Errorf("unissued entry should have no issued key: %v", e1)
+	}
+	bu := data["batchUpdates"].([]any)
+	if len(bu) != 1 || bu[0].(map[string]any)["amount"] != float64(500) {
+		t.Errorf("batchUpdates wrong: %v", data["batchUpdates"])
+	}
+}
+
+func TestGetValidationAndNotFound(t *testing.T) {
+	if body := serveGet(t, &stubClients{}, &stubBatches{}, map[string]string{}); body["code"] != float64(422) {
+		t.Errorf("missing client_id should 422: %v", body)
+	}
+	body := serveGet(t, &stubClients{detailFound: false}, &stubBatches{}, map[string]string{"client_id": "x"})
+	if body["code"] != float64(404) || body["message"] != "Client not found." {
+		t.Errorf("not found: %v", body)
 	}
 }

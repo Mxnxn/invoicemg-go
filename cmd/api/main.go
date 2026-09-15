@@ -169,7 +169,7 @@ func routes(db store.Store) http.Handler {
 	wastageHandler := wastage.New(db.Wastages())
 	entryHandler := entry.New(db.Entries())
 	sheetHandler := sheet.New(db.Sheets())
-	clientHandler := client.New(db.Clients())
+	clientHandler := client.New(db.Clients(), db.BatchReceives())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
 	quotationHandler := quotation.New(db.Quotations())
@@ -241,6 +241,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /client/add", feature("customers", clientHandler.Add, auth.RequireCreate("customers")))
 	mux.Handle("POST /client/update", feature("customers", clientHandler.Update))
 	mux.Handle("POST /client/remove", feature("customers", clientHandler.Remove, auth.RequireDelete("customers")))
+	mux.Handle("POST /client/get", feature("customers", clientHandler.Get))
 
 	// The shell bootstrap: the company switcher, the active-company letterhead, and the admin
 	// profile. /company/* need only a session; /userinfo/get is admin-only.
@@ -260,6 +261,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /material/add", feature("products", materialHandler.Add, auth.RequireCreate("products")))
 	mux.Handle("POST /material/update", feature("products", materialHandler.Update))
 	mux.Handle("POST /material/remove", feature("products", materialHandler.Remove, auth.RequireDelete("products")))
+	mux.Handle("POST /material/get", feature("products", materialHandler.Get))
 
 	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
 	mux.Handle("POST /person/list", admin(personHandler.List))

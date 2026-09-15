@@ -2,8 +2,10 @@ package sqlstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -175,4 +177,15 @@ func (m *materials) one(ctx context.Context, companyID, materialID store.ID) (st
 		out.PriceHistory = append(out.PriceHistory, e)
 	}
 	return out, hRows.Err()
+}
+
+func (m *materials) Get(ctx context.Context, companyID, materialID store.ID) (store.Material, bool, error) {
+	out, err := m.one(ctx, companyID, materialID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return store.Material{}, false, nil
+		}
+		return store.Material{}, false, err
+	}
+	return out, true, nil
 }

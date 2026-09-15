@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (109 of 209)
+## Routes ready (111 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -38,6 +38,7 @@ the 209 routes the Node API declares.
 | `POST /client/add` | create; per-company GST/phone uniqueness; phone=10/gst=15 checks; also_supplier convenience; legacy client_id millis | Live · Unit |
 | `POST /client/update` | edit; same uniqueness (excludes self); 404 on miss; dup check precedes not-found | Live · Unit |
 | `POST /client/remove` | hard delete (not via Trash), company-scoped; 404 on miss | Live · Unit |
+| `POST /client/get` | one client + entries populated (issued invoice number; quotation link null on Postgres - no column yet) + batchUpdates; 404/422 | Live · Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /company/create` | admin; first company becomes default; firm falls back to name | Live · Unit |
@@ -49,6 +50,7 @@ the 209 routes the Node API declares.
 | `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |
 | `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |
 | `POST /material/remove` | hard delete, company-scoped; a miss still answers 200 (matches Node) | Live · Unit |
+| `POST /material/get` | admin/products; one product by id, company-scoped; miss -> 200 data:null | Live · Unit |
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 | `POST /person/create` | employee/supplier; only Employee+email+password gets a bcrypt login; perms normalised; dup email 422 | Live · Unit |
 | `POST /person/update` | partial edit (present-key semantics); password kept unless resupplied; email cleared to NULL when blank; 404 on miss | Live · Unit |
