@@ -699,3 +699,130 @@ func (a *analytics) gstEntryLines(ctx context.Context, ids []primitive.ObjectID)
 // normalizeGstDate is Helpers/NormalizeDate.normalizeDate: passes YYYY-MM-DD through, converts
 // a "Wkd Mon DD YYYY" toString form, else returns as-is.
 func normalizeGstDate(raw string) string { return store.NormalizeDate(raw) }
+
+func (a *analytics) Cashflow(ctx context.Context, companyID store.ID) (store.CashflowData, error) {
+	var out store.CashflowData
+	oid, err := objectID(companyID)
+	if err != nil {
+		return out, err
+	}
+	scope := bson.M{"company_id": oid}
+
+	// invoices: billed + collected
+	{
+		cur, err := a.db.Collection(colInvoices).Find(ctx, scope, options.Find().SetProjection(bson.M{"date": 1, "totalAmount": 1, "amount": 1}))
+		if err != nil {
+			return out, fmt.Errorf("cashflow invoices: %w", err)
+		}
+		var rows []struct {
+			Date        string  `bson:"date"`
+			TotalAmount float64 `bson:"totalAmount"`
+			Amount      float64 `bson:"amount"`
+		}
+		if err := cur.All(ctx, &rows); err != nil {
+			return out, err
+		}
+		for _, r := range rows {
+			out.Invoices = append(out.Invoices, store.CashflowInvoice{Date: store.NormalizeDate(r.Date), TotalAmount: r.TotalAmount, Amount: r.Amount})
+		}
+	}
+
+	// (date, amount) collections; purchase invoices read `total` into the amount slot.
+	for _, q := range []struct {
+		coll   string
+		amount string
+		dest   *[]store.CashflowRow
+	}{
+		{colInvoiceReceived, "amount", &out.Received},
+		{colBatchReceives, "amount", &out.BatchReceives},
+		{colSupplierPayments, "amount", &out.SupplierPayments},
+		{colPurchaseInvoices, "total", &out.PurchaseInvoices},
+	} {
+		cur, err := a.db.Collection(q.coll).Find(ctx, scope, options.Find().SetProjection(bson.M{"date": 1, q.amount: 1}))
+		if err != nil {
+			return out, fmt.Errorf("cashflow rows: %w", err)
+		}
+		var raw []bson.M
+		if err := cur.All(ctx, &raw); err != nil {
+			return out, err
+		}
+		for _, r := range raw {
+			*q.dest = append(*q.dest, store.CashflowRow{Date: store.NormalizeDate(asString(r["date"])), Amount: asFloat(r[q.amount])})
+		}
+	}
+
+	// sold entries (invoiced only)
+	{
+		cur, err := a.db.Collection(colEntries).Find(ctx, bson.M{"company_id": oid, "has_issued": true}, options.Find().SetProjection(bson.M{"date": 1, "material": 1, "qty": 1}))
+		if err != nil {
+			return out, fmt.Errorf("cashflow entries: %w", err)
+		}
+		var rows []struct {
+			Date     string  `bson:"date"`
+			Material string  `bson:"material"`
+			Qty      float64 `bson:"qty"`
+		}
+		if err := cur.All(ctx, &rows); err != nil {
+			return out, err
+		}
+		for _, r := range rows {
+			out.SoldEntries = append(out.SoldEntries, store.CashflowSoldEntry{Date: store.NormalizeDate(r.Date), Material: r.Material, Qty: r.Qty})
+		}
+	}
+
+	// wastages
+	{
+		cur, err := a.db.Collection(colWastages).Find(ctx, scope, options.Find().SetProjection(bson.M{"date": 1, "total": 1, "cost_total": 1}))
+		if err != nil {
+			return out, fmt.Errorf("cashflow wastages: %w", err)
+		}
+		var rows []struct {
+			Date      string  `bson:"date"`
+			Total     float64 `bson:"total"`
+			CostTotal float64 `bson:"cost_total"`
+		}
+		if err := cur.All(ctx, &rows); err != nil {
+			return out, err
+		}
+		for _, r := range rows {
+			out.Wastages = append(out.Wastages, store.CashflowWastage{Date: store.NormalizeDate(r.Date), Total: r.Total, CostTotal: r.CostTotal})
+		}
+	}
+
+	// materials
+	{
+		cur, err := a.db.Collection(colMaterials).Find(ctx, scope, options.Find().SetProjection(bson.M{"material_name": 1, "material_rate": 1, "purchase_rate": 1}))
+		if err != nil {
+			return out, fmt.Errorf("cashflow materials: %w", err)
+		}
+		var rows []struct {
+			Name string  `bson:"material_name"`
+			Sell float64 `bson:"material_rate"`
+			Buy  float64 `bson:"purchase_rate"`
+		}
+		if err := cur.All(ctx, &rows); err != nil {
+			return out, err
+		}
+		for _, r := range rows {
+			out.Materials = append(out.Materials, store.CashflowMaterial{Name: r.Name, MaterialRate: r.Sell, PurchaseRate: r.Buy})
+		}
+	}
+	return out, nil
+}
+
+func asString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+func asFloat(v any) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int32:
+		return float64(n)
+	case int64:
+		return float64(n)
+	}
+	return 0
+}

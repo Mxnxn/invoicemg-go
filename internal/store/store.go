@@ -922,6 +922,56 @@ type Analytics interface {
 	// source "all" reads entries (total, amount); "invoiced" reads invoices (totalAmount) and
 	// invoice_received (amount). Each amount carries createdAt when set, else the typed date.
 	RevenueSeries(ctx context.Context, companyID ID, source string) (billed, collected []DatedAmount, err error)
+	// Cashflow returns the cashflow dashboard's raw inputs (all company-scoped, dates
+	// normalized). The handler does the date filtering, month bucketing, and cost matching.
+	Cashflow(ctx context.Context, companyID ID) (CashflowData, error)
+}
+
+// CashflowRow is a dated money row (receipts, transfers, supplier payments, purchase invoices).
+type CashflowRow struct {
+	Date   string // normalized YYYY-MM-DD
+	Amount float64
+}
+
+// CashflowInvoice carries both the billed total and the collected amount of one invoice.
+type CashflowInvoice struct {
+	Date        string
+	TotalAmount float64
+	Amount      float64
+}
+
+// CashflowSoldEntry is an invoiced entry's sold volume, keyed by material name so the handler
+// can look up the cost basis (entries carry only the sell rate).
+type CashflowSoldEntry struct {
+	Date     string
+	Material string
+	Qty      float64
+}
+
+// CashflowWastage carries the selling total and the cost basis.
+type CashflowWastage struct {
+	Date      string
+	Total     float64
+	CostTotal float64
+}
+
+// CashflowMaterial is a product's name and buy/sell rates, for cost matching and the margin table.
+type CashflowMaterial struct {
+	Name         string
+	MaterialRate float64
+	PurchaseRate float64
+}
+
+// CashflowData is the cashflow report's raw inputs.
+type CashflowData struct {
+	Invoices         []CashflowInvoice
+	Received         []CashflowRow
+	BatchReceives    []CashflowRow
+	SupplierPayments []CashflowRow
+	PurchaseInvoices []CashflowRow
+	SoldEntries      []CashflowSoldEntry
+	Wastages         []CashflowWastage
+	Materials        []CashflowMaterial
 }
 
 // ---------------------------------------------------------------------------------------

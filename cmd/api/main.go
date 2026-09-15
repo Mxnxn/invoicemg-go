@@ -291,6 +291,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /analytics/unbilled", feature("analytics", analyticsHandler.Unbilled))
 	mux.Handle("POST /analytics/reviews", feature("analytics", analyticsHandler.Reviews))
 	mux.Handle("POST /analytics/payout-weekday", feature("analytics", analyticsHandler.PayoutWeekday))
+	mux.Handle("POST /analytics/cashflow", feature("analytics", analyticsHandler.Cashflow))
 
 	mux.Handle("POST /gst-report", feature("gst_report", gstHandler.Report))
 

@@ -372,3 +372,114 @@ func (a *analytics) GstPurchases(ctx context.Context, companyID store.ID) ([]sto
 	}
 	return docs, pr.Err()
 }
+
+func (a *analytics) Cashflow(ctx context.Context, companyID store.ID) (store.CashflowData, error) {
+	var out store.CashflowData
+	co := string(companyID)
+
+	// invoices: billed + collected
+	if rows, err := a.pool.Query(ctx, `SELECT date, total_amount, amount FROM invoices WHERE company_id = $1`, co); err != nil {
+		return out, fmt.Errorf("cashflow invoices: %w", err)
+	} else {
+		for rows.Next() {
+			var date string
+			var total, amount float64
+			if err := rows.Scan(&date, &total, &amount); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.Invoices = append(out.Invoices, store.CashflowInvoice{Date: store.NormalizeDate(date), TotalAmount: total, Amount: amount})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+
+	// (date, amount) collections
+	for _, q := range []struct {
+		sql  string
+		dest *[]store.CashflowRow
+	}{
+		{`SELECT date, amount FROM invoice_received WHERE company_id = $1`, &out.Received},
+		{`SELECT date, amount FROM batch_receives WHERE company_id = $1`, &out.BatchReceives},
+		{`SELECT date, amount FROM supplier_payments WHERE company_id = $1`, &out.SupplierPayments},
+		{`SELECT date, total FROM purchase_invoices WHERE company_id = $1`, &out.PurchaseInvoices},
+	} {
+		rows, err := a.pool.Query(ctx, q.sql, co)
+		if err != nil {
+			return out, fmt.Errorf("cashflow rows: %w", err)
+		}
+		for rows.Next() {
+			var date string
+			var amount float64
+			if err := rows.Scan(&date, &amount); err != nil {
+				rows.Close()
+				return out, err
+			}
+			*q.dest = append(*q.dest, store.CashflowRow{Date: store.NormalizeDate(date), Amount: amount})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+
+	// sold entries (invoiced only)
+	if rows, err := a.pool.Query(ctx, `SELECT date, material, qty FROM entries WHERE company_id = $1 AND has_issued = true`, co); err != nil {
+		return out, fmt.Errorf("cashflow entries: %w", err)
+	} else {
+		for rows.Next() {
+			var date, material string
+			var qty float64
+			if err := rows.Scan(&date, &material, &qty); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.SoldEntries = append(out.SoldEntries, store.CashflowSoldEntry{Date: store.NormalizeDate(date), Material: material, Qty: qty})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+
+	// wastages
+	if rows, err := a.pool.Query(ctx, `SELECT date, total, cost_total FROM wastages WHERE company_id = $1`, co); err != nil {
+		return out, fmt.Errorf("cashflow wastages: %w", err)
+	} else {
+		for rows.Next() {
+			var date string
+			var total, cost float64
+			if err := rows.Scan(&date, &total, &cost); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.Wastages = append(out.Wastages, store.CashflowWastage{Date: store.NormalizeDate(date), Total: total, CostTotal: cost})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+
+	// materials (cost basis + margins)
+	if rows, err := a.pool.Query(ctx, `SELECT material_name, material_rate, purchase_rate FROM materials WHERE company_id = $1`, co); err != nil {
+		return out, fmt.Errorf("cashflow materials: %w", err)
+	} else {
+		for rows.Next() {
+			var name string
+			var sell, buy float64
+			if err := rows.Scan(&name, &sell, &buy); err != nil {
+				rows.Close()
+				return out, err
+			}
+			out.Materials = append(out.Materials, store.CashflowMaterial{Name: name, MaterialRate: sell, PurchaseRate: buy})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
