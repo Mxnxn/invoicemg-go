@@ -3,7 +3,10 @@ package purchaseinvoice
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,10 +14,29 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type stubPI struct{ list []store.PurchaseInvoice }
+type stubPI struct {
+	list      []store.PurchaseInvoice
+	created   store.PurchaseInvoice
+	updated   store.PurchaseInvoice
+	updateRes store.PurchaseUpdateResult
+	deleteRes store.PurchaseDeleteStatus
+	gotCreate store.PurchaseInvoiceWrite
+	gotUpdate store.PurchaseInvoiceUpdate
+}
 
 func (s *stubPI) List(_ context.Context, _, _ store.ID) ([]store.PurchaseInvoice, error) {
 	return s.list, nil
+}
+func (s *stubPI) Create(_ context.Context, _, _ store.ID, in store.PurchaseInvoiceWrite) (store.PurchaseInvoice, error) {
+	s.gotCreate = in
+	return s.created, nil
+}
+func (s *stubPI) Update(_ context.Context, _, _, _ store.ID, in store.PurchaseInvoiceUpdate) (store.PurchaseInvoice, store.PurchaseUpdateResult, error) {
+	s.gotUpdate = in
+	return s.updated, s.updateRes, nil
+}
+func (s *stubPI) Delete(_ context.Context, _, _, _ store.ID) (store.PurchaseDeleteStatus, error) {
+	return s.deleteRes, nil
 }
 
 func serve(t *testing.T, s store.PurchaseInvoices) map[string]any {
@@ -67,5 +89,118 @@ func TestList_NullSupplier(t *testing.T) {
 	}
 	if _, ok := inv["rows"].([]any); !ok {
 		t.Errorf("rows should be [], got %v", inv["rows"])
+	}
+}
+
+func postPI(t *testing.T, s store.PurchaseInvoices, fn func(*Handler) http.HandlerFunc, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	fn(New(s))(rec, r)
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return out
+}
+
+func TestCreate_TotalAndCoercion(t *testing.T) {
+	s := &stubPI{created: store.PurchaseInvoice{ID: "pi1"}}
+	body := postPI(t, s, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"supplier_id": "s1", "date": "2026-09-15", "invoiceNumber": "BILL-1",
+		"rows": `[{"material":"ACP","qty":"10","rate":45,"discount":50,"charges":20,"gst":18}]`,
+	})
+	if body["code"] != float64(200) || body["message"] != "Purchase invoice created." {
+		t.Fatalf("envelope: %v", body)
+	}
+	// (10*45 - 50 + 20) * 1.18 = 420 * 1.18 = 495.6
+	if s.gotCreate.Total < 495.59 || s.gotCreate.Total > 495.61 {
+		t.Errorf("total = %v, want ~495.6", s.gotCreate.Total)
+	}
+	if len(s.gotCreate.Rows) != 1 || s.gotCreate.Rows[0].Qty != 10 {
+		t.Errorf("rows: %+v", s.gotCreate.Rows)
+	}
+}
+
+func TestCreate_Validation(t *testing.T) {
+	body := postPI(t, &stubPI{}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{"supplier_id": "s1"})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing fields: %v", body)
+	}
+	body = postPI(t, &stubPI{}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"supplier_id": "s1", "date": "d", "invoiceNumber": "n", "rows": "notjson",
+	})
+	if body["message"] != "rows must be a JSON array." {
+		t.Errorf("bad rows: %v", body)
+	}
+	body = postPI(t, &stubPI{}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"supplier_id": "s1", "date": "d", "invoiceNumber": "n", "rows": "[]",
+	})
+	if body["message"] != "A purchase invoice needs at least one row." {
+		t.Errorf("empty rows: %v", body)
+	}
+}
+
+func TestUpdate_PaidExceedsAndNotFound(t *testing.T) {
+	// paid guard: message carries both amounts, toFixed(2).
+	s := &stubPI{updateRes: store.PurchaseUpdateResult{Status: store.PurchaseUpdatePaidExceeds, AmountPaid: 1000, NewTotal: 495.6}}
+	body := postPI(t, s, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{
+		"purchase_invoice_id": "pi1", "rows": `[{"material":"ACP","qty":1,"rate":1}]`,
+	})
+	if body["code"] != float64(422) {
+		t.Fatalf("paid guard: %v", body)
+	}
+	msg, _ := body["message"].(string)
+	if !strings.Contains(msg, "1000.00") || !strings.Contains(msg, "495.60") {
+		t.Errorf("refusal message amounts: %q", msg)
+	}
+
+	body = postPI(t, &stubPI{updateRes: store.PurchaseUpdateResult{Status: store.PurchaseUpdateNotFound}},
+		func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{"purchase_invoice_id": "pi9"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
+
+	body = postPI(t, &stubPI{}, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing id: %v", body)
+	}
+}
+
+func TestUpdate_Success(t *testing.T) {
+	s := &stubPI{updateRes: store.PurchaseUpdateResult{Status: store.PurchaseUpdateOK}, updated: store.PurchaseInvoice{ID: "pi1"}}
+	body := postPI(t, s, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{
+		"purchase_invoice_id": "pi1", "date": "2026-10-01",
+	})
+	if body["code"] != float64(200) || body["message"] != "Purchase invoice updated." {
+		t.Fatalf("envelope: %v", body)
+	}
+	if s.gotUpdate.Date == nil || *s.gotUpdate.Date != "2026-10-01" || s.gotUpdate.Rows != nil {
+		t.Errorf("patch: date=%v rows=%v", s.gotUpdate.Date, s.gotUpdate.Rows)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	body := postPI(t, &stubPI{deleteRes: store.PurchaseDeleteOK}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{"purchase_invoice_id": "pi1"})
+	if body["code"] != float64(200) || body["status"] != true || body["message"] != "Purchase invoice deleted." {
+		t.Errorf("delete ok: %v", body)
+	}
+	body = postPI(t, &stubPI{deleteRes: store.PurchaseDeleteHasPayment}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{"purchase_invoice_id": "pi1"})
+	if body["code"] != float64(422) {
+		t.Errorf("has payment: %v", body)
+	}
+	body = postPI(t, &stubPI{deleteRes: store.PurchaseDeleteNotFound}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{"purchase_invoice_id": "pi1"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
+	body = postPI(t, &stubPI{}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing id: %v", body)
 	}
 }

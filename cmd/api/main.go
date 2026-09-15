@@ -273,6 +273,9 @@ func routes(db store.Store) http.Handler {
 	// populated. Only /list is ported.
 	mux.Handle("POST /purchase-invoice/list", feature("purchase_invoices", purchaseInvoiceHandler.List))
 	mux.Handle("GET /purchase-invoices", feature("purchase_invoices", purchaseInvoiceHandler.List))
+	mux.Handle("POST /purchase-invoice/create", feature("purchase_invoices", purchaseInvoiceHandler.Create, auth.RequireCreate("purchase_invoices")))
+	mux.Handle("POST /purchase-invoice/update", feature("purchase_invoices", purchaseInvoiceHandler.Update))
+	mux.Handle("POST /purchase-invoice/delete", feature("purchase_invoices", purchaseInvoiceHandler.Delete, auth.RequireDelete("purchase_invoices")))
 
 	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
 	// the populated entries and computed totals. Only /getAll is ported.

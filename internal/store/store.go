@@ -754,9 +754,74 @@ type PurchaseInvoice struct {
 	Version       int
 }
 
+// PurchaseRowInput is one submitted purchase-invoice row (normalizeRow), already coerced.
+type PurchaseRowInput struct {
+	Description string
+	Material    string
+	Hsn         string
+	Gst         float64
+	Rate        float64
+	Qty         float64
+	Unit        string
+	Discount    float64
+	Charges     float64
+}
+
+// PurchaseInvoiceWrite is the field set of /purchase-invoice/create; Total is precomputed by the
+// handler via the shared row-total formula.
+type PurchaseInvoiceWrite struct {
+	SupplierID    ID
+	Date          string
+	InvoiceNumber string
+	Rows          []PurchaseRowInput
+	Total         float64
+}
+
+// PurchaseInvoiceUpdate is /purchase-invoice/update's partial edit; a nil field was not
+// submitted. When Rows is set, NewTotal is the recomputed total the store guards against.
+type PurchaseInvoiceUpdate struct {
+	SupplierID    *ID
+	Date          *string
+	InvoiceNumber *string
+	Rows          *[]PurchaseRowInput
+	NewTotal      float64
+}
+
+// PurchaseUpdateStatus is the outcome of a purchase-invoice update.
+type PurchaseUpdateStatus int
+
+const (
+	PurchaseUpdateOK          PurchaseUpdateStatus = iota
+	PurchaseUpdateNotFound                         // no such invoice for this owner+company
+	PurchaseUpdatePaidExceeds                      // the new total would fall below what is paid
+)
+
+// PurchaseUpdateResult carries the status plus the amounts the refusal message needs.
+type PurchaseUpdateResult struct {
+	Status     PurchaseUpdateStatus
+	AmountPaid float64
+	NewTotal   float64
+}
+
+// PurchaseDeleteStatus is the outcome of a purchase-invoice delete.
+type PurchaseDeleteStatus int
+
+const (
+	PurchaseDeleteOK         PurchaseDeleteStatus = iota
+	PurchaseDeleteNotFound                        // no such invoice
+	PurchaseDeleteHasPayment                      // a supplier payment allocates to it
+)
+
 type PurchaseInvoices interface {
 	// List returns a company's purchase invoices (newest first), supplier_id populated.
 	List(ctx context.Context, uid, companyID ID) ([]PurchaseInvoice, error)
+	// Create inserts a purchase invoice with its rows and the precomputed total.
+	Create(ctx context.Context, uid, companyID ID, in PurchaseInvoiceWrite) (PurchaseInvoice, error)
+	// Update applies a partial patch. When rows change, it stores in.NewTotal but refuses
+	// (PurchaseUpdatePaidExceeds) if that would drop below what is already paid.
+	Update(ctx context.Context, uid, companyID, invoiceID ID, in PurchaseInvoiceUpdate) (PurchaseInvoice, PurchaseUpdateResult, error)
+	// Delete removes an invoice unless a supplier payment allocates to it (PurchaseDeleteHasPayment).
+	Delete(ctx context.Context, uid, companyID, invoiceID ID) (PurchaseDeleteStatus, error)
 }
 
 // ---------------------------------------------------------------------------------------
