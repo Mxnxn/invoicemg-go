@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
@@ -222,4 +223,110 @@ func (h *Handler) Payables(w http.ResponseWriter, r *http.Request) {
 		"code": 200, "message": "Operation successful.", "status": true,
 		"totalPayable": total, "bySupplier": sup,
 	})
+}
+
+// Aging is POST /analytics/aging - outstanding AR bucketed by age.
+func (h *Handler) Aging(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	list, err := h.store.OutstandingInvoices(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	now := h.now()
+	type bd struct {
+		label    string
+		min, max float64
+	}
+	defs := []bd{{"0-30 days", 0, 30}, {"31-60 days", 30, 60}, {"61-90 days", 60, 90}, {"90+ days", 90, math.Inf(1)}}
+	sums := make([]float64, len(defs))
+	counts := make([]int, len(defs))
+	var totalOutstanding, oldestDays float64
+	for _, iv := range list {
+		age := now.Sub(iv.Date).Hours() / 24
+		for i, b := range defs {
+			if age >= b.min && age < b.max {
+				sums[i] += iv.Amount
+				counts[i]++
+				totalOutstanding += iv.Amount
+				if age > oldestDays {
+					oldestDays = age
+				}
+				break
+			}
+		}
+	}
+	data := make([]map[string]any, len(defs))
+	for i, b := range defs {
+		data[i] = map[string]any{"label": b.label, "amount": round2(sums[i]), "count": counts[i]}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": 200, "message": "Operation successful.", "data": data,
+		"totalOutstanding": round2(totalOutstanding), "oldestDays": math.Floor(oldestDays + 0.5),
+	})
+}
+
+// Unbilled is POST /analytics/unbilled - done-but-not-invoiced work.
+func (h *Handler) Unbilled(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	entries, err := h.store.UnbilledEntries(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	now := h.now()
+	var totalValue, ageSum float64
+	ageCount := 0
+	byClient := map[string]*unbilledAcc{}
+	order := []string{}
+	for _, e := range entries {
+		totalValue += e.Value
+		if e.HasDate {
+			ageSum += now.Sub(e.Date).Hours() / 24
+			ageCount++
+		}
+		if e.ClientID == "" {
+			continue
+		}
+		cid := string(e.ClientID)
+		if byClient[cid] == nil {
+			byClient[cid] = &unbilledAcc{id: cid, name: e.ClientName, firm: e.ClientFirm}
+			order = append(order, cid)
+		}
+		byClient[cid].value += e.Value
+		byClient[cid].count++
+	}
+	ranked := make([]*unbilledAcc, 0, len(order))
+	for _, cid := range order {
+		ranked = append(ranked, byClient[cid])
+	}
+	sortAcc(ranked)
+	top := ranked
+	if len(top) > 5 {
+		top = top[:5]
+	}
+	topClients := make([]map[string]any, 0, len(top))
+	for _, c := range top {
+		topClients = append(topClients, map[string]any{"clientId": c.id, "clientName": c.name, "clientFirm": c.firm, "value": round2(c.value), "count": c.count})
+	}
+	avgAge := 0.0
+	if ageCount > 0 {
+		avgAge = round1(ageSum / float64(ageCount))
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": 200, "message": "Operation successful.", "count": len(entries),
+		"totalValue": round2(totalValue), "avgAgeDays": avgAge, "topClients": topClients,
+	})
+}
+
+type unbilledAcc struct {
+	id, name, firm string
+	value          float64
+	count          int
+}
+
+func sortAcc(xs []*unbilledAcc) {
+	sort.SliceStable(xs, func(i, j int) bool { return xs[i].value > xs[j].value })
 }

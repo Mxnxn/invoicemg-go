@@ -838,6 +838,17 @@ type DatedAmount struct {
 	Amount float64
 }
 
+// UnbilledEntry is one not-yet-invoiced entry, for the unbilled report. HasDate is false when
+// neither createdAt nor date resolved.
+type UnbilledEntry struct {
+	Value      float64
+	Date       time.Time
+	HasDate    bool
+	ClientID   ID
+	ClientName string
+	ClientFirm string
+}
+
 // SupplierDue is one supplier's outstanding payable.
 type SupplierDue struct {
 	Name string
@@ -859,6 +870,10 @@ type Analytics interface {
 	TopSales(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopCredits(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
+	// OutstandingInvoices returns each unpaid invoice's due amount and billed date (due>0).
+	OutstandingInvoices(ctx context.Context, companyID ID) ([]DatedAmount, error)
+	// UnbilledEntries returns entries not yet invoiced (has_issued false), for the billing-lag report.
+	UnbilledEntries(ctx context.Context, companyID ID) ([]UnbilledEntry, error)
 	// PaymentGaps returns, per fully-paid invoice, days from invoice date to its last receipt.
 	PaymentGaps(ctx context.Context, companyID ID) ([]float64, error)
 	// PendingSince returns the effective date of each partially-paid invoice.

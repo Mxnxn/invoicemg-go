@@ -351,3 +351,80 @@ func (a *analytics) personNamesForPayables(ctx context.Context, ids []primitive.
 	}
 	return out, nil
 }
+
+func (a *analytics) OutstandingInvoices(ctx context.Context, companyID store.ID) ([]store.DatedAmount, error) {
+	oid, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	cur, err := a.db.Collection(colInvoices).Find(ctx, bson.M{"company_id": oid},
+		options.Find().SetProjection(bson.M{"createdAt": 1, "date": 1, "amount": 1, "totalAmount": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("outstanding invoices: %w", err)
+	}
+	defer cur.Close(ctx)
+	var invs []struct {
+		CreatedAt   *time.Time `bson:"createdAt"`
+		Date        string     `bson:"date"`
+		Amount      float64    `bson:"amount"`
+		TotalAmount float64    `bson:"totalAmount"`
+	}
+	if err := cur.All(ctx, &invs); err != nil {
+		return nil, err
+	}
+	out := []store.DatedAmount{}
+	for _, iv := range invs {
+		due := iv.TotalAmount - iv.Amount
+		if due <= 0 {
+			continue
+		}
+		if t, ok := (revRow{CreatedAt: iv.CreatedAt, Date: iv.Date}).effective(); ok {
+			out = append(out, store.DatedAmount{Date: t, Amount: due})
+		}
+	}
+	return out, nil
+}
+
+func (a *analytics) UnbilledEntries(ctx context.Context, companyID store.ID) ([]store.UnbilledEntry, error) {
+	oid, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	cur, err := a.db.Collection(colEntries).Find(ctx, bson.M{"company_id": oid, "has_issued": false},
+		options.Find().SetProjection(bson.M{"client_id": 1, "createdAt": 1, "date": 1, "total": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("unbilled entries: %w", err)
+	}
+	defer cur.Close(ctx)
+	var rows []struct {
+		ClientID  *primitive.ObjectID `bson:"client_id"`
+		CreatedAt *time.Time          `bson:"createdAt"`
+		Date      string              `bson:"date"`
+		Total     float64             `bson:"total"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
+		return nil, err
+	}
+	cids := map[primitive.ObjectID]struct{}{}
+	for _, r := range rows {
+		addID(cids, r.ClientID)
+	}
+	names, err := a.clientNames(ctx, keys(cids))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]store.UnbilledEntry, 0, len(rows))
+	for _, r := range rows {
+		e := store.UnbilledEntry{Value: r.Total}
+		if t, ok := (revRow{CreatedAt: r.CreatedAt, Date: r.Date}).effective(); ok {
+			e.Date, e.HasDate = t, true
+		}
+		if r.ClientID != nil {
+			if c, ok := names[*r.ClientID]; ok {
+				e.ClientID, e.ClientName, e.ClientFirm = idOf(*r.ClientID), c.name, c.firm
+			}
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}

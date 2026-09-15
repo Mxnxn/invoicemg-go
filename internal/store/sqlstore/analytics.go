@@ -181,3 +181,54 @@ func (a *analytics) Payables(ctx context.Context, companyID store.ID) (float64, 
 	total, bySup := store.SumPayables(prs)
 	return total, bySup, nil
 }
+
+func (a *analytics) OutstandingInvoices(ctx context.Context, companyID store.ID) ([]store.DatedAmount, error) {
+	rows, err := a.pool.Query(ctx, `
+		SELECT COALESCE(created_at, to_timestamp(NULLIF(date,''),'YYYY-MM-DD')), (total_amount - amount)
+		  FROM invoices WHERE company_id = $1 AND (total_amount - amount) > 0`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("outstanding invoices: %w", err)
+	}
+	defer rows.Close()
+	out := []store.DatedAmount{}
+	for rows.Next() {
+		var t *time.Time
+		var due float64
+		if err := rows.Scan(&t, &due); err != nil {
+			return nil, err
+		}
+		if t != nil {
+			out = append(out, store.DatedAmount{Date: t.UTC(), Amount: due})
+		}
+	}
+	return out, rows.Err()
+}
+
+func (a *analytics) UnbilledEntries(ctx context.Context, companyID store.ID) ([]store.UnbilledEntry, error) {
+	rows, err := a.pool.Query(ctx, `
+		SELECT e.total, COALESCE(e.created_at, to_timestamp(NULLIF(e.date,''),'YYYY-MM-DD')),
+		       c.id, COALESCE(c.client_name,''), COALESCE(c.client_firm,'')
+		  FROM entries e LEFT JOIN clients c ON c.id = e.client_id
+		 WHERE e.company_id = $1 AND e.has_issued = false`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("unbilled entries: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.UnbilledEntry, 0)
+	for rows.Next() {
+		var e store.UnbilledEntry
+		var t *time.Time
+		var cid *string
+		if err := rows.Scan(&e.Value, &t, &cid, &e.ClientName, &e.ClientFirm); err != nil {
+			return nil, err
+		}
+		if t != nil {
+			e.Date, e.HasDate = t.UTC(), true
+		}
+		if cid != nil {
+			e.ClientID = store.ID(*cid)
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
