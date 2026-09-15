@@ -80,3 +80,11 @@ VALUES ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'a00000000000000
 INSERT INTO banks (uid, company_id, name, opening_balance) VALUES
     ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Cash Drawer',  2500),
     ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'HDFC Current', 50000);
+
+-- Products, so the Products tab has rows on the local stack.
+INSERT INTO materials (id, uid, company_id, material_name, material_rate, purchase_rate, unit, hsn, tax) VALUES
+    ('d00000000000000000000001', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Vinyl Sticker', 45, 30, 'SQ. Ft', '4911', 18),
+    ('d00000000000000000000002', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'Flex Banner',   25, 15, 'SQ. Ft', '4911', 18);
+INSERT INTO material_price_history (material_id, material_rate, purchase_rate) VALUES
+    ('d00000000000000000000001', 45, 30),
+    ('d00000000000000000000002', 25, 15);

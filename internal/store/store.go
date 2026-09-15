@@ -396,6 +396,42 @@ type Companies interface {
 	Active(ctx context.Context, companyID, uid ID) (Company, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Materials (products)
+// ---------------------------------------------------------------------------------------
+
+// PriceHistoryEntry is one rate change on a product.
+type PriceHistoryEntry struct {
+	MaterialRate float64
+	PurchaseRate float64
+	ChangedAt    time.Time
+}
+
+// Material is a product as the list reads it - the whole record, like Node's lean() getall.
+// Sharing is a *[]ID for the same nil-vs-empty reason as Client.
+type Material struct {
+	ID           ID
+	UID          ID
+	CompanyID    ID
+	MaterialName string
+	MaterialRate float64
+	PurchaseRate float64
+	Unit         string
+	Hsn          string
+	Tax          float64
+	Sharing      *[]ID
+	PriceHistory []PriceHistoryEntry
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Version      int
+}
+
+type Materials interface {
+	// Visible returns the products company companyID may READ: its own plus any shared with it.
+	// The read half of #1 (Helpers/SharedRecords.visibleScope) - a write path would not widen.
+	Visible(ctx context.Context, companyID ID) ([]Material, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -406,6 +442,7 @@ type Store interface {
 	Banks() Banks
 	Clients() Clients
 	Companies() Companies
+	Materials() Materials
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

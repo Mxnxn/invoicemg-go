@@ -251,6 +251,35 @@ CREATE TABLE units (
 );
 CREATE UNIQUE INDEX units_key_per_company ON units (company_id, key);
 
+-- Products (materials). Shared like clients (#1): a read widens by shared_company_ids, a write
+-- never does. priceHistory is a child table rather than a JSON column so a rate change is one
+-- INSERT and the history is queryable.
+CREATE TABLE materials (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    uid            text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id     text REFERENCES companies(id) ON DELETE CASCADE,
+    material_name  text NOT NULL DEFAULT '',
+    material_rate  numeric(14,2) NOT NULL DEFAULT 0,
+    purchase_rate  numeric(14,2) NOT NULL DEFAULT 0,
+    -- Stocked unit, by name (matches how a job row stores it). Blank on products predating it.
+    unit           text NOT NULL DEFAULT '',
+    hsn            text NOT NULL DEFAULT '',
+    tax            numeric(6,2) NOT NULL DEFAULT 0,
+    shared_company_ids text[] NOT NULL DEFAULT '{}',
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX materials_company_idx ON materials (company_id);
+
+CREATE TABLE material_price_history (
+    id            text PRIMARY KEY DEFAULT gen_ulid(),
+    material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    material_rate numeric(14,2) NOT NULL,
+    purchase_rate numeric(14,2) NOT NULL,
+    changed_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX material_price_history_material_idx ON material_price_history (material_id, changed_at);
+
 -- Bank accounts for the Batch Receive form's "which bank did this land in" dropdown.
 CREATE TABLE banks (
     id              text PRIMARY KEY DEFAULT gen_ulid(),

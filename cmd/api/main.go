@@ -28,6 +28,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
@@ -137,6 +138,7 @@ func routes(db store.Store) http.Handler {
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	clientHandler := client.New(db.Clients())
+	materialHandler := material.New(db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -199,6 +201,11 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("GET /companies", authed(companyHandler.List))
 	mux.Handle("POST /company/active", authed(companyHandler.Active))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
+
+	// Products, behind the products feature as routes/Material.js is. Read widens by sharing
+	// (#1); the writes and /material/get are not ported.
+	mux.Handle("POST /material/getall", feature("products", materialHandler.Getall))
+	mux.Handle("GET /materials", feature("products", materialHandler.Getall))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since
