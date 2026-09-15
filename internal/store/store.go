@@ -622,6 +622,17 @@ type PersonPatch struct {
 	PasswordHash *string
 }
 
+// EmployeeAuth is the credential-bearing view of an Employee person, for /person/login.
+type EmployeeAuth struct {
+	ID           ID
+	UID          ID
+	Name         string
+	Email        string
+	PasswordHash string
+	IsActive     bool
+	Permissions  []string
+}
+
 type People interface {
 	// List returns the owner's people (uid), optionally filtered by type ("Employee"/"Supplier").
 	// An empty personType means no filter.
@@ -629,6 +640,9 @@ type People interface {
 	// Create inserts an owner-scoped person. dupEmail is true (and nothing is inserted) when the
 	// email is already registered to another of this owner's people.
 	Create(ctx context.Context, uid ID, in PersonWrite) (p Person, dupEmail bool, err error)
+	// FindEmployeeByEmail returns the Employee with this exact email and its credentials, for
+	// the employee portal login. found is false when there is no such employee.
+	FindEmployeeByEmail(ctx context.Context, email string) (EmployeeAuth, bool, error)
 	// Update applies a partial patch to an owner-scoped person. found is false on a miss;
 	// dupEmail is true when the new email collides with another of the owner's people.
 	Update(ctx context.Context, uid, personID ID, patch PersonPatch) (p Person, dupEmail bool, found bool, err error)
@@ -747,11 +761,11 @@ type Quotations interface {
 type QuotationRowToJobStatus int
 
 const (
-	QRJOk               QuotationRowToJobStatus = iota // converted
-	QRJQuotationNotFound                               // no such quotation for this owner/company
-	QRJRowNotFound                                     // no such row in the quotation
-	QRJAlreadyAdded                                    // the row is already on a job
-	QRJDupChallan                                      // a challan-number collision (retryable)
+	QRJOk                QuotationRowToJobStatus = iota // converted
+	QRJQuotationNotFound                                // no such quotation for this owner/company
+	QRJRowNotFound                                      // no such row in the quotation
+	QRJAlreadyAdded                                     // the row is already on a job
+	QRJDupChallan                                       // a challan-number collision (retryable)
 )
 
 // QuotationRowToJobResult carries the converted quotation and job (both populated) plus whether

@@ -16,12 +16,13 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (123 of 209)
+## Routes ready (124 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
 | `POST /user/login` (+ `POST /sessions`) | bcrypt (`$2a`), TOTP accounts refused, session issued | Live · Unit |
 | `POST /user/logout` | retire the caller's session (is_active=false) so its token can't be replayed | Live · Unit |
+| `POST /person/login` | employee portal login: bcrypt verify, opens an "employee" session (person_id + permissions); 422 unknown/bad, 401 disabled | Live · Unit |
 | `POST /sheet/only` (+ `GET /days`) | day list from job `receivedDate`; no `status` field | Live |
 | `POST /sheet/open-jobs` (+ `GET /jobs/open`) | open job-ids, oldest first, client nested | Live |
 | `POST /unit/list` (+ `GET /units`) | seeds defaults on first call | Live · Unit |

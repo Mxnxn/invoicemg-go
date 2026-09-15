@@ -19,6 +19,9 @@ type stubPeople struct {
 	gotType string
 }
 
+func (s *stubPeople) FindEmployeeByEmail(context.Context, string) (store.EmployeeAuth, bool, error) {
+	return store.EmployeeAuth{}, false, nil
+}
 func (s *stubPeople) List(_ context.Context, uid store.ID, personType string) ([]store.Person, error) {
 	s.gotUID, s.gotType = uid, personType
 	return s.list, nil
@@ -46,6 +49,9 @@ type writeStub struct {
 	gotDeleteID store.ID
 }
 
+func (s *writeStub) FindEmployeeByEmail(context.Context, string) (store.EmployeeAuth, bool, error) {
+	return store.EmployeeAuth{}, false, nil
+}
 func (s *writeStub) List(context.Context, store.ID, string) ([]store.Person, error) { return nil, nil }
 func (s *writeStub) Create(_ context.Context, _ store.ID, in store.PersonWrite) (store.Person, bool, error) {
 	s.gotCreate = in
@@ -70,7 +76,7 @@ func serve(t *testing.T, s store.People, typeField string) map[string]any {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1"}))
 	rec := httptest.NewRecorder()
-	New(s).List(rec, r)
+	New(s, nil).List(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -141,7 +147,7 @@ func postW(t *testing.T, s store.People, fn func(*Handler) http.HandlerFunc, fie
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1"}))
 	rec := httptest.NewRecorder()
-	fn(New(s))(rec, r)
+	fn(New(s, nil))(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())

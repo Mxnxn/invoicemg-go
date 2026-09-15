@@ -168,3 +168,26 @@ func (p *people) one(ctx context.Context, uid, personID store.ID) (store.Person,
 	}
 	return pr, nil
 }
+
+// FindEmployeeByEmail loads an Employee's credentials by exact email for the portal login.
+func (p *people) FindEmployeeByEmail(ctx context.Context, email string) (store.EmployeeAuth, bool, error) {
+	var a store.EmployeeAuth
+	var emailCol, passwordCol *string
+	err := p.pool.QueryRow(ctx, `
+		SELECT id, uid, name, email, password, is_active, permissions
+		  FROM persons WHERE email = $1 AND type = 'Employee' LIMIT 1`, email).
+		Scan(&a.ID, &a.UID, &a.Name, &emailCol, &passwordCol, &a.IsActive, &a.Permissions)
+	if noRows(err) {
+		return store.EmployeeAuth{}, false, nil
+	}
+	if err != nil {
+		return store.EmployeeAuth{}, false, fmt.Errorf("employee login lookup: %w", err)
+	}
+	if emailCol != nil {
+		a.Email = *emailCol
+	}
+	if passwordCol != nil {
+		a.PasswordHash = *passwordCol
+	}
+	return a, true, nil
+}

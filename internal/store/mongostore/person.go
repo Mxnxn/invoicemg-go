@@ -2,6 +2,7 @@ package mongostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -213,4 +214,28 @@ func strOrEmpty(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// FindEmployeeByEmail loads an Employee's credentials by exact email for the portal login.
+func (p *people) FindEmployeeByEmail(ctx context.Context, email string) (store.EmployeeAuth, bool, error) {
+	var doc struct {
+		ID          primitive.ObjectID `bson:"_id"`
+		UID         primitive.ObjectID `bson:"uid"`
+		Name        string             `bson:"name"`
+		Email       string             `bson:"email"`
+		Password    string             `bson:"password"`
+		IsActive    bool               `bson:"is_active"`
+		Permissions []string           `bson:"permissions"`
+	}
+	err := p.db.Collection(colPersons).FindOne(ctx, bson.M{"email": email, "type": "Employee"}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.EmployeeAuth{}, false, nil
+	}
+	if err != nil {
+		return store.EmployeeAuth{}, false, fmt.Errorf("employee login lookup: %w", err)
+	}
+	return store.EmployeeAuth{
+		ID: idOf(doc.ID), UID: idOf(doc.UID), Name: doc.Name, Email: doc.Email,
+		PasswordHash: doc.Password, IsActive: doc.IsActive, Permissions: doc.Permissions,
+	}, true, nil
 }

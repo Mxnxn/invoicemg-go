@@ -172,7 +172,7 @@ func routes(db store.Store) http.Handler {
 	sheetHandler := sheet.New(db.Sheets())
 	clientHandler := client.New(db.Clients(), db.BatchReceives())
 	materialHandler := material.New(db.Materials())
-	personHandler := person.New(db.People())
+	personHandler := person.New(db.People(), db.Users())
 	quotationHandler := quotation.New(db.Quotations())
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
@@ -199,6 +199,7 @@ func routes(db store.Store) http.Handler {
 	// Unauthenticated - this is what issues a session. A login CREATES a session, so POST is
 	// right under either surface; only the path shape differs.
 	mux.HandleFunc("POST /user/login", userHandler.Login)
+	mux.HandleFunc("POST /person/login", personHandler.Login)
 	mux.Handle("POST /user/logout", authed(userHandler.Logout))
 	mux.HandleFunc("POST /sessions", userHandler.Login)
 
