@@ -63,6 +63,22 @@ func (u *users) FindByID(ctx context.Context, uid store.ID) (store.User, error) 
 	return user, nil
 }
 
+func (u *users) UpdateProfile(ctx context.Context, uid store.ID, email, name string) (store.User, bool, error) {
+	ct, err := u.pool.Exec(ctx,
+		`UPDATE users SET email = $1, name = $2 WHERE id = $3`, email, name, string(uid))
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("updating user profile: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return store.User{}, false, nil
+	}
+	user, err := u.FindByID(ctx, uid)
+	if err != nil {
+		return store.User{}, false, err
+	}
+	return user, true, nil
+}
+
 func (u *users) CreateSession(ctx context.Context, s store.NewSession) (store.Session, error) {
 	// permissions is a text[] and must never be NULL - the column is NOT NULL DEFAULT '{}',
 	// and a nil slice would fail the insert rather than become an empty array.

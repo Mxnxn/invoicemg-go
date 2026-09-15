@@ -73,6 +73,9 @@ func (s *stubSessions) BindCompany(_ context.Context, _, tabID string, _, compan
 // stubUsers implements store.Users; only FindByID matters here.
 type stubUsers struct{ limit int }
 
+func (s *stubUsers) UpdateProfile(_ context.Context, _ store.ID, _, _ string) (store.User, bool, error) {
+	return store.User{}, false, nil
+}
 func (s *stubUsers) FindByEmail(_ context.Context, _ string) (store.User, error) {
 	return store.User{}, store.ErrNotFound
 }

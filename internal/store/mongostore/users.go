@@ -75,6 +75,25 @@ func (u *usersStore) FindByID(ctx context.Context, uid store.ID) (store.User, er
 	return doc.toStore(), nil
 }
 
+func (u *usersStore) UpdateProfile(ctx context.Context, uid store.ID, email, name string) (store.User, bool, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return store.User{}, false, nil
+	}
+	res, err := u.db.Collection(colUsers).UpdateByID(ctx, oid, bson.M{"$set": bson.M{"email": email, "name": name}})
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("updating user profile: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return store.User{}, false, nil
+	}
+	user, err := u.FindByID(ctx, uid)
+	if err != nil {
+		return store.User{}, false, err
+	}
+	return user, true, nil
+}
+
 func (u *usersStore) CreateSession(ctx context.Context, s store.NewSession) (store.Session, error) {
 	uid, err := objectID(s.UID)
 	if err != nil {

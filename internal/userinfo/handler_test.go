@@ -13,6 +13,10 @@ import (
 
 type stubUsers struct{ user store.User }
 
+func (s *stubUsers) UpdateProfile(_ context.Context, _ store.ID, email, name string) (store.User, bool, error) {
+	s.user.Email, s.user.Name = email, name
+	return s.user, true, nil
+}
 func (s *stubUsers) FindByEmail(_ context.Context, _ string) (store.User, error) {
 	return store.User{}, store.ErrNotFound
 }
@@ -127,5 +131,31 @@ func TestAdd(t *testing.T) {
 	body = postForm(t, u, &stubCompanies{updateFound: false}, "phone=1&firm=X&address=Y&gst=G")
 	if body["code"] != float64(404) || body["message"] != "Company not found." {
 		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	u := &stubUsers{user: store.User{Name: "Old", Email: "old@x.test", Role: "admin"}}
+	c := &stubCompanies{updateFound: true, updated: store.Company{ID: "co1", Firm: "F", Gst: "G"}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader("phone=1&firm=F&address=A&gst=G&email=new@x.test&name=New"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(u, c).Update(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	data, _ := body["data"].(map[string]any)
+	if body["code"] != float64(200) || data["name"] != "New" || data["email"] != "new@x.test" {
+		t.Fatalf("update: %v", body)
+	}
+	// missing name -> 422
+	r2 := httptest.NewRequest("POST", "/", strings.NewReader("phone=1&firm=F&address=A&gst=G&email=e"))
+	r2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec2 := httptest.NewRecorder()
+	New(u, c).Update(rec2, r2)
+	json.Unmarshal(rec2.Body.Bytes(), &body)
+	if body["code"] != float64(422) {
+		t.Errorf("missing name should 422: %v", body)
 	}
 }

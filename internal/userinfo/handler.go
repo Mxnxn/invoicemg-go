@@ -68,6 +68,47 @@ func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: buildProfile(user, company)})
 }
 
+// Update is POST /userinfo/update: like Add, but it also updates the user's own email and name,
+// and requires both. Same 422/404 shapes as Add.
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	if !form.Has("phone") || !form.Has("firm") || !form.Has("address") || !form.Has("gst") ||
+		!form.Has("email") || !form.Has("name") {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid GST number.", Status: httpx.True()})
+		return
+	}
+	phone, firm, address, gst := form.String("phone"), form.String("firm"), form.String("address"), form.String("gst")
+	patch := store.CompanyPatch{Phone: &phone, Firm: &firm, Address: &address, Gst: &gst}
+	if form.Present("account_no") {
+		v := form.String("account_no")
+		patch.AccountNo = &v
+	}
+	if form.Present("ifsc") {
+		v := form.String("ifsc")
+		patch.Ifsc = &v
+	}
+	if form.Present("bank_name") {
+		v := form.String("bank_name")
+		patch.BankName = &v
+	}
+	company, found, err := h.companies.Update(r.Context(), sess.UID, sess.CompanyID, patch)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Company not found.", Status: httpx.False()})
+		return
+	}
+	user, _, err := h.users.UpdateProfile(r.Context(), sess.UID, form.String("email"), form.String("name"))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: buildProfile(user, company)})
+}
+
 // buildProfile is Node's buildProfile plus the extra fields this port's shell reads (role,
 // activeUntil, upiQr, templates, font, scale) - the same shape /userinfo/get answers.
 func buildProfile(user store.User, company store.Company) profileDTO {

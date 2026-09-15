@@ -208,6 +208,9 @@ type Users interface {
 	FindByEmail(ctx context.Context, email string) (User, error)
 	// FindByID returns the account by id, for the profile the shell loads. ErrNotFound if gone.
 	FindByID(ctx context.Context, uid ID) (User, error)
+	// UpdateProfile sets a user's editable account fields (email, name) for /userinfo/update;
+	// found is false when no such user.
+	UpdateProfile(ctx context.Context, uid ID, email, name string) (User, bool, error)
 	CreateSession(ctx context.Context, s NewSession) (Session, error)
 }
 
