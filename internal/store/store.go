@@ -925,6 +925,44 @@ type Wastages interface {
 	List(ctx context.Context, companyID ID) ([]Wastage, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Batch receives (client lump payments)
+// ---------------------------------------------------------------------------------------
+
+// ReceiptDestination is one place a receipt's money went, with the resolved label.
+type ReceiptDestination struct {
+	Kind   string // "job" | "invoice" | "purchase-invoice"
+	ID     string
+	Label  string
+	Amount float64
+}
+
+// BatchReceive is one client lump payment with its client/bank populated and destinations
+// resolved (which jobs/invoices it settled).
+type BatchReceive struct {
+	ID           ID
+	UID          ID
+	CompanyID    ID
+	BankName     string
+	BankID       ID
+	Date         string
+	Amount       float64
+	Note         string
+	Mode         string
+	ClientName   string
+	ClientFirm   string
+	ClientPhone  string
+	ClientID     ID
+	Destinations []ReceiptDestination
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Version      int
+}
+
+type BatchReceives interface {
+	List(ctx context.Context, uid, companyID, clientID ID) ([]BatchReceive, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -946,6 +984,7 @@ type Store interface {
 	Expenses() Expenses
 	Analytics() Analytics
 	Wastages() Wastages
+	BatchReceives() BatchReceives
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

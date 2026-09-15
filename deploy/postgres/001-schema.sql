@@ -477,6 +477,26 @@ CREATE TABLE invoice_received (
 );
 CREATE INDEX invoice_received_company_idx ON invoice_received (company_id);
 
+-- Batch receives (client-level lump payments, allocated across jobs/entries). allocations and
+-- entry_allocations are JSONB, mirroring the Mongo subdocument arrays.
+CREATE TABLE batch_receives (
+    id                text PRIMARY KEY DEFAULT gen_ulid(),
+    uid               text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id        text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id         text REFERENCES clients(id) ON DELETE SET NULL,
+    invoice_id        text,
+    bank_id           text,
+    date              text NOT NULL DEFAULT '',
+    amount            numeric(14,2) NOT NULL DEFAULT 0,
+    note              text NOT NULL DEFAULT '',
+    mode              text NOT NULL DEFAULT '',
+    allocations       jsonb NOT NULL DEFAULT '[]',
+    entry_allocations jsonb NOT NULL DEFAULT '[]',
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    updated_at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX batch_receives_company_idx ON batch_receives (company_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
