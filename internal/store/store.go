@@ -838,8 +838,21 @@ type DatedAmount struct {
 	Amount float64
 }
 
+// ClientRank is a client with a single ranked money value (sales, dues, or paid).
+type ClientRank struct {
+	ClientID   ID
+	ClientName string
+	ClientFirm string
+	Value      float64
+}
+
 // Analytics serves the reporting reads.
 type Analytics interface {
+	// ClientRank is one client's ranked total (sales / dues / paid).
+	// TopSales/TopCredits/TopPaid return them sorted desc; TopCredits/TopPaid drop non-positive.
+	TopSales(ctx context.Context, companyID ID) ([]ClientRank, error)
+	TopCredits(ctx context.Context, companyID ID) ([]ClientRank, error)
+	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
 	// RevenueSeries returns the billed and collected dated amounts for the revenue chart.
 	// source "all" reads entries (total, amount); "invoiced" reads invoices (totalAmount) and
 	// invoice_received (amount). Each amount carries createdAt when set, else the typed date.

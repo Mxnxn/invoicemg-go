@@ -265,6 +265,9 @@ func routes(db store.Store) http.Handler {
 	// Analytics (the reporting dashboards). Only /revenue is ported so far; the other tabs
 	// still 404 until their aggregations are ported.
 	mux.Handle("POST /analytics/revenue", feature("analytics", analyticsHandler.Revenue))
+	mux.Handle("POST /analytics/top-sales", feature("analytics", analyticsHandler.TopSales))
+	mux.Handle("POST /analytics/top-credits", feature("analytics", analyticsHandler.TopCredits))
+	mux.Handle("POST /analytics/top-paid", feature("analytics", analyticsHandler.TopPaid))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 

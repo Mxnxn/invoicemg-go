@@ -121,3 +121,37 @@ type point struct {
 	Billed    float64 `json:"billed"`
 	Collected float64 `json:"collected"`
 }
+
+// TopSales / TopCredits / TopPaid are the Customers-tab client rankings. Each names its value
+// field as the Node route does: amount / due / paid.
+func (h *Handler) TopSales(w http.ResponseWriter, r *http.Request) {
+	h.rank(w, r, "amount", func(s store.Analytics, companyID store.ID) ([]store.ClientRank, error) {
+		return s.TopSales(r.Context(), companyID)
+	})
+}
+func (h *Handler) TopCredits(w http.ResponseWriter, r *http.Request) {
+	h.rank(w, r, "due", func(s store.Analytics, companyID store.ID) ([]store.ClientRank, error) {
+		return s.TopCredits(r.Context(), companyID)
+	})
+}
+func (h *Handler) TopPaid(w http.ResponseWriter, r *http.Request) {
+	h.rank(w, r, "paid", func(s store.Analytics, companyID store.ID) ([]store.ClientRank, error) {
+		return s.TopPaid(r.Context(), companyID)
+	})
+}
+
+func (h *Handler) rank(w http.ResponseWriter, r *http.Request, field string, fn func(store.Analytics, store.ID) ([]store.ClientRank, error)) {
+	sess := auth.MustFrom(r.Context())
+	list, err := fn(h.store, sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(list))
+	for _, c := range list {
+		out = append(out, map[string]any{
+			"clientId": string(c.ClientID), "clientName": c.ClientName, "clientFirm": c.ClientFirm, field: c.Value,
+		})
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
+}

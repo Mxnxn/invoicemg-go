@@ -18,6 +18,16 @@ type stubAnalytics struct {
 	gotSource         string
 }
 
+func (s *stubAnalytics) TopSales(_ context.Context, _ store.ID) ([]store.ClientRank, error) {
+	return nil, nil
+}
+func (s *stubAnalytics) TopCredits(_ context.Context, _ store.ID) ([]store.ClientRank, error) {
+	return nil, nil
+}
+func (s *stubAnalytics) TopPaid(_ context.Context, _ store.ID) ([]store.ClientRank, error) {
+	return nil, nil
+}
+
 func (s *stubAnalytics) RevenueSeries(_ context.Context, _ store.ID, source string) ([]store.DatedAmount, []store.DatedAmount, error) {
 	s.gotSource = source
 	return s.billed, s.collected, nil
