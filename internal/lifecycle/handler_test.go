@@ -4,20 +4,32 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	neturl "net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
 type stubJobs struct {
-	list        []store.Job
-	gotClientID store.ID
+	list         []store.Job
+	gotClientID  store.ID
+	challans     []string
+	byEntry      store.Job
+	byEntryFound bool
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
 	s.gotClientID = clientID
 	return s.list, nil
+}
+func (s *stubJobs) ChallanNumbers(_ context.Context, _, _ store.ID) ([]string, error) {
+	return s.challans, nil
+}
+func (s *stubJobs) ByEntry(_ context.Context, _, _, _ store.ID) (store.Job, bool, error) {
+	return s.byEntry, s.byEntryFound, nil
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -100,5 +112,59 @@ func TestJobsList_EmptyIsArray(t *testing.T) {
 	body := serve(t, &stubJobs{list: nil})
 	if rows, ok := body["data"].([]any); !ok || len(rows) != 0 {
 		t.Errorf("data should be [], got %v", body["data"])
+	}
+}
+
+func TestNextChallan(t *testing.T) {
+	s := &stubJobs{challans: []string{"MG/26-27/00004", "MG/26-27/00002"}}
+	h := New(s)
+	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
+	defer func() { now = func() time.Time { return time.Now().UTC() } }()
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	h.NextChallan(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if body["data"].(map[string]any)["challanNumber"] != "MG/26-27/00005" {
+		t.Errorf("next challan: %v", body["data"])
+	}
+}
+
+func TestByEntry(t *testing.T) {
+	// found -> populated job object
+	s := &stubJobs{byEntryFound: true, byEntry: store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001"}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(neturl.Values{"entry_id": {"e1"}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).ByEntry(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if _, ok := body["data"].(map[string]any); !ok {
+		t.Errorf("found should return a job object, got %T: %v", body["data"], body["data"])
+	}
+
+	// not found -> data:null
+	r2 := httptest.NewRequest("POST", "/", strings.NewReader(neturl.Values{"entry_id": {"e9"}}.Encode()))
+	r2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec2 := httptest.NewRecorder()
+	New(&stubJobs{byEntryFound: false}).ByEntry(rec2, r2)
+	var body2 map[string]any
+	json.Unmarshal(rec2.Body.Bytes(), &body2)
+	if v, ok := body2["data"]; !ok || v != nil {
+		t.Errorf("not found should be data:null, got ok=%v v=%v", ok, v)
+	}
+
+	// missing entry_id -> 422
+	r3 := httptest.NewRequest("POST", "/", nil)
+	r3 = r3.WithContext(auth.WithSession(r3.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec3 := httptest.NewRecorder()
+	New(&stubJobs{}).ByEntry(rec3, r3)
+	var body3 map[string]any
+	json.Unmarshal(rec3.Body.Bytes(), &body3)
+	if body3["code"] != float64(422) {
+		t.Errorf("missing entry_id: %v", body3)
 	}
 }

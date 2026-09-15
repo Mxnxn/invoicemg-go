@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (87 of 209)
+## Routes ready (89 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -78,6 +78,8 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |
 | `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
+| `POST /lifecycle/jobs/next-challan-number` | next MG/FY/ challan (docnumber, empty code) | Live · Unit |
+| `POST /lifecycle/jobs/by-entry` | populated job owning an entry, or data:null | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
 | `POST /batch-receive/lookups/open-jobs` | client's unpaid jobs (advance<total), oldest first, entryCount | Live · Unit |

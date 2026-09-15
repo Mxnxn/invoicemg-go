@@ -1075,6 +1075,10 @@ type Jobs interface {
 	// List returns a company's jobs (newest first), all six populations resolved and each row's
 	// entry invoice-state filled, optionally filtered by clientID (""=no filter).
 	List(ctx context.Context, uid, companyID, clientID ID) ([]Job, error)
+	// ChallanNumbers returns every job's challan number for the owner+company (next-challan helper).
+	ChallanNumbers(ctx context.Context, uid, companyID ID) ([]string, error)
+	// ByEntry returns the populated job whose rows carry entryID; found is false when none does.
+	ByEntry(ctx context.Context, uid, companyID, entryID ID) (Job, bool, error)
 }
 
 // ---------------------------------------------------------------------------------------

@@ -296,6 +296,8 @@ func routes(db store.Store) http.Handler {
 
 	// The Jobs board. Behind the lifecycle feature. Only /jobs/list is ported.
 	mux.Handle("POST /lifecycle/jobs/list", feature("lifecycle", lifecycleHandler.List))
+	mux.Handle("POST /lifecycle/jobs/next-challan-number", feature("lifecycle", lifecycleHandler.NextChallan))
+	mux.Handle("POST /lifecycle/jobs/by-entry", feature("lifecycle", lifecycleHandler.ByEntry))
 	mux.Handle("GET /jobs", feature("lifecycle", lifecycleHandler.List))
 
 	// Delivery challans, behind the challan feature. Only /getAll is ported.
