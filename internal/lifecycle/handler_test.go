@@ -23,6 +23,11 @@ type stubJobs struct {
 	created      store.Job
 	createDup    bool
 	gotCreate    store.JobCreateInput
+	updated      store.Job
+	updateFound  bool
+	updateDup    bool
+	updateEmpty  bool
+	gotUpdate    store.JobUpdateInput
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
@@ -38,6 +43,10 @@ func (s *stubJobs) ByEntry(_ context.Context, _, _, _ store.ID) (store.Job, bool
 func (s *stubJobs) Create(_ context.Context, in store.JobCreateInput) (store.Job, bool, error) {
 	s.gotCreate = in
 	return s.created, s.createDup, nil
+}
+func (s *stubJobs) Update(_ context.Context, in store.JobUpdateInput) (store.Job, bool, bool, bool, error) {
+	s.gotUpdate = in
+	return s.updated, s.updateFound, s.updateDup, s.updateEmpty, nil
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -344,4 +353,44 @@ func postNotesJob(t *testing.T, s store.Jobs, fn func(*Handler) func(http.Respon
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
 	}
 	return out
+}
+
+func TestJobUpdate(t *testing.T) {
+	s := &stubJobs{updateFound: true, updated: store.Job{ID: "j1"}}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{
+		"job_id": "j1", "challanNumber": "MG/26-27/00002", "rows": `[{"_id":"r1","material":"V","qty":1,"rate":10}]`,
+	})
+	if body["code"] != float64(200) || body["message"] != "Job updated." {
+		t.Fatalf("update: %v", body)
+	}
+	if s.gotUpdate.ChallanNumber == nil || *s.gotUpdate.ChallanNumber != "MG/26-27/00002" {
+		t.Errorf("challan patch: %v", s.gotUpdate.ChallanNumber)
+	}
+	if !s.gotUpdate.RowsSet || len(s.gotUpdate.Rows) != 1 || s.gotUpdate.Rows[0].ID != "r1" {
+		t.Errorf("rows patch: set=%v rows=%v", s.gotUpdate.RowsSet, s.gotUpdate.Rows)
+	}
+	if s.gotUpdate.ClientID != nil {
+		t.Errorf("client_id not submitted -> nil")
+	}
+
+	// missing job_id
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing id: %v", body)
+	}
+	// empty rows
+	body = postNotesJob(t, &stubJobs{updateEmpty: true}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{"job_id": "j1", "rows": "[]"})
+	if body["message"] != "A job needs at least one row." {
+		t.Errorf("empty rows: %v", body)
+	}
+	// dup challan
+	body = postNotesJob(t, &stubJobs{updateDup: true}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{"job_id": "j1", "challanNumber": "X"})
+	if body["message"] != "This job number is already in use." {
+		t.Errorf("dup: %v", body)
+	}
+	// not found
+	body = postNotesJob(t, &stubJobs{updateFound: false}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Update }, map[string]string{"job_id": "j9"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
 }

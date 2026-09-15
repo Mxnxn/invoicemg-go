@@ -1082,6 +1082,43 @@ type Jobs interface {
 	// Create inserts a job and its rows, logs a "Created" history entry, and returns the populated
 	// job. dupChallan is true (nothing inserted) when the challan number already exists.
 	Create(ctx context.Context, in JobCreateInput) (j Job, dupChallan bool, err error)
+	// Update applies a partial job edit and (when rows are submitted) the row diff, logs an
+	// "Updated" history entry, and returns the populated job. found is false on a miss; dupChallan
+	// on a number collision; emptyRows when the submitted row set would leave the job with none.
+	Update(ctx context.Context, in JobUpdateInput) (j Job, found, dupChallan, emptyRows bool, err error)
+}
+
+// JobRowPatch is one row submitted to /lifecycle/jobs/update. ID (the existing row's id) matches
+// it to a current row; a blank ID (or an unmatched one) is a brand-new row.
+type JobRowPatch struct {
+	ID          ID
+	Material    string
+	Description string
+	Length      string
+	Width       string
+	Qty         float64
+	Rate        float64
+	Cgst        float64
+	Sgst        float64
+	Igst        float64
+	Discount    float64
+	Charges     float64
+	QuotationID ID
+}
+
+// JobUpdateInput is /lifecycle/jobs/update. Each *field is nil when not submitted. RowsSet marks
+// whether a rows array was sent (its diff runs only then).
+type JobUpdateInput struct {
+	UID           ID
+	CompanyID     ID
+	JobID         ID
+	ClientID      *ID
+	ChallanNumber *string
+	ReceivedDate  *string
+	Advance       *float64
+	RowsSet       bool
+	Rows          []JobRowPatch
+	Actor         NoteActor
 }
 
 // JobRowWrite is one submitted job row (normalizeRow), already coerced; QuotationID may be blank.

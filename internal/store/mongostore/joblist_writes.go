@@ -7,6 +7,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -173,4 +174,185 @@ func (j *jobs) Create(ctx context.Context, in store.JobCreateInput) (store.Job, 
 		}
 	}
 	return store.Job{}, false, nil
+}
+
+func (j *jobs) Update(ctx context.Context, in store.JobUpdateInput) (store.Job, bool, bool, bool, error) {
+	uidOID, err := objectID(in.UID)
+	if err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	companyOID, err := objectID(in.CompanyID)
+	if err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	jobOID, err := objectID(in.JobID)
+	if err != nil {
+		return store.Job{}, false, false, false, nil
+	}
+	scope := bson.M{"_id": jobOID, "uid": uidOID, "company_id": companyOID}
+	var job struct {
+		ChallanNumber string       `bson:"challanNumber"`
+		Rows          []jobRowFull `bson:"rows"`
+	}
+	err = j.db.Collection(colJobs).FindOne(ctx, scope).Decode(&job)
+	if err == mongo.ErrNoDocuments {
+		return store.Job{}, false, false, false, nil
+	}
+	if err != nil {
+		return store.Job{}, false, false, false, fmt.Errorf("looking up job: %w", err)
+	}
+	challan := job.ChallanNumber
+
+	set := bson.M{"updatedAt": time.Now().UTC()}
+	changed := []string{}
+	if in.ClientID != nil {
+		if oid, err := objectID(*in.ClientID); err == nil {
+			set["client_id"] = oid
+			changed = append(changed, "client_id")
+		}
+	}
+	if in.ChallanNumber != nil {
+		set["challanNumber"] = *in.ChallanNumber
+		changed = append(changed, "challanNumber")
+		challan = *in.ChallanNumber
+	}
+	if in.ReceivedDate != nil {
+		set["receivedDate"] = *in.ReceivedDate
+		changed = append(changed, "receivedDate")
+	}
+	if in.Advance != nil {
+		set["advance"] = *in.Advance
+		changed = append(changed, "advance")
+	}
+
+	if in.RowsSet {
+		incomingByID := map[string]store.JobRowPatch{}
+		matched := map[string]bool{}
+		for _, r := range in.Rows {
+			if r.ID != "" {
+				incomingByID[string(r.ID)] = r
+			}
+		}
+		existingIDs := map[string]bool{}
+		for _, e := range job.Rows {
+			existingIDs[e.ID.Hex()] = true
+		}
+		nextDocs := bson.A{}
+		var total float64
+		appendRow := func(id primitive.ObjectID, rowID string, material, description string, quotationID *primitive.ObjectID, p store.JobRowPricing, entryID *primitive.ObjectID, queue, progress string) {
+			total += store.JobRowGrossTotal(p)
+			doc := bson.M{
+				"_id": id, "rowId": rowID, "material": material, "description": description,
+				"length": p.Length, "width": p.Width, "qty": p.Qty, "rate": p.Rate,
+				"cgst": p.Cgst, "sgst": p.Sgst, "igst": p.Igst, "discount": p.Discount, "charges": p.Charges,
+				"queue": queue, "progress": progress,
+			}
+			if quotationID != nil {
+				doc["quotation_id"] = *quotationID
+			}
+			if entryID != nil {
+				doc["entry_id"] = *entryID
+			}
+			nextDocs = append(nextDocs, doc)
+		}
+		for _, e := range job.Rows {
+			if e.EntryID != nil {
+				appendRow(e.ID, e.RowID, e.Material, e.Description, e.QuotationID,
+					store.JobRowPricing{Length: e.Length, Width: e.Width, Qty: e.Qty, Rate: e.Rate, Cgst: e.Cgst, Sgst: e.Sgst, Igst: e.Igst, Discount: e.Discount, Charges: e.Charges},
+					e.EntryID, e.Queue, e.Progress)
+				continue
+			}
+			inc, ok := incomingByID[e.ID.Hex()]
+			if !ok {
+				continue
+			}
+			matched[e.ID.Hex()] = true
+			var quot *primitive.ObjectID
+			if inc.QuotationID != "" {
+				if q, err := objectID(inc.QuotationID); err == nil {
+					quot = &q
+				}
+			}
+			appendRow(e.ID, e.RowID, inc.Material, inc.Description, quot, patchPricing(inc), nil, e.Queue, e.Progress)
+		}
+		newCount := 0
+		for _, inc := range in.Rows {
+			if inc.ID != "" && existingIDs[string(inc.ID)] {
+				continue
+			}
+			_ = newCount
+			var quot *primitive.ObjectID
+			if inc.QuotationID != "" {
+				if q, err := objectID(inc.QuotationID); err == nil {
+					quot = &q
+				}
+			}
+			appendRow(primitive.NewObjectID(), "", inc.Material, inc.Description, quot, patchPricing(inc), nil, "Created", "Assign")
+		}
+		if len(nextDocs) == 0 {
+			return store.Job{}, false, false, true, nil
+		}
+		// Assign rowIds by final position for rows that lack one.
+		for i, d := range nextDocs {
+			dm := d.(bson.M)
+			if dm["rowId"] == "" {
+				dm["rowId"] = fmt.Sprintf("%s-%06d", challan, i+1)
+			}
+		}
+		set["rows"] = nextDocs
+		set["total"] = total
+		changed = append(changed, "rows")
+	}
+
+	if _, err := j.db.Collection(colJobs).UpdateOne(ctx, scope, bson.M{"$set": set}); err != nil {
+		return store.Job{}, false, false, false, fmt.Errorf("update job: %w", err)
+	}
+
+	detail := "No fields changed"
+	if len(changed) > 0 {
+		detail = "Changed: " + joinComma(changed)
+	}
+	name := j.actorName(ctx, in.Actor)
+	actorID, _ := objectID(in.Actor.ActorID())
+	if _, err := j.db.Collection(colJobHistories).InsertOne(ctx, bson.M{
+		"job_id": jobOID, "uid": uidOID, "company_id": companyOID, "actorType": in.Actor.Role,
+		"actorId": actorID, "actorName": name, "action": "Updated", "detail": detail, "createdAt": time.Now().UTC(), "__v": 0,
+	}); err != nil {
+		return store.Job{}, false, false, false, fmt.Errorf("log history: %w", err)
+	}
+
+	list, err := j.List(ctx, in.UID, in.CompanyID, "")
+	if err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	for _, job := range list {
+		if job.ID == idOf(jobOID) {
+			return job, true, false, false, nil
+		}
+	}
+	return store.Job{}, true, false, false, nil
+}
+
+func patchPricing(r store.JobRowPatch) store.JobRowPricing {
+	length := r.Length
+	if length == "" {
+		length = "1"
+	}
+	width := r.Width
+	if width == "" {
+		width = "1"
+	}
+	return store.JobRowPricing{Length: length, Width: width, Qty: r.Qty, Rate: r.Rate,
+		Cgst: r.Cgst, Sgst: r.Sgst, Igst: r.Igst, Discount: r.Discount, Charges: r.Charges}
+}
+
+func joinComma(s []string) string {
+	out := ""
+	for i, v := range s {
+		if i > 0 {
+			out += ", "
+		}
+		out += v
+	}
+	return out
 }

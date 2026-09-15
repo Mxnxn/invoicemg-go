@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (94 of 209)
+## Routes ready (95 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -81,6 +81,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/next-challan-number` | next MG/FY/ challan (docnumber, empty code) | Live · Unit |
 | `POST /lifecycle/jobs/by-entry` | populated job owning an entry, or data:null | Live · Unit |
 | `POST /lifecycle/jobs/create` | create a job + rows (dimensional total, rowIds), assignee→In Progress; logs "Created" history; dup challan 422 | Live · Unit |
+| `POST /lifecycle/jobs/update` | partial edit + row diff (converted rows immutable/in place, matched kept by _id+rowId, removed dropped, new get position rowIds); recomputes total; logs "Updated"; dup 422; 404 | Live · Unit |
 | `POST /lifecycle/notes/list` | job notes newest-first, each flagged canEdit (author + 24h) | Live · Unit |
 | `POST /lifecycle/notes/create` | add a note (actor name resolved), logs "Note added" history | Live · Unit |
 | `POST /lifecycle/notes/update` | edit within author's 24h window; 403 otherwise; logs "Note edited" | Live · Unit |

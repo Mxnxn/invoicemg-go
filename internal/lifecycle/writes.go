@@ -186,3 +186,85 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Job created.", Data: build(job)})
 }
+
+// Update is POST /lifecycle/jobs/update: partial edit + row diff (converted rows are immutable).
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+
+	jobID := form.String("job_id")
+	if jobID == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	in := store.JobUpdateInput{UID: sess.UID, CompanyID: sess.CompanyID, JobID: store.ID(jobID), Actor: actorOf(sess)}
+	// client_id / challanNumber / receivedDate change only when non-empty (Node's `!== undefined`
+	// with a truthy body value; the edit form always sends these, so Present is the faithful gate).
+	if form.Present("client_id") {
+		v := store.ID(form.String("client_id"))
+		in.ClientID = &v
+	}
+	if form.Present("challanNumber") {
+		v := form.String("challanNumber")
+		in.ChallanNumber = &v
+	}
+	if form.Present("receivedDate") {
+		v := form.String("receivedDate")
+		in.ReceivedDate = &v
+	}
+	if form.Present("advance") {
+		v := numOrZero(form.String("advance"))
+		in.Advance = &v
+	}
+	if form.Present("rows") {
+		var raw []jobUpdateRawRow
+		if err := form.JSON("rows", &raw); err != nil {
+			httpx.Write(w, httpx.Envelope{Code: 422, Message: "rows must be a JSON array.", Status: httpx.False()})
+			return
+		}
+		in.RowsSet = true
+		for _, rr := range raw {
+			in.Rows = append(in.Rows, store.JobRowPatch{
+				ID: store.ID(rr.ID), Material: rr.Material, Description: rr.Description, Length: rr.Length, Width: rr.Width,
+				Qty: rr.Qty, Rate: rr.Rate, Cgst: rr.Cgst, Sgst: rr.Sgst, Igst: rr.Igst,
+				Discount: rr.Discount, Charges: rr.Charges, QuotationID: store.ID(rr.QuotationID),
+			})
+		}
+	}
+	job, found, dup, empty, err := h.store.Update(r.Context(), in)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if empty {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "A job needs at least one row.", Status: httpx.False()})
+		return
+	}
+	if dup {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "This job number is already in use.", Status: httpx.False()})
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Job not found.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Job updated.", Data: build(job)})
+}
+
+// jobUpdateRawRow adds the row _id to the create row shape.
+type jobUpdateRawRow struct {
+	ID string
+	jobRawRow
+}
+
+func (r *jobUpdateRawRow) UnmarshalJSON(b []byte) error {
+	if err := r.jobRawRow.UnmarshalJSON(b); err != nil {
+		return err
+	}
+	var m struct {
+		ID string `json:"_id"`
+	}
+	_ = json.Unmarshal(b, &m)
+	r.ID = m.ID
+	return nil
+}

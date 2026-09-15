@@ -3,6 +3,7 @@ package sqlstore
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -137,4 +138,221 @@ func (j *jobs) Create(ctx context.Context, in store.JobCreateInput) (store.Job, 
 		}
 	}
 	return store.Job{}, false, nil
+}
+
+func (j *jobs) Update(ctx context.Context, in store.JobUpdateInput) (store.Job, bool, bool, bool, error) {
+	tx, err := j.pool.Begin(ctx)
+	if err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var challan string
+	err = tx.QueryRow(ctx, `SELECT challan_number FROM jobs WHERE id=$1 AND uid=$2 AND company_id=$3`,
+		string(in.JobID), string(in.UID), string(in.CompanyID)).Scan(&challan)
+	if noRows(err) {
+		return store.Job{}, false, false, false, nil
+	}
+	if err != nil {
+		return store.Job{}, false, false, false, fmt.Errorf("looking up job: %w", err)
+	}
+
+	changed := []string{}
+	setField := func(col, label string, v any) error {
+		_, err := tx.Exec(ctx, `UPDATE jobs SET `+col+`=$2 WHERE id=$1`, string(in.JobID), v)
+		if err == nil {
+			changed = append(changed, label)
+		}
+		return err
+	}
+	if in.ClientID != nil {
+		if err := setField("client_id", "client_id", string(*in.ClientID)); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+	}
+	if in.ChallanNumber != nil {
+		_, err := tx.Exec(ctx, `UPDATE jobs SET challan_number=$2 WHERE id=$1`, string(in.JobID), *in.ChallanNumber)
+		if isUniqueViolation(err) {
+			return store.Job{}, false, true, false, nil
+		}
+		if err != nil {
+			return store.Job{}, false, false, false, err
+		}
+		changed = append(changed, "challanNumber")
+		challan = *in.ChallanNumber
+	}
+	if in.ReceivedDate != nil {
+		var rd any
+		if *in.ReceivedDate != "" {
+			rd = *in.ReceivedDate
+		}
+		if err := setField("received_date", "receivedDate", rd); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+	}
+	if in.Advance != nil {
+		if err := setField("advance", "advance", *in.Advance); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+	}
+
+	if in.RowsSet {
+		// Load the current rows in order, with everything the diff and the total need.
+		rows, err := tx.Query(ctx, `
+			SELECT id, row_id, entry_id, material, description, length, width, qty, rate, cgst, sgst, igst, discount, charges, quotation_id
+			  FROM job_rows WHERE job_id=$1 ORDER BY position ASC, id ASC`, string(in.JobID))
+		if err != nil {
+			return store.Job{}, false, false, false, fmt.Errorf("job rows: %w", err)
+		}
+		type existingRow struct {
+			id, rowID                          string
+			converted                          bool
+			p                                  store.JobRowPricing
+			material, description, quotationID string
+		}
+		var existing []existingRow
+		byID := map[string]int{}
+		for rows.Next() {
+			var e existingRow
+			var entryID, quotationID *string
+			if err := rows.Scan(&e.id, &e.rowID, &entryID, &e.material, &e.description, &e.p.Length, &e.p.Width,
+				&e.p.Qty, &e.p.Rate, &e.p.Cgst, &e.p.Sgst, &e.p.Igst, &e.p.Discount, &e.p.Charges, &quotationID); err != nil {
+				rows.Close()
+				return store.Job{}, false, false, false, err
+			}
+			e.converted = entryID != nil
+			if quotationID != nil {
+				e.quotationID = *quotationID
+			}
+			byID[e.id] = len(existing)
+			existing = append(existing, e)
+			_ = entryID
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+
+		incomingByID := map[string]store.JobRowPatch{}
+		for _, r := range in.Rows {
+			if r.ID != "" {
+				incomingByID[string(r.ID)] = r
+			}
+		}
+
+		// nextRow describes a row to write, in final order.
+		type nextRow struct {
+			id, rowID             string // id/"" (new), rowID/"" (assign)
+			p                     store.JobRowPricing
+			material, description string
+			quotationID           store.ID
+			isNew                 bool
+		}
+		var next []nextRow
+		for _, e := range existing {
+			if e.converted {
+				next = append(next, nextRow{id: e.id, rowID: e.rowID, p: e.p, material: e.material, description: e.description, quotationID: store.ID(e.quotationID)})
+				continue
+			}
+			inc, ok := incomingByID[e.id]
+			if !ok {
+				continue // removed in the edit form
+			}
+			next = append(next, nextRow{id: e.id, rowID: e.rowID, material: inc.Material, description: inc.Description,
+				quotationID: inc.QuotationID, p: pricingOf(inc)})
+		}
+		for _, inc := range in.Rows {
+			if inc.ID != "" {
+				if _, ok := byID[string(inc.ID)]; ok {
+					continue // matched an existing row above
+				}
+			}
+			next = append(next, nextRow{isNew: true, material: inc.Material, description: inc.Description,
+				quotationID: inc.QuotationID, p: pricingOf(inc)})
+		}
+		if len(next) == 0 {
+			return store.Job{}, false, false, true, nil
+		}
+
+		// Rewrite the row set. Delete all, re-insert in final order; kept rows reuse their id and
+		// rowId, new rows get a fresh id and a "<challan>-<final position>" rowId.
+		if _, err := tx.Exec(ctx, `DELETE FROM job_rows WHERE job_id=$1`, string(in.JobID)); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+		var total float64
+		for i, nr := range next {
+			total += store.JobRowGrossTotal(nr.p)
+			rowID := nr.rowID
+			if rowID == "" {
+				rowID = fmt.Sprintf("%s-%06d", challan, i+1)
+			}
+			var quot any
+			if nr.quotationID != "" {
+				quot = string(nr.quotationID)
+			}
+			if nr.isNew || nr.id == "" {
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO job_rows (job_id, row_id, position, material, description, length, width, qty, rate, cgst, sgst, igst, discount, charges, quotation_id)
+					VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+					string(in.JobID), rowID, i, nr.material, nr.description, nr.p.Length, nr.p.Width, nr.p.Qty, nr.p.Rate,
+					nr.p.Cgst, nr.p.Sgst, nr.p.Igst, nr.p.Discount, nr.p.Charges, quot); err != nil {
+					return store.Job{}, false, false, false, err
+				}
+			} else {
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO job_rows (id, job_id, row_id, position, material, description, length, width, qty, rate, cgst, sgst, igst, discount, charges, quotation_id)
+					VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+					nr.id, string(in.JobID), rowID, i, nr.material, nr.description, nr.p.Length, nr.p.Width, nr.p.Qty, nr.p.Rate,
+					nr.p.Cgst, nr.p.Sgst, nr.p.Igst, nr.p.Discount, nr.p.Charges, quot); err != nil {
+					return store.Job{}, false, false, false, err
+				}
+			}
+		}
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET total=$2 WHERE id=$1`, string(in.JobID), total); err != nil {
+			return store.Job{}, false, false, false, err
+		}
+		changed = append(changed, "rows")
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE jobs SET updated_at=now() WHERE id=$1`, string(in.JobID)); err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	detail := "No fields changed"
+	if len(changed) > 0 {
+		detail = "Changed: " + strings.Join(changed, ", ")
+	}
+	name := resolveActorName(ctx, j.pool, in.Actor)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO job_history (job_id, uid, company_id, actor_type, actor_id, actor_name, action, detail)
+		VALUES ($1,$2,$3,$4,$5,$6,'Updated',$7)`,
+		string(in.JobID), string(in.UID), string(in.CompanyID), in.Actor.Role, string(in.Actor.ActorID()), name, detail); err != nil {
+		return store.Job{}, false, false, false, fmt.Errorf("log history: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return store.Job{}, false, false, false, err
+	}
+
+	list, err := j.List(ctx, in.UID, in.CompanyID, "")
+	if err != nil {
+		return store.Job{}, false, false, false, err
+	}
+	for _, job := range list {
+		if job.ID == in.JobID {
+			return job, true, false, false, nil
+		}
+	}
+	return store.Job{}, true, false, false, nil
+}
+
+func pricingOf(r store.JobRowPatch) store.JobRowPricing {
+	length := r.Length
+	if length == "" {
+		length = "1"
+	}
+	width := r.Width
+	if width == "" {
+		width = "1"
+	}
+	return store.JobRowPricing{Length: length, Width: width, Qty: r.Qty, Rate: r.Rate,
+		Cgst: r.Cgst, Sgst: r.Sgst, Igst: r.Igst, Discount: r.Discount, Charges: r.Charges}
 }
