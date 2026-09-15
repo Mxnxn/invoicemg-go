@@ -317,6 +317,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /ledger/dues", feature("ledger", ledgerHandler.Dues))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
+	mux.Handle("POST /wastage/add", feature("challan", wastageHandler.Add, auth.RequireCreate("challan")))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

@@ -1085,8 +1085,23 @@ type Wastage struct {
 	Version      int
 }
 
+// WastageWrite is the field set of /wastage/add. Rate/Length/Height/Total are numbers Mongoose
+// casts from the submitted strings; PurchaseRate/CostTotal default to 0 when omitted.
+type WastageWrite struct {
+	MaterialName string
+	Rate         float64
+	PurchaseRate float64
+	CostTotal    float64
+	Length       float64
+	Height       float64
+	Total        float64
+	Date         string
+}
+
 type Wastages interface {
 	List(ctx context.Context, companyID ID) ([]Wastage, error)
+	// Create inserts a company-scoped wastage record owned by uid, returning the stored row.
+	Create(ctx context.Context, companyID, uid ID, in WastageWrite) (Wastage, error)
 }
 
 // ---------------------------------------------------------------------------------------

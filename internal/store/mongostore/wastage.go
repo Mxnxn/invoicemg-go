@@ -65,3 +65,34 @@ func (w *wastages) List(ctx context.Context, companyID store.ID) ([]store.Wastag
 	}
 	return out, nil
 }
+
+func (w *wastages) Create(ctx context.Context, companyID, uid store.ID, in store.WastageWrite) (store.Wastage, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Wastage{}, err
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Wastage{}, err
+	}
+	now := time.Now().UTC()
+	doc := bson.M{
+		"uid": uidOID, "company_id": companyOID, "material_name": in.MaterialName,
+		"rate": in.Rate, "purchase_rate": in.PurchaseRate, "cost_total": in.CostTotal,
+		"length": in.Length, "height": in.Height, "total": in.Total, "date": in.Date,
+		"createdAt": now, "updatedAt": now, "__v": 0,
+	}
+	res, err := w.db.Collection(colWastages).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Wastage{}, fmt.Errorf("insert wastage: %w", err)
+	}
+	out := store.Wastage{
+		UID: uid, CompanyID: companyID, MaterialName: in.MaterialName, Rate: in.Rate,
+		PurchaseRate: in.PurchaseRate, CostTotal: in.CostTotal, Length: in.Length, Height: in.Height,
+		Total: in.Total, Date: in.Date, CreatedAt: now, UpdatedAt: now,
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		out.ID = idOf(oid)
+	}
+	return out, nil
+}

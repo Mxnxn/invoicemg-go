@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (61 of 209)
+## Routes ready (62 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -58,6 +58,8 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
+| `POST /wastage/getall` | company wastage log, newest first | Live · Unit |
+| `POST /wastage/add` | log an offcut; numeric casts; purchase_rate/cost_total default 0; whole record echoed | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |
 | `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |

@@ -36,3 +36,22 @@ func (w *wastages) List(ctx context.Context, companyID store.ID) ([]store.Wastag
 	}
 	return out, rows.Err()
 }
+
+func (w *wastages) Create(ctx context.Context, companyID, uid store.ID, in store.WastageWrite) (store.Wastage, error) {
+	var out store.Wastage
+	var companyCol *string
+	err := w.pool.QueryRow(ctx, `
+		INSERT INTO wastages (uid, company_id, material_name, rate, purchase_rate, cost_total, length, height, total, date)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id, uid, company_id, material_name, rate, purchase_rate, cost_total, length, height, total, date, created_at, updated_at`,
+		string(uid), string(companyID), in.MaterialName, in.Rate, in.PurchaseRate, in.CostTotal, in.Length, in.Height, in.Total, in.Date).
+		Scan(&out.ID, &out.UID, &companyCol, &out.MaterialName, &out.Rate, &out.PurchaseRate, &out.CostTotal,
+			&out.Length, &out.Height, &out.Total, &out.Date, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.Wastage{}, fmt.Errorf("insert wastage: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	return out, nil
+}
