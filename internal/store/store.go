@@ -1299,8 +1299,46 @@ type BatchReceive struct {
 	Version      int
 }
 
+// BatchOpenJob is one not-fully-paid job for the manual picker / auto preview.
+type BatchOpenJob struct {
+	ID            ID
+	ChallanNumber string
+	ReceivedDate  string
+	Total         float64
+	Advance       float64
+	Remaining     float64
+	EntryCount    int
+}
+
+// BatchAllocInput is one manual job allocation submitted with a batch receive.
+type BatchAllocInput struct {
+	JobID  ID
+	Amount float64
+}
+
+// BatchReceiveWrite is the field set of /batch-receive/create. In auto mode Allocations is
+// ignored and the store spreads Amount over the client's unpaid jobs oldest-first; in manual
+// mode the store applies exactly these allocations.
+type BatchReceiveWrite struct {
+	ClientID    ID
+	Amount      float64
+	Mode        string // "auto" | "manual"
+	Note        string
+	BankID      ID
+	Date        string
+	Allocations []BatchAllocInput
+}
+
 type BatchReceives interface {
 	List(ctx context.Context, uid, companyID, clientID ID) ([]BatchReceive, error)
+	// OpenJobs returns a client's not-fully-paid jobs (advance < total), oldest first.
+	OpenJobs(ctx context.Context, uid, companyID, clientID ID) ([]BatchOpenJob, error)
+	// Create records a client lump payment, applying it to jobs (and downstream to their
+	// invoiced entries/invoices) per the mode, and returns the resolved record.
+	Create(ctx context.Context, uid, companyID ID, in BatchReceiveWrite) (BatchReceive, error)
+	// Delete reverses everything the record applied (job advances, entry/invoice propagation)
+	// and removes it. found is false on a miss.
+	Delete(ctx context.Context, uid, companyID, batchID ID) (found bool, err error)
 }
 
 // SupplierPayment is one payment to a supplier, mirror of BatchReceive (supplier/bank

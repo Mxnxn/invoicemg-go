@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (75 of 209)
+## Routes ready (78 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -71,6 +71,9 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
+| `POST /batch-receive/lookups/open-jobs` | client's unpaid jobs (advance<total), oldest first, entryCount | Live · Unit |
+| `POST /batch-receive/create` | client lump payment; auto (oldest-first) or manual allocation; propagates to entries+invoices (applyJobPaymentDownstream) | Live · Unit |
+| `POST /batch-receive/delete` | reverses job advances + entry/invoice propagation, then removes; 404 on miss | Live · Unit |
 | `POST /wastage/getall` | company wastage log, newest first | Live · Unit |
 | `POST /wastage/add` | log an offcut; numeric casts; purchase_rate/cost_total default 0; whole record echoed | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |

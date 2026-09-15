@@ -297,6 +297,9 @@ func routes(db store.Store) http.Handler {
 
 	// Expenses, behind the batch_receive feature. Only /list is ported.
 	mux.Handle("POST /batch-receive/list", feature("batch_receive", batchReceiveHandler.List))
+	mux.Handle("POST /batch-receive/lookups/open-jobs", feature("batch_receive", batchReceiveHandler.OpenJobs))
+	mux.Handle("POST /batch-receive/create", feature("batch_receive", batchReceiveHandler.Create, auth.RequireCreate("batch_receive")))
+	mux.Handle("POST /batch-receive/delete", feature("batch_receive", batchReceiveHandler.Delete, auth.RequireDelete("batch_receive")))
 	mux.Handle("POST /supplier-payment/list", feature("purchase_invoices", supplierPaymentHandler.List))
 	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
 	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
