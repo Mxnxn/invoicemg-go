@@ -81,6 +81,34 @@ func (i *invoices) Received(ctx context.Context, companyID, invoiceID store.ID) 
 	return out, rows.Err()
 }
 
+func (i *invoices) ReceivedByClient(ctx context.Context, companyID, clientID store.ID) ([]store.InvoiceReceivedRow, error) {
+	rows, err := i.pool.Query(ctx, `
+		SELECT rc.id, rc.date, rc.amount, rc.note, rc.invoice_id, rc.created_at, bk.id, COALESCE(bk.name,'')
+		  FROM invoice_received rc LEFT JOIN banks bk ON bk.id = rc.bank_id
+		 WHERE rc.company_id=$1 AND rc.client_id=$2
+		 ORDER BY rc.created_at ASC, rc.id ASC`, string(companyID), string(clientID))
+	if err != nil {
+		return nil, fmt.Errorf("invoice received by client: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.InvoiceReceivedRow, 0)
+	for rows.Next() {
+		var r store.InvoiceReceivedRow
+		var invID, bankID *string
+		if err := rows.Scan(&r.ID, &r.Date, &r.Amount, &r.Note, &invID, &r.CreatedAt, &bankID, &r.BankName); err != nil {
+			return nil, err
+		}
+		if invID != nil {
+			r.InvoiceID = store.ID(*invID)
+		}
+		if bankID != nil {
+			r.BankID = store.ID(*bankID)
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (i *invoices) Remove(ctx context.Context, companyID, invoiceID store.ID) (bool, error) {
 	tx, err := i.pool.Begin(ctx)
 	if err != nil {

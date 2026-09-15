@@ -15,15 +15,16 @@ import (
 )
 
 type stubInvoices struct {
-	list        []store.Invoice
-	numbers     []string
-	labels      map[string]string
-	received    []store.InvoiceReceivedRow
-	savedID     store.ID
-	paidFound   bool
-	removeFound bool
-	gotSave     store.InvoiceSaveInput
-	gotPaid     store.InvoicePaidInput
+	list             []store.Invoice
+	numbers          []string
+	labels           map[string]string
+	received         []store.InvoiceReceivedRow
+	receivedByClient []store.InvoiceReceivedRow
+	savedID          store.ID
+	paidFound        bool
+	removeFound      bool
+	gotSave          store.InvoiceSaveInput
+	gotPaid          store.InvoicePaidInput
 }
 
 func (s *stubInvoices) List(_ context.Context, _ store.ID) ([]store.Invoice, error) {
@@ -34,6 +35,9 @@ func (s *stubInvoices) Numbers(_ context.Context, _ store.ID) ([]string, error) 
 }
 func (s *stubInvoices) EntryJobLabels(_ context.Context, _ store.ID, _ []store.ID) (map[string]string, error) {
 	return s.labels, nil
+}
+func (s *stubInvoices) ReceivedByClient(_ context.Context, _, _ store.ID) ([]store.InvoiceReceivedRow, error) {
+	return s.receivedByClient, nil
 }
 func (s *stubInvoices) Received(_ context.Context, _, _ store.ID) ([]store.InvoiceReceivedRow, error) {
 	return s.received, nil
@@ -270,5 +274,80 @@ func TestRemove(t *testing.T) {
 	body = postInv(t, &stubInvoices{removeFound: false}, func(h *Handler) http.HandlerFunc { return h.Remove }, map[string]string{"invoice_id": "inv1"})
 	if body["code"] != float64(404) {
 		t.Errorf("404: %v", body)
+	}
+}
+
+func TestGet_RawShapeWithProfile(t *testing.T) {
+	inv := []store.Invoice{{
+		ID: "iv1", InvoiceID: "INV/1", Date: "2026-09-11", Amount: 5000, TotalAmount: 11800,
+		Client:  &store.InvoiceClient{ID: "c1", UID: "u1", ClientName: "Priya", ClientFirm: "Acme"},
+		Entries: []store.Entry{{ID: "e1", Material: "Vinyl", Amount: 4500}},
+	}}
+	h := New(&stubInvoices{list: inv},
+		&stubCompanies{c: store.Company{Firm: "Manan LLP", Gst: "GST1", BankName: "HDFC"}},
+		&stubUsers{u: store.User{Name: "Owner", Email: "o@x.test"}})
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	h.Get(rec, r)
+	var out map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if out["message"] != "Successfully retreived!" {
+		t.Fatalf("message: %v", out["message"])
+	}
+	row := out["data"].([]any)[0].(map[string]any)
+	if row["invoiceId"] != "INV/1" || row["client"].(map[string]any)["clientName"] != "Priya" {
+		t.Errorf("raw shape: %v", row)
+	}
+	uid := row["uid"].(map[string]any)
+	if uid["name"] != "Owner" || uid["firm"] != "Manan LLP" || uid["bank_name"] != "HDFC" {
+		t.Errorf("uid profile: %v", uid)
+	}
+	if len(row["entries"].([]any)) != 1 {
+		t.Errorf("entries not populated: %v", row["entries"])
+	}
+}
+
+func TestGetClientInvoices(t *testing.T) {
+	inv := []store.Invoice{
+		{ID: "iv1", InvoiceID: "INV/1", Date: "2026-09-11", Amount: 1000,
+			Client:  &store.InvoiceClient{ID: "c1", ClientName: "Priya", ClientFirm: "Acme"},
+			Entries: []store.Entry{{ID: "e1", Amount: 1000, Advance: 500, Total: 680}}},
+		{ID: "iv2", InvoiceID: "INV/2", Amount: 0,
+			Client:  &store.InvoiceClient{ID: "c2", ClientName: "Other"},
+			Entries: []store.Entry{{ID: "e9", Amount: 999}}},
+	}
+	s := &stubInvoices{list: inv, receivedByClient: []store.InvoiceReceivedRow{{ID: "r1", Amount: 300, Date: "2026-09-12"}}}
+	h := New(s, &stubCompanies{}, &stubUsers{})
+	r := httptest.NewRequest("POST", "/", strings.NewReader("cid=c1"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	h.GetClientInvoices(rec, r)
+	var out map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if out["clientName"] != "Priya" || out["status"] != true {
+		t.Fatalf("top-level: %v", out)
+	}
+	data := out["data"].([]any)
+	if len(data) != 1 { // only c1's invoice
+		t.Fatalf("want 1 invoice, got %d", len(data))
+	}
+	row := data[0].(map[string]any)
+	// amount 1000 -> taxedValue 1180, nonTaxedValue 1000, entryReceived 500 (total != 0)
+	if row["nonTaxedValue"] != float64(1000) || row["taxedValue"].(float64) < 1179.9 || row["entryReceived"] != float64(500) {
+		t.Errorf("per-invoice math: %v", row)
+	}
+	if len(out["receivedHistory"].([]any)) != 1 {
+		t.Errorf("receivedHistory: %v", out["receivedHistory"])
+	}
+	// missing cid -> 422
+	r2 := httptest.NewRequest("POST", "/", nil)
+	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec2 := httptest.NewRecorder()
+	h.GetClientInvoices(rec2, r2)
+	json.Unmarshal(rec2.Body.Bytes(), &out)
+	if out["code"] != float64(422) {
+		t.Errorf("missing cid should 422: %v", out)
 	}
 }

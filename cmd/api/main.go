@@ -291,6 +291,8 @@ func routes(db store.Store) http.Handler {
 	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
 	// the populated entries and computed totals. Only /getAll is ported.
 	mux.Handle("POST /invoice/getAll", feature("invoices", invoiceHandler.List))
+	mux.Handle("POST /invoice/get", feature("invoices", invoiceHandler.Get))
+	mux.Handle("POST /invoice/getClientInvoices", feature("invoices", invoiceHandler.GetClientInvoices))
 	mux.Handle("GET /invoices", feature("invoices", invoiceHandler.List))
 	mux.Handle("POST /invoice/next-invoice-number", feature("invoices", invoiceHandler.NextNumber))
 	mux.Handle("POST /invoice/entries-jobs", feature("invoices", invoiceHandler.EntriesJobs))

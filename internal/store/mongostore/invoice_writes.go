@@ -131,6 +131,57 @@ func (i *invoices) Received(ctx context.Context, companyID, invoiceID store.ID) 
 	return out, nil
 }
 
+func (i *invoices) ReceivedByClient(ctx context.Context, companyID, clientID store.ID) ([]store.InvoiceReceivedRow, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return nil, store.ErrBadID
+	}
+	cur, err := i.db.Collection(colInvoiceReceived).Find(ctx, bson.M{"company_id": companyOID, "client": clientOID},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("invoice received by client: %w", err)
+	}
+	var docs []struct {
+		ID        primitive.ObjectID  `bson:"_id"`
+		Date      string              `bson:"date"`
+		Amount    float64             `bson:"amount"`
+		Note      string              `bson:"note"`
+		InvoiceID *primitive.ObjectID `bson:"invoice_id"`
+		BankID    *primitive.ObjectID `bson:"bank_id"`
+		CreatedAt time.Time           `bson:"createdAt"`
+		Version   int                 `bson:"__v"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	bankIDs := map[primitive.ObjectID]struct{}{}
+	for _, d := range docs {
+		if d.BankID != nil {
+			bankIDs[*d.BankID] = struct{}{}
+		}
+	}
+	banks, err := i.bankNames(ctx, bankIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]store.InvoiceReceivedRow, 0, len(docs))
+	for _, d := range docs {
+		r := store.InvoiceReceivedRow{ID: idOf(d.ID), Date: d.Date, Amount: d.Amount, Note: d.Note, CreatedAt: d.CreatedAt, Version: d.Version}
+		if d.InvoiceID != nil {
+			r.InvoiceID = idOf(*d.InvoiceID)
+		}
+		if d.BankID != nil {
+			r.BankID, r.BankName = idOf(*d.BankID), banks[*d.BankID]
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 func (i *invoices) bankNames(ctx context.Context, ids map[primitive.ObjectID]struct{}) (map[primitive.ObjectID]string, error) {
 	out := map[primitive.ObjectID]string{}
 	if len(ids) == 0 {

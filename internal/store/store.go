@@ -1024,6 +1024,9 @@ type Invoices interface {
 	EntryJobLabels(ctx context.Context, companyID ID, entryIDs []ID) (map[string]string, error)
 	// Received returns the payments recorded against an invoice, bank populated.
 	Received(ctx context.Context, companyID, invoiceID ID) ([]InvoiceReceivedRow, error)
+	// ReceivedByClient returns all payments recorded against a client's invoices (the
+	// receivedHistory of /invoice/getClientInvoices), newest queries aside, in insertion order.
+	ReceivedByClient(ctx context.Context, companyID, clientID ID) ([]InvoiceReceivedRow, error)
 	// Save issues (or re-issues) an invoice from the given entries and returns its id; found is
 	// false only for the not-applicable cases (always true here). It marks entries issued and
 	// computes amount (Σ advance) and totalAmount (Σ RoundOffWithAmount(amount·1.18)).

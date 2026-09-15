@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (111 of 209)
+## Routes ready (113 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -70,6 +70,8 @@ the 209 routes the Node API declares.
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
+| `POST /invoice/get` | all company invoices raw, entries+client populated, uid replaced by the issuer letterhead (sourced from Company per this port); msg "Successfully retreived!" | Live · Unit |
+| `POST /invoice/getClientInvoices` | one client's invoices with taxed/untaxed/received/due (flat *1.18, RoundOffWithAmount), totals, receivedHistory; 422 | Live · Unit |
 | `POST /invoice/next-invoice-number` | next MG/FY/INV- number (docnumber) | Live · Unit |
 | `POST /invoice/entries-jobs` | map entry ids → job challan numbers (reverse lookup) | Live · Unit |
 | `POST /invoice/getReceived` | payments recorded against an invoice, bank populated | Live · Unit |
