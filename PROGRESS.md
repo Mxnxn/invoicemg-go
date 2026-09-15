@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (127 of 209)
+## Routes ready (128 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -37,6 +37,7 @@ the 209 routes the Node API declares.
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
 | `POST /whatsapp/config` | company WhatsApp settings (phone/business ids, hasApiToken, configured); token never echoed; 404 | Live · Unit |
 | `POST /whatsapp/config/update` | admin; save phone/business ids and (only when non-blank) the api token; 404 | Live · Unit |
+| `POST /whatsapp/send` | forward a text to a client over the company's Cloud API; validation live-verified, Meta success/error mapping (incl. 190 expired-token) unit-tested against a mock | Unit (send path mocked) |
 | `POST /client/getall` (+ `GET /clients`) | sharing-widened read; `borrowed` flag; `"Operation successful"` (no period) | Live · Unit |
 | `POST /client/only` (+ `GET /clients/only`) | lighter list + `openingBalance` | Live · Unit |
 | `POST /client/add` | create; per-company GST/phone uniqueness; phone=10/gst=15 checks; also_supplier convenience; legacy client_id millis | Live · Unit |

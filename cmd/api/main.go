@@ -403,6 +403,7 @@ func routes(db store.Store) http.Handler {
 	mux.HandleFunc("GET /whatsapp/webhook", whatsappHandler.Verify)
 	mux.Handle("POST /whatsapp/config", feature("whatsapp", whatsappHandler.Config))
 	mux.Handle("POST /whatsapp/config/update", feature("whatsapp", whatsappHandler.ConfigUpdate, auth.RequireAdmin))
+	mux.Handle("POST /whatsapp/send", feature("whatsapp", whatsappHandler.Send))
 
 	mux.HandleFunc("GET /healthz", health(db))
 

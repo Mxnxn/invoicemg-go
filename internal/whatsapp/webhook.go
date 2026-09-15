@@ -10,6 +10,7 @@ package whatsapp
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -20,10 +21,17 @@ type Handler struct {
 	// request, but the token is set once at deploy, so a boot-time value matches in practice.
 	verifyToken string
 	companies   store.Companies
+	// graphBase and httpClient front the WhatsApp Cloud API; overridable in tests.
+	graphBase  string
+	httpClient *http.Client
 }
 
 func New(verifyToken string, companies store.Companies) *Handler {
-	return &Handler{verifyToken: verifyToken, companies: companies}
+	return &Handler{
+		verifyToken: verifyToken, companies: companies,
+		graphBase:  "https://graph.facebook.com",
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+	}
 }
 
 // Verify is GET /whatsapp/webhook: Meta's one-time subscription handshake. When the token
