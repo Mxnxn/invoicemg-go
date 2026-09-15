@@ -144,3 +144,8 @@ INSERT INTO wastages (uid, company_id, material_name, rate, purchase_rate, cost_
 INSERT INTO batch_receives (uid, company_id, client_id, bank_id, date, amount, note, mode, allocations) VALUES
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','c00000000000000000000001','b0000000000000000000000b','2026-09-13',3000,'NEFT ref 8891','manual',
      '[{"job_id":"a00000000000000000000001","amount":3000}]');
+
+-- A supplier payment against the seeded purchase invoice.
+INSERT INTO supplier_payments (uid, company_id, supplier_id, bank_id, date, amount, note, mode, allocations) VALUES
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','f00000000000000000000001','b0000000000000000000000b','2026-09-14',5000,'Part payment','manual',
+     '[{"purchase_invoice_id":"10000000000000000000000a","amount":5000}]');

@@ -963,6 +963,32 @@ type BatchReceives interface {
 	List(ctx context.Context, uid, companyID, clientID ID) ([]BatchReceive, error)
 }
 
+// SupplierPayment is one payment to a supplier, mirror of BatchReceive (supplier/bank
+// populated, purchase-invoice destinations resolved).
+type SupplierPayment struct {
+	ID            ID
+	UID           ID
+	CompanyID     ID
+	SupplierID    ID
+	SupplierName  string
+	SupplierFirm  string
+	SupplierPhone string
+	BankID        ID
+	BankName      string
+	Date          string
+	Amount        float64
+	Note          string
+	Mode          string
+	Destinations  []ReceiptDestination
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Version       int
+}
+
+type SupplierPayments interface {
+	List(ctx context.Context, uid, companyID ID) ([]SupplierPayment, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -985,6 +1011,7 @@ type Store interface {
 	Analytics() Analytics
 	Wastages() Wastages
 	BatchReceives() BatchReceives
+	SupplierPayments() SupplierPayments
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

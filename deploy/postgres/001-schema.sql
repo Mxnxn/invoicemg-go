@@ -497,6 +497,23 @@ CREATE TABLE batch_receives (
 );
 CREATE INDEX batch_receives_company_idx ON batch_receives (company_id);
 
+-- Supplier payments (money out against purchase invoices), mirror of batch_receives.
+CREATE TABLE supplier_payments (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    uid         text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id  text REFERENCES companies(id) ON DELETE CASCADE,
+    supplier_id text,
+    bank_id     text,
+    date        text NOT NULL DEFAULT '',
+    amount      numeric(14,2) NOT NULL DEFAULT 0,
+    note        text NOT NULL DEFAULT '',
+    mode        text NOT NULL DEFAULT '',
+    allocations jsonb NOT NULL DEFAULT '[]',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX supplier_payments_company_idx ON supplier_payments (company_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,

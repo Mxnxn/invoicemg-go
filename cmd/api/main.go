@@ -42,6 +42,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
+	"github.com/mxnxn/invoicemg-go/internal/supplierpayment"
 	"github.com/mxnxn/invoicemg-go/internal/units"
 	"github.com/mxnxn/invoicemg-go/internal/userinfo"
 	"github.com/mxnxn/invoicemg-go/internal/users"
@@ -149,6 +150,7 @@ func routes(db store.Store) http.Handler {
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	batchReceiveHandler := batchreceive.New(db.BatchReceives())
+	supplierPaymentHandler := supplierpayment.New(db.SupplierPayments())
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
 	analyticsHandler := analytics.New(db.Analytics())
@@ -262,6 +264,7 @@ func routes(db store.Store) http.Handler {
 
 	// Expenses, behind the batch_receive feature. Only /list is ported.
 	mux.Handle("POST /batch-receive/list", feature("batch_receive", batchReceiveHandler.List))
+	mux.Handle("POST /supplier-payment/list", feature("purchase_invoices", supplierPaymentHandler.List))
 	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
 	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
 
