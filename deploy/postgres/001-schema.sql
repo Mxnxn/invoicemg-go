@@ -332,6 +332,44 @@ CREATE TABLE quotation_rows (
 );
 CREATE INDEX quotation_rows_quotation_idx ON quotation_rows (quotation_id);
 
+-- Purchase invoices (supplier bills). supplier_id references a person of type Supplier and is
+-- populated into a nested object on the list.
+CREATE TABLE purchase_invoices (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    uid            text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id     text REFERENCES companies(id) ON DELETE CASCADE,
+    supplier_id    text REFERENCES persons(id) ON DELETE SET NULL,
+    date           text NOT NULL,
+    invoice_number text NOT NULL,
+    total          numeric(14,2) NOT NULL DEFAULT 0,
+    amount         numeric(14,2) NOT NULL DEFAULT 0,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_invoices_company_idx ON purchase_invoices (company_id);
+
+CREATE TABLE purchase_invoice_rows (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    invoice_id     text NOT NULL REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+    position       integer NOT NULL DEFAULT 0,
+    description    text NOT NULL DEFAULT '',
+    material       text NOT NULL DEFAULT '',
+    hsn            text NOT NULL DEFAULT '',
+    gst            numeric(6,2) NOT NULL DEFAULT 0,
+    -- Purchase rows default to BY-QUANTITY (false), unlike job/quotation rows.
+    has_dimensions boolean NOT NULL DEFAULT false,
+    length         text NOT NULL DEFAULT '1',
+    width          text NOT NULL DEFAULT '1',
+    rate           numeric(14,2) NOT NULL DEFAULT 0,
+    qty            numeric(14,3) NOT NULL DEFAULT 1,
+    unit           text NOT NULL DEFAULT '',
+    discount       numeric(14,2) NOT NULL DEFAULT 0,
+    charges        numeric(14,2) NOT NULL DEFAULT 0,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_invoice_rows_invoice_idx ON purchase_invoice_rows (invoice_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,

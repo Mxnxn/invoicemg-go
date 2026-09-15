@@ -30,6 +30,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
+	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
@@ -143,6 +144,7 @@ func routes(db store.Store) http.Handler {
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
 	quotationHandler := quotation.New(db.Quotations())
+	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -218,6 +220,11 @@ func routes(db store.Store) http.Handler {
 	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
 	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))
 	mux.Handle("GET /quotations", feature("quotations", quotationHandler.List))
+
+	// Purchase invoices (supplier bills), behind the purchase_invoices feature. supplier_id is
+	// populated. Only /list is ported.
+	mux.Handle("POST /purchase-invoice/list", feature("purchase_invoices", purchaseInvoiceHandler.List))
+	mux.Handle("GET /purchase-invoices", feature("purchase_invoices", purchaseInvoiceHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

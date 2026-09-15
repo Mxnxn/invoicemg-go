@@ -92,8 +92,8 @@ INSERT INTO material_price_history (material_id, material_rate, purchase_rate) V
 -- People: an employee (with permissions) and a supplier, so both Configure tabs have rows.
 INSERT INTO persons (uid, name, type, email, phone, firm, permissions, notify_po_created) VALUES
     ('6a8b8c48ae946c0049e824a8', 'Anita', 'Employee', 'anita@local.test', '919000001111', '', ARRAY['products','customers'], NULL);
-INSERT INTO persons (uid, name, type, phone, firm, gst, opening_balance, notify_po_created) VALUES
-    ('6a8b8c48ae946c0049e824a8', 'Metro Papers', 'Supplier', '919000002222', 'Metro Papers Pvt Ltd', '24AAAAA0000A1Z5', 12000, true);
+INSERT INTO persons (id, uid, name, type, phone, firm, gst, opening_balance, notify_po_created) VALUES
+    ('f00000000000000000000001', '6a8b8c48ae946c0049e824a8', 'Metro Papers', 'Supplier', '919000002222', 'Metro Papers Pvt Ltd', '24AAAAA0000A1Z5', 12000, true);
 
 -- A quotation with two rows for Priya, so the Quotations screen has content.
 INSERT INTO quotations (id, uid, company_id, client_id, quotation_number, date) VALUES
@@ -102,3 +102,10 @@ INSERT INTO quotations (id, uid, company_id, client_id, quotation_number, date) 
 INSERT INTO quotation_rows (quotation_id, position, material, description, qty, rate, cgst, sgst) VALUES
     ('e00000000000000000000001', 1, 'Vinyl Sticker', 'Window decals', 10, 45, 9, 9),
     ('e00000000000000000000001', 2, 'Flex Banner',   'Entrance banner', 1, 2500, 9, 9);
+
+-- A supplier bill from Metro Papers, so the Purchase Invoices screen has content.
+INSERT INTO purchase_invoices (id, uid, company_id, supplier_id, date, invoice_number, total, amount) VALUES
+    ('10000000000000000000000a', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9',
+     'f00000000000000000000001', '2026-09-08', 'MP-4471', 11800, 5000);
+INSERT INTO purchase_invoice_rows (invoice_id, position, description, material, hsn, gst, rate, qty, unit) VALUES
+    ('10000000000000000000000a', 1, 'Art paper 300gsm', 'Art Paper', '4802', 18, 100, 100, 'Sheet');

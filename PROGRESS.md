@@ -14,7 +14,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (20 of 209)
+## Routes ready (21 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -38,6 +38,7 @@ the 209 routes the Node API declares.
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
+| `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -64,6 +65,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `materials`, `material_price_history` | added for `/material/getall` (sharing array; history child table) |
 | `persons` | added for `/person/list` (nullable notify_po_* = absent-on-wire) |
 | `quotations`, `quotation_rows` | added for `/quotation/list` (populate via LEFT JOIN + batched rows) |
+| `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.

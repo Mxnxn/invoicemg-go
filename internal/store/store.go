@@ -519,6 +519,60 @@ type Quotations interface {
 	List(ctx context.Context, uid, companyID, clientID ID) ([]Quotation, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Purchase invoices
+// ---------------------------------------------------------------------------------------
+
+// PurchaseSupplier is the populated supplier object (name/firm/phone) the list nests in place
+// of supplier_id. nil when the supplier was deleted.
+type PurchaseSupplier struct {
+	ID    ID
+	Name  string
+	Firm  string
+	Phone string
+}
+
+// PurchaseInvoiceRow is one line of a supplier bill. HasDimensions is a *bool; purchase rows
+// default to false (by quantity), unlike job/quotation rows.
+type PurchaseInvoiceRow struct {
+	ID            ID
+	Description   string
+	Material      string
+	Hsn           string
+	Gst           float64
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Rate          float64
+	Qty           float64
+	Unit          string
+	Discount      float64
+	Charges       float64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// PurchaseInvoice is the whole record the list returns, supplier_id populated.
+type PurchaseInvoice struct {
+	ID            ID
+	UID           ID
+	CompanyID     ID
+	Supplier      *PurchaseSupplier
+	Date          string
+	InvoiceNumber string
+	Rows          []PurchaseInvoiceRow
+	Total         float64
+	Amount        float64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Version       int
+}
+
+type PurchaseInvoices interface {
+	// List returns a company's purchase invoices (newest first), supplier_id populated.
+	List(ctx context.Context, uid, companyID ID) ([]PurchaseInvoice, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -532,6 +586,7 @@ type Store interface {
 	Materials() Materials
 	People() People
 	Quotations() Quotations
+	PurchaseInvoices() PurchaseInvoices
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
