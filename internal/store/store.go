@@ -432,6 +432,37 @@ type Materials interface {
 	Visible(ctx context.Context, companyID ID) ([]Material, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// People (employees and suppliers)
+// ---------------------------------------------------------------------------------------
+
+// Person is an employee or a supplier, as /person/list projects it. The NotifyPo* flags are
+// pointers because Model/Person.js gives them no default: unset means ABSENT on the wire, not
+// false, so the handler omits a nil rather than sending it.
+type Person struct {
+	ID                ID
+	Name              string
+	Type              string
+	Email             string
+	Phone             string
+	Firm              string
+	Address           string
+	Gst               string
+	OpeningBalance    float64
+	IsActive          bool
+	Permissions       []string
+	NotifyPoCreated   *bool
+	NotifyPoUpdated   *bool
+	NotifyPoConfirmed *bool
+	CreatedAt         time.Time
+}
+
+type People interface {
+	// List returns the owner's people (uid), optionally filtered by type ("Employee"/"Supplier").
+	// An empty personType means no filter.
+	List(ctx context.Context, uid ID, personType string) ([]Person, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -443,6 +474,7 @@ type Store interface {
 	Clients() Clients
 	Companies() Companies
 	Materials() Materials
+	People() People
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

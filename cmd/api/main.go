@@ -29,6 +29,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/material"
+	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
@@ -139,6 +140,7 @@ func routes(db store.Store) http.Handler {
 	bankHandler := bank.New(db.Banks())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
+	personHandler := person.New(db.People())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -206,6 +208,10 @@ func routes(db store.Store) http.Handler {
 	// (#1); the writes and /material/get are not ported.
 	mux.Handle("POST /material/getall", feature("products", materialHandler.Getall))
 	mux.Handle("GET /materials", feature("products", materialHandler.Getall))
+
+	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
+	mux.Handle("POST /person/list", admin(personHandler.List))
+	mux.Handle("GET /people", admin(personHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

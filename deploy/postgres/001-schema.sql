@@ -271,6 +271,30 @@ CREATE TABLE materials (
 );
 CREATE INDEX materials_company_idx ON materials (company_id);
 
+-- People: employees (portal logins) and suppliers, scoped by owner (uid), filtered by `type`.
+-- The notify_po_* flags are nullable on purpose - Model/Person.js gives them no default, so an
+-- unset flag is ABSENT on the wire, not false; the handler omits a NULL rather than sending it.
+CREATE TABLE persons (
+    id            text PRIMARY KEY DEFAULT gen_ulid(),
+    uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name          text NOT NULL DEFAULT '',
+    type          text NOT NULL DEFAULT '',
+    email         text,
+    phone         text NOT NULL DEFAULT '',
+    firm          text NOT NULL DEFAULT '',
+    address       text NOT NULL DEFAULT '',
+    gst           text NOT NULL DEFAULT '',
+    opening_balance numeric(14,2) NOT NULL DEFAULT 0,
+    is_active     boolean NOT NULL DEFAULT true,
+    permissions   text[] NOT NULL DEFAULT '{}',
+    notify_po_created   boolean,
+    notify_po_updated   boolean,
+    notify_po_confirmed boolean,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX persons_uid_idx ON persons (uid);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,

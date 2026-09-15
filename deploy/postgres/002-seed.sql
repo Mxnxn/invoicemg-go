@@ -88,3 +88,9 @@ INSERT INTO materials (id, uid, company_id, material_name, material_rate, purcha
 INSERT INTO material_price_history (material_id, material_rate, purchase_rate) VALUES
     ('d00000000000000000000001', 45, 30),
     ('d00000000000000000000002', 25, 15);
+
+-- People: an employee (with permissions) and a supplier, so both Configure tabs have rows.
+INSERT INTO persons (uid, name, type, email, phone, firm, permissions, notify_po_created) VALUES
+    ('6a8b8c48ae946c0049e824a8', 'Anita', 'Employee', 'anita@local.test', '919000001111', '', ARRAY['products','customers'], NULL);
+INSERT INTO persons (uid, name, type, phone, firm, gst, opening_balance, notify_po_created) VALUES
+    ('6a8b8c48ae946c0049e824a8', 'Metro Papers', 'Supplier', '919000002222', 'Metro Papers Pvt Ltd', '24AAAAA0000A1Z5', 12000, true);

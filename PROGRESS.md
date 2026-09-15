@@ -14,7 +14,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (17 of 209)
+## Routes ready (19 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -35,6 +35,8 @@ the 209 routes the Node API declares.
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
+| `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
+| `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -58,6 +60,8 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `units` | unique `(company_id, key)` |
 | `banks` | added for `/bank/list` |
 | `job_reviews` | added for Alert reviews (unique `job_id`, 1–5 CHECKs) |
+| `materials`, `material_price_history` | added for `/material/getall` (sharing array; history child table) |
+| `persons` | added for `/person/list` (nullable notify_po_* = absent-on-wire) |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.
