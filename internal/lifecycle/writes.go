@@ -1,7 +1,9 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
@@ -44,4 +46,143 @@ func (h *Handler) ByEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: build(job)})
+}
+
+// jobRawRow is one submitted job row before coercion.
+type jobRawRow struct {
+	Material    string
+	Description string
+	Length      string
+	Width       string
+	Qty         float64
+	Rate        float64
+	Cgst        float64
+	Sgst        float64
+	Igst        float64
+	Discount    float64
+	Charges     float64
+	QuotationID string
+}
+
+func (r *jobRawRow) UnmarshalJSON(b []byte) error {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	str := func(k string) string {
+		if raw, ok := m[k]; ok {
+			var s string
+			if json.Unmarshal(raw, &s) == nil {
+				return s
+			}
+		}
+		return ""
+	}
+	strOr := func(k, def string) string {
+		if s := str(k); s != "" {
+			return s
+		}
+		return def
+	}
+	num := func(k string) float64 {
+		raw, ok := m[k]
+		if !ok {
+			return 0
+		}
+		var f float64
+		if json.Unmarshal(raw, &f) == nil {
+			return f
+		}
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			if f, err := strconv.ParseFloat(s, 64); err == nil {
+				return f
+			}
+		}
+		return 0
+	}
+	r.Material, r.Description = str("material"), str("description")
+	r.Length, r.Width = strOr("length", "1"), strOr("width", "1")
+	r.Qty, r.Rate = num("qty"), num("rate")
+	r.Cgst, r.Sgst, r.Igst = num("cgst"), num("sgst"), num("igst")
+	r.Discount, r.Charges = num("discount"), num("charges")
+	r.QuotationID = str("quotation_id")
+	return nil
+}
+
+// numOrZero is Number(x)||0 for a submitted string.
+func numOrZero(s string) float64 {
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	return 0
+}
+
+// jobRowGrossTotal is routes/Lifecycle.rowGrossTotal: qty·length·width·rate, net of
+// discount/charges, inclusive of tax (job rows always price by dimension; length/width default 1).
+func jobRowGrossTotal(r store.JobRowWrite) float64 {
+	length := numOrZero(r.Length)
+	width := numOrZero(r.Width)
+	amount := r.Qty * length * width * r.Rate
+	net := amount - r.Discount + r.Charges
+	tax := (r.Cgst + r.Sgst + r.Igst) / 100
+	return net * (1 + tax)
+}
+
+func jobRowsTotal(rows []store.JobRowWrite) float64 {
+	var sum float64
+	for _, r := range rows {
+		sum += jobRowGrossTotal(r)
+	}
+	return sum
+}
+
+// Create is POST /lifecycle/jobs/create.
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+
+	clientID := form.String("client_id")
+	challan := form.String("challanNumber")
+	if clientID == "" || challan == "" || !form.Has("rows") {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	var raw []jobRawRow
+	if err := form.JSON("rows", &raw); err != nil {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "rows must be a JSON array.", Status: httpx.False()})
+		return
+	}
+	if len(raw) == 0 {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "A job needs at least one row.", Status: httpx.False()})
+		return
+	}
+	rows := make([]store.JobRowWrite, 0, len(raw))
+	for _, rr := range raw {
+		rows = append(rows, store.JobRowWrite{
+			Material: rr.Material, Description: rr.Description, Length: rr.Length, Width: rr.Width,
+			Qty: rr.Qty, Rate: rr.Rate, Cgst: rr.Cgst, Sgst: rr.Sgst, Igst: rr.Igst,
+			Discount: rr.Discount, Charges: rr.Charges, QuotationID: store.ID(rr.QuotationID),
+		})
+	}
+	progress := "Unassigned"
+	if form.Has("employee_id") || form.Has("vendor_id") {
+		progress = "In Progress"
+	}
+	job, dup, err := h.store.Create(r.Context(), store.JobCreateInput{
+		UID: sess.UID, CompanyID: sess.CompanyID, ClientID: store.ID(clientID),
+		EmployeeID: store.ID(form.String("employee_id")), VendorID: store.ID(form.String("vendor_id")),
+		ChallanNumber: challan, ReceivedDate: form.String("receivedDate"),
+		Advance: numOrZero(form.String("advance")), Total: jobRowsTotal(rows), Progress: progress, Rows: rows,
+		Actor: actorOf(sess),
+	})
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if dup {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "This job number is already in use.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Job created.", Data: build(job)})
 }

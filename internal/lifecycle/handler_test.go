@@ -20,6 +20,9 @@ type stubJobs struct {
 	challans     []string
 	byEntry      store.Job
 	byEntryFound bool
+	created      store.Job
+	createDup    bool
+	gotCreate    store.JobCreateInput
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
@@ -31,6 +34,10 @@ func (s *stubJobs) ChallanNumbers(_ context.Context, _, _ store.ID) ([]string, e
 }
 func (s *stubJobs) ByEntry(_ context.Context, _, _, _ store.ID) (store.Job, bool, error) {
 	return s.byEntry, s.byEntryFound, nil
+}
+func (s *stubJobs) Create(_ context.Context, in store.JobCreateInput) (store.Job, bool, error) {
+	s.gotCreate = in
+	return s.created, s.createDup, nil
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -277,4 +284,64 @@ func TestHistoryList(t *testing.T) {
 	if body["code"] != float64(422) {
 		t.Errorf("missing job_id: %v", body)
 	}
+}
+
+func TestJobCreate(t *testing.T) {
+	s := &stubJobs{created: store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001"}}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Create }, map[string]string{
+		"client_id": "c1", "challanNumber": "MG/26-27/00001",
+		"rows": `[{"material":"Vinyl","qty":"10","length":"2","width":"3","rate":45,"cgst":9,"sgst":9}]`,
+	})
+	if body["code"] != float64(200) || body["message"] != "Job created." {
+		t.Fatalf("create: %v", body)
+	}
+	// total = (10*2*3*45) * 1.18 = 2700 * 1.18 = 3186 ; one row; unassigned
+	if len(s.gotCreate.Rows) != 1 || s.gotCreate.Total < 3185.9 || s.gotCreate.Total > 3186.1 {
+		t.Errorf("create total/rows: %+v total=%v", s.gotCreate.Rows, s.gotCreate.Total)
+	}
+	if s.gotCreate.Progress != "Unassigned" {
+		t.Errorf("no assignee -> Unassigned, got %q", s.gotCreate.Progress)
+	}
+
+	// with an assignee -> In Progress
+	s2 := &stubJobs{created: store.Job{ID: "j2"}}
+	postNotesJob(t, s2, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Create }, map[string]string{
+		"client_id": "c1", "challanNumber": "X", "employee_id": "e1", "rows": `[{"material":"m","qty":1,"rate":1}]`,
+	})
+	if s2.gotCreate.Progress != "In Progress" {
+		t.Errorf("assignee -> In Progress, got %q", s2.gotCreate.Progress)
+	}
+
+	// validation
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Create }, map[string]string{"client_id": "c1"})
+	if body["code"] != float64(422) {
+		t.Errorf("missing fields: %v", body)
+	}
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Create }, map[string]string{"client_id": "c1", "challanNumber": "X", "rows": "[]"})
+	if body["message"] != "A job needs at least one row." {
+		t.Errorf("empty rows: %v", body)
+	}
+	// dup challan
+	body = postNotesJob(t, &stubJobs{createDup: true}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Create }, map[string]string{"client_id": "c1", "challanNumber": "X", "rows": `[{"material":"m","qty":1,"rate":1}]`})
+	if body["message"] != "This job number is already in use." {
+		t.Errorf("dup: %v", body)
+	}
+}
+
+func postNotesJob(t *testing.T, s store.Jobs, fn func(*Handler) func(http.ResponseWriter, *http.Request), fields map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1", Role: "admin"}))
+	rec := httptest.NewRecorder()
+	fn(New(s, &stubNotes{}))(rec, r)
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return out
 }

@@ -1079,6 +1079,42 @@ type Jobs interface {
 	ChallanNumbers(ctx context.Context, uid, companyID ID) ([]string, error)
 	// ByEntry returns the populated job whose rows carry entryID; found is false when none does.
 	ByEntry(ctx context.Context, uid, companyID, entryID ID) (Job, bool, error)
+	// Create inserts a job and its rows, logs a "Created" history entry, and returns the populated
+	// job. dupChallan is true (nothing inserted) when the challan number already exists.
+	Create(ctx context.Context, in JobCreateInput) (j Job, dupChallan bool, err error)
+}
+
+// JobRowWrite is one submitted job row (normalizeRow), already coerced; QuotationID may be blank.
+type JobRowWrite struct {
+	Material    string
+	Description string
+	Length      string
+	Width       string
+	Qty         float64
+	Rate        float64
+	Cgst        float64
+	Sgst        float64
+	Igst        float64
+	Discount    float64
+	Charges     float64
+	QuotationID ID
+}
+
+// JobCreateInput is /lifecycle/jobs/create. Progress is "In Progress" when an assignee is set,
+// else "Unassigned"; Total is the handler-computed job total; Actor logs the history entry.
+type JobCreateInput struct {
+	UID           ID
+	CompanyID     ID
+	ClientID      ID
+	EmployeeID    ID
+	VendorID      ID
+	ChallanNumber string
+	ReceivedDate  string
+	Advance       float64
+	Total         float64
+	Progress      string
+	Rows          []JobRowWrite
+	Actor         NoteActor
 }
 
 // NoteActor identifies who is acting on a note/history entry: an admin acts as their user, an
