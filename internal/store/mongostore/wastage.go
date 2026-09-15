@@ -96,3 +96,38 @@ func (w *wastages) Create(ctx context.Context, companyID, uid store.ID, in store
 	}
 	return out, nil
 }
+
+func (w *wastages) MaterialsSummary(ctx context.Context, companyID store.ID) ([]store.MaterialAvg, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"company_id": companyOID}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":           bson.M{"$toLower": "$material_name"},
+			"material_name": bson.M{"$first": "$material_name"},
+			"material_rate": bson.M{"$avg": "$material_rate"},
+			"purchase_rate": bson.M{"$avg": "$purchase_rate"},
+		}}},
+		{{Key: "$project", Value: bson.M{"_id": 0, "material_name": 1, "material_rate": 1, "purchase_rate": 1}}},
+		{{Key: "$sort", Value: bson.M{"material_name": 1}}},
+	}
+	cur, err := w.db.Collection(colMaterials).Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("wastage materials summary: %w", err)
+	}
+	var docs []struct {
+		MaterialName string  `bson:"material_name"`
+		MaterialRate float64 `bson:"material_rate"`
+		PurchaseRate float64 `bson:"purchase_rate"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.MaterialAvg, 0, len(docs))
+	for _, d := range docs {
+		out = append(out, store.MaterialAvg{MaterialName: d.MaterialName, MaterialRate: d.MaterialRate, PurchaseRate: d.PurchaseRate})
+	}
+	return out, nil
+}

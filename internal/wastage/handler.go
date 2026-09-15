@@ -56,3 +56,21 @@ type dto struct {
 	UpdatedAt    httpx.Time `json:"updatedAt"`
 	Version      int        `json:"__v"`
 }
+
+// Materials is POST /wastage/materials: the wastage form's product picker - distinct products
+// by (case-insensitive) name with averaged rates, name-sorted. Only a valid session is needed.
+func (h *Handler) Materials(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	list, err := h.store.MaterialsSummary(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(list))
+	for _, m := range list {
+		out = append(out, map[string]any{
+			"material_name": m.MaterialName, "material_rate": m.MaterialRate, "purchase_rate": m.PurchaseRate,
+		})
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
+}

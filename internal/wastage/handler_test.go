@@ -13,6 +13,7 @@ import (
 )
 
 type stub struct {
+	summary   []store.MaterialAvg
 	list      []store.Wastage
 	got       store.ID
 	created   store.Wastage
@@ -24,6 +25,9 @@ func (s *stub) List(_ context.Context, c store.ID) ([]store.Wastage, error) {
 	return s.list, nil
 }
 
+func (s *stub) MaterialsSummary(_ context.Context, _ store.ID) ([]store.MaterialAvg, error) {
+	return s.summary, nil
+}
 func (s *stub) Create(_ context.Context, companyID, uid store.ID, in store.WastageWrite) (store.Wastage, error) {
 	s.gotCreate = in
 	return s.created, nil
@@ -99,5 +103,19 @@ func TestAdd_Validation(t *testing.T) {
 		if b["code"] != float64(422) || b["status"] != false || b["message"] != "Invalid request." {
 			t.Errorf("missing %s should 422: %v", missing, b)
 		}
+	}
+}
+
+func TestMaterials(t *testing.T) {
+	s := &stub{summary: []store.MaterialAvg{{MaterialName: "Vinyl", MaterialRate: 45, PurchaseRate: 30}}}
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Materials(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	rows := body["data"].([]any)
+	if body["code"] != float64(200) || len(rows) != 1 || rows[0].(map[string]any)["material_name"] != "Vinyl" {
+		t.Fatalf("materials: %v", body)
 	}
 }

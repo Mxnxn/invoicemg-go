@@ -1573,10 +1573,21 @@ type WastageWrite struct {
 	Date         string
 }
 
+// MaterialAvg is one distinct product name for the wastage picker (/wastage/materials): names
+// are collapsed case-insensitively and the rates averaged across the duplicates.
+type MaterialAvg struct {
+	MaterialName string
+	MaterialRate float64
+	PurchaseRate float64
+}
+
 type Wastages interface {
 	List(ctx context.Context, companyID ID) ([]Wastage, error)
 	// Create inserts a company-scoped wastage record owned by uid, returning the stored row.
 	Create(ctx context.Context, companyID, uid ID, in WastageWrite) (Wastage, error)
+	// MaterialsSummary is /wastage/materials: distinct products by lowercased name with averaged
+	// rates, name-sorted - the wastage form's material picker.
+	MaterialsSummary(ctx context.Context, companyID ID) ([]MaterialAvg, error)
 }
 
 // ---------------------------------------------------------------------------------------

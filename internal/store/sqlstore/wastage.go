@@ -55,3 +55,24 @@ func (w *wastages) Create(ctx context.Context, companyID, uid store.ID, in store
 	}
 	return out, nil
 }
+
+func (w *wastages) MaterialsSummary(ctx context.Context, companyID store.ID) ([]store.MaterialAvg, error) {
+	rows, err := w.pool.Query(ctx, `
+		SELECT min(material_name) AS name, avg(material_rate), avg(purchase_rate)
+		  FROM materials WHERE company_id = $1
+		 GROUP BY lower(material_name)
+		 ORDER BY lower(material_name) ASC`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("wastage materials summary: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.MaterialAvg, 0)
+	for rows.Next() {
+		var m store.MaterialAvg
+		if err := rows.Scan(&m.MaterialName, &m.MaterialRate, &m.PurchaseRate); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
