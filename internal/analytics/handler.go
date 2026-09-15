@@ -155,3 +155,71 @@ func (h *Handler) rank(w http.ResponseWriter, r *http.Request, field string, fn 
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
 }
+
+func avg(xs []float64) (float64, int) {
+	if len(xs) == 0 {
+		return 0, 0
+	}
+	var s float64
+	for _, x := range xs {
+		s += x
+	}
+	a := s / float64(len(xs))
+	if a < 1 {
+		a = 1 // Node clamps a sub-day average up to 1
+	}
+	return a, len(xs)
+}
+
+func round1(n float64) float64 { return math.Floor(n*10+0.5) / 10 }
+
+// AvgPaymentTime is POST /analytics/avg-payment-time.
+func (h *Handler) AvgPaymentTime(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	gaps, err := h.store.PaymentGaps(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	a, n := avg(gaps)
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: map[string]any{"avgDays": round1(a), "count": n}})
+}
+
+// AvgPendingTime is POST /analytics/avg-pending-time.
+func (h *Handler) AvgPendingTime(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	since, err := h.store.PendingSince(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	now := h.now()
+	gaps := make([]float64, 0, len(since))
+	for _, t := range since {
+		if d := now.Sub(t).Hours() / 24; d >= 0 {
+			gaps = append(gaps, d)
+		}
+	}
+	a, n := avg(gaps)
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: map[string]any{"avgDays": round1(a), "count": n}})
+}
+
+// Payables is POST /analytics/payables - totalPayable + bySupplier at the TOP level (not under
+// data), with status:true, exactly as the Node route sends it.
+func (h *Handler) Payables(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	total, bySupplier, err := h.store.Payables(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	sup := make([]map[string]any, 0, len(bySupplier))
+	for _, s := range bySupplier {
+		sup = append(sup, map[string]any{"name": s.Name, "due": s.Due})
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code": 200, "message": "Operation successful.", "status": true,
+		"totalPayable": total, "bySupplier": sup,
+	})
+}

@@ -28,6 +28,15 @@ func (s *stubAnalytics) TopPaid(_ context.Context, _ store.ID) ([]store.ClientRa
 	return nil, nil
 }
 
+func (s *stubAnalytics) PaymentGaps(_ context.Context, _ store.ID) ([]float64, error) {
+	return nil, nil
+}
+func (s *stubAnalytics) PendingSince(_ context.Context, _ store.ID) ([]time.Time, error) {
+	return nil, nil
+}
+func (s *stubAnalytics) Payables(_ context.Context, _ store.ID) (float64, []store.SupplierDue, error) {
+	return 0, nil, nil
+}
 func (s *stubAnalytics) RevenueSeries(_ context.Context, _ store.ID, source string) ([]store.DatedAmount, []store.DatedAmount, error) {
 	s.gotSource = source
 	return s.billed, s.collected, nil

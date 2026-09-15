@@ -838,6 +838,12 @@ type DatedAmount struct {
 	Amount float64
 }
 
+// SupplierDue is one supplier's outstanding payable.
+type SupplierDue struct {
+	Name string
+	Due  float64
+}
+
 // ClientRank is a client with a single ranked money value (sales, dues, or paid).
 type ClientRank struct {
 	ClientID   ID
@@ -853,6 +859,12 @@ type Analytics interface {
 	TopSales(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopCredits(ctx context.Context, companyID ID) ([]ClientRank, error)
 	TopPaid(ctx context.Context, companyID ID) ([]ClientRank, error)
+	// PaymentGaps returns, per fully-paid invoice, days from invoice date to its last receipt.
+	PaymentGaps(ctx context.Context, companyID ID) ([]float64, error)
+	// PendingSince returns the effective date of each partially-paid invoice.
+	PendingSince(ctx context.Context, companyID ID) ([]time.Time, error)
+	// Payables totals what is owed to suppliers, and the per-supplier breakdown (desc).
+	Payables(ctx context.Context, companyID ID) (total float64, bySupplier []SupplierDue, err error)
 	// RevenueSeries returns the billed and collected dated amounts for the revenue chart.
 	// source "all" reads entries (total, amount); "invoiced" reads invoices (totalAmount) and
 	// invoice_received (amount). Each amount carries createdAt when set, else the typed date.

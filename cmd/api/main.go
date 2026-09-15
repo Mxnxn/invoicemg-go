@@ -268,6 +268,9 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /analytics/top-sales", feature("analytics", analyticsHandler.TopSales))
 	mux.Handle("POST /analytics/top-credits", feature("analytics", analyticsHandler.TopCredits))
 	mux.Handle("POST /analytics/top-paid", feature("analytics", analyticsHandler.TopPaid))
+	mux.Handle("POST /analytics/avg-payment-time", feature("analytics", analyticsHandler.AvgPaymentTime))
+	mux.Handle("POST /analytics/avg-pending-time", feature("analytics", analyticsHandler.AvgPendingTime))
+	mux.Handle("POST /analytics/payables", feature("analytics", analyticsHandler.Payables))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 

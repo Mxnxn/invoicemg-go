@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (33 of 209)
+## Routes ready (36 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
