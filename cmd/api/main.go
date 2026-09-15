@@ -154,7 +154,7 @@ func routes(db store.Store) http.Handler {
 
 	dayHandler := days.New(db.Days())
 	unitHandler := units.New(db.Units())
-	userHandler := users.New(db.Users())
+	userHandler := users.New(db.Users(), db.Sessions())
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	batchReceiveHandler := batchreceive.New(db.BatchReceives())
@@ -199,6 +199,7 @@ func routes(db store.Store) http.Handler {
 	// Unauthenticated - this is what issues a session. A login CREATES a session, so POST is
 	// right under either surface; only the path shape differs.
 	mux.HandleFunc("POST /user/login", userHandler.Login)
+	mux.Handle("POST /user/logout", authed(userHandler.Logout))
 	mux.HandleFunc("POST /sessions", userHandler.Login)
 
 	// Reads. GET under REST, so they are cacheable, safe to retry, and visible as reads in

@@ -15,16 +15,20 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
 type Handler struct {
-	Users store.Users
-	Now   func() time.Time
+	Users    store.Users
+	Sessions store.Sessions
+	Now      func() time.Time
 }
 
-func New(users store.Users) *Handler { return &Handler{Users: users, Now: time.Now} }
+func New(users store.Users, sessions store.Sessions) *Handler {
+	return &Handler{Users: users, Sessions: sessions, Now: time.Now}
+}
 
 // Session lifetimes, from Helpers/SessionLifetime.js.
 const (
@@ -49,14 +53,14 @@ func normaliseEmail(email string) string {
 // the role string - Helpers/SessionFlags.js. UI hints only: every endpoint still enforces its
 // own rules, so a tampered flag buys nothing.
 type flags struct {
-	IsOwner           bool     `json:"isOwner"`
-	IsSuperadmin      bool     `json:"isSuperadmin"`
-	IsEmployee        bool     `json:"isEmployee"`
-	CanManageCompanies bool    `json:"canManageCompanies"`
-	CanManageAccount  bool     `json:"canManageAccount"`
-	CanManagePeople   bool     `json:"canManagePeople"`
-	CanOpenDevPanel   bool     `json:"canOpenDevPanel"`
-	Permissions       []string `json:"permissions"`
+	IsOwner            bool     `json:"isOwner"`
+	IsSuperadmin       bool     `json:"isSuperadmin"`
+	IsEmployee         bool     `json:"isEmployee"`
+	CanManageCompanies bool     `json:"canManageCompanies"`
+	CanManageAccount   bool     `json:"canManageAccount"`
+	CanManagePeople    bool     `json:"canManagePeople"`
+	CanOpenDevPanel    bool     `json:"canOpenDevPanel"`
+	Permissions        []string `json:"permissions"`
 }
 
 func sessionFlags(role string, permissions []string) flags {
@@ -199,4 +203,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt: httpx.NewTimePtr(created.ExpiresAt),
 		},
 	})
+}
+
+// Logout is POST /user/logout: retire the caller's session so its token can't be replayed.
+// Runs behind a valid-session guard, so the session is already resolved on the context.
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	if err := h.Sessions.Deactivate(r.Context(), sess.SessionID); err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Logout successful.", Status: httpx.True()})
 }
