@@ -295,6 +295,43 @@ CREATE TABLE persons (
 );
 CREATE INDEX persons_uid_idx ON persons (uid);
 
+-- Quotations. company+uid scoped; the list populates client_id into a nested client object.
+CREATE TABLE quotations (
+    id               text PRIMARY KEY DEFAULT gen_ulid(),
+    uid              text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id       text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id        text REFERENCES clients(id) ON DELETE SET NULL,
+    quotation_number text NOT NULL,
+    date             text NOT NULL,
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    updated_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX quotations_company_idx ON quotations (company_id);
+CREATE UNIQUE INDEX quotations_number_per_company ON quotations (company_id, quotation_number);
+
+CREATE TABLE quotation_rows (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    quotation_id   text NOT NULL REFERENCES quotations(id) ON DELETE CASCADE,
+    position       integer NOT NULL DEFAULT 0,
+    material       text NOT NULL DEFAULT '',
+    description    text NOT NULL DEFAULT '',
+    has_dimensions boolean NOT NULL DEFAULT true,
+    length         text NOT NULL DEFAULT '1',
+    width          text NOT NULL DEFAULT '1',
+    qty            numeric(14,3) NOT NULL DEFAULT 1,
+    rate           numeric(14,2) NOT NULL DEFAULT 0,
+    cgst           numeric(6,2) NOT NULL DEFAULT 0,
+    sgst           numeric(6,2) NOT NULL DEFAULT 0,
+    igst           numeric(6,2) NOT NULL DEFAULT 0,
+    discount       numeric(14,2) NOT NULL DEFAULT 0,
+    charges        numeric(14,2) NOT NULL DEFAULT 0,
+    -- Set once this row has started a job, so it cannot be added twice.
+    job_id         text,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX quotation_rows_quotation_idx ON quotation_rows (quotation_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,

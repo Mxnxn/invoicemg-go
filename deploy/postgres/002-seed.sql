@@ -94,3 +94,11 @@ INSERT INTO persons (uid, name, type, email, phone, firm, permissions, notify_po
     ('6a8b8c48ae946c0049e824a8', 'Anita', 'Employee', 'anita@local.test', '919000001111', '', ARRAY['products','customers'], NULL);
 INSERT INTO persons (uid, name, type, phone, firm, gst, opening_balance, notify_po_created) VALUES
     ('6a8b8c48ae946c0049e824a8', 'Metro Papers', 'Supplier', '919000002222', 'Metro Papers Pvt Ltd', '24AAAAA0000A1Z5', 12000, true);
+
+-- A quotation with two rows for Priya, so the Quotations screen has content.
+INSERT INTO quotations (id, uid, company_id, client_id, quotation_number, date) VALUES
+    ('e00000000000000000000001', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9',
+     'c00000000000000000000001', 'QT/26-27/000001', '2026-09-10');
+INSERT INTO quotation_rows (quotation_id, position, material, description, qty, rate, cgst, sgst) VALUES
+    ('e00000000000000000000001', 1, 'Vinyl Sticker', 'Window decals', 10, 45, 9, 9),
+    ('e00000000000000000000001', 2, 'Flex Banner',   'Entrance banner', 1, 2500, 9, 9);

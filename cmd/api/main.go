@@ -30,6 +30,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
+	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
@@ -141,6 +142,7 @@ func routes(db store.Store) http.Handler {
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
+	quotationHandler := quotation.New(db.Quotations())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -212,6 +214,10 @@ func routes(db store.Store) http.Handler {
 	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
 	mux.Handle("POST /person/list", admin(personHandler.List))
 	mux.Handle("GET /people", admin(personHandler.List))
+
+	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
+	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))
+	mux.Handle("GET /quotations", feature("quotations", quotationHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

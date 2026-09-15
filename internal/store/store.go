@@ -463,6 +463,62 @@ type People interface {
 	List(ctx context.Context, uid ID, personType string) ([]Person, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Quotations
+// ---------------------------------------------------------------------------------------
+
+// QuotationClient is the populated client object the list nests in place of client_id
+// (Mongoose .populate). nil when the client was deleted (a dangling ref populates to null).
+type QuotationClient struct {
+	ID            ID
+	ClientName    string
+	ClientFirm    string
+	ClientPhone   string
+	ClientAddress string
+	ClientGST     string
+}
+
+// QuotationRow is one line of a quotation. HasDimensions is a *bool (absent = by-dimension).
+// JobID is nil until the row has started a job.
+type QuotationRow struct {
+	ID            ID
+	Material      string
+	Description   string
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Qty           float64
+	Rate          float64
+	Cgst          float64
+	Sgst          float64
+	Igst          float64
+	Discount      float64
+	Charges       float64
+	JobID         ID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// Quotation is the whole record the list returns, client_id populated into Client.
+type Quotation struct {
+	ID              ID
+	UID             ID
+	CompanyID       ID
+	QuotationNumber string
+	Date            string
+	Client          *QuotationClient
+	Rows            []QuotationRow
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Version         int
+}
+
+type Quotations interface {
+	// List returns a company's quotations (newest first), client_id populated, optionally
+	// filtered by clientID (""=no filter).
+	List(ctx context.Context, uid, companyID, clientID ID) ([]Quotation, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -475,6 +531,7 @@ type Store interface {
 	Companies() Companies
 	Materials() Materials
 	People() People
+	Quotations() Quotations
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
