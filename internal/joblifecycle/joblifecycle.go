@@ -41,12 +41,12 @@ type Row struct {
 	EntryID       string // "" when not converted
 }
 
-// Channel is one alert channel's stored state (created or done).
+// Channel is one alert channel's stored state (created or done) - only the fields the
+// derivation logic reads. The dates (sentAt/statusAt) are added by the caller, which formats
+// them, so they stay out of this pure package.
 type Channel struct {
 	Status    string
-	StatusAt  *string
 	Error     string
-	SentAt    *string
 	Count     int
 	RowIDs    []string
 	Signature string
@@ -188,28 +188,20 @@ func doneRowIDs(rows []Row) []string {
 	return out
 }
 
-// AlertState is one channel's derived state, matching JobAlertState.alertState(job, kind).
+// AlertState is one channel's derived state, matching JobAlertState.alertState(job, kind). The
+// pure logic fields; the caller adds sentAt/statusAt (dates) when it builds the response.
 type AlertState struct {
-	SentBefore  bool    `json:"sentBefore"`
-	SentAt      *string `json:"sentAt"`
-	Count       int     `json:"count"`
-	Status      *string `json:"status"`
-	StatusAt    *string `json:"statusAt"`
-	Error       string  `json:"error"`
-	CanSend     bool    `json:"canSend"`
-	IsUpdate    bool    `json:"isUpdate"`
-	Changed     bool    `json:"changed"`
-	Signature   string  `json:"signature"`
-	PendingRows int     `json:"pendingRows"`
+	SentBefore  bool
+	Count       int
+	Status      string
+	Error       string
+	CanSend     bool
+	IsUpdate    bool
+	Changed     bool
+	Signature   string
+	PendingRows int
 	// DoneRowIDs is only set on the done channel.
-	DoneRowIDs []string `json:"doneRowIds,omitempty"`
-}
-
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
+	DoneRowIDs []string
 }
 
 // Alert computes a channel's state. kind is "created" or "done".
@@ -220,10 +212,8 @@ func Alert(job Job, kind string) AlertState {
 	}
 	base := AlertState{
 		SentBefore: ch.Count > 0,
-		SentAt:     ch.SentAt,
 		Count:      ch.Count,
-		Status:     strPtr(ch.Status),
-		StatusAt:   ch.StatusAt,
+		Status:     ch.Status,
 		Error:      ch.Error,
 		Signature:  RowSignature(job.Rows),
 	}

@@ -148,6 +148,14 @@ CREATE TABLE jobs (
     queue          text NOT NULL DEFAULT 'Created',
     progress       text NOT NULL DEFAULT 'Unassigned',
     unlocked       boolean NOT NULL DEFAULT false,
+    employee_id    text,
+    vendor_id      text,
+    queue_order    text[] NOT NULL DEFAULT '{}',
+    -- The two customer-alert channels (created/done), as JSONB - {status,statusAt,error,
+    -- sentAt,count,rowIds,signature}. Empty until a message goes out; the board derives
+    -- the send buttons from them (internal/joblifecycle).
+    created_alert  jsonb NOT NULL DEFAULT '{}',
+    done_alert     jsonb NOT NULL DEFAULT '{}',
     created_at     timestamptz NOT NULL DEFAULT now(),
     updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -180,6 +188,9 @@ CREATE TABLE job_rows (
     queue        text NOT NULL DEFAULT 'Created',
     progress     text NOT NULL DEFAULT 'Assign',
     entry_id     text,
+    employee_id  text,
+    quotation_id text,
+    queue_order  text[] NOT NULL DEFAULT '{}',
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT job_rows_one_tax_side CHECK (igst = 0 OR (cgst = 0 AND sgst = 0))

@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (25 of 209)
+## Routes ready (26 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -45,6 +45,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/lookups/clients` | name picker; uid+company scoped (not sharing-widened) | Live · Unit |
 | `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |
 | `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |
+| `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -73,6 +74,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `quotations`, `quotation_rows` | added for `/quotation/list` (populate via LEFT JOIN + batched rows) |
 | `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
 | `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
+| jobs/job_rows extended | employee/vendor/queue_order/alert channels + row employee/quotation/queue_order, for `/lifecycle/jobs/list` |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.
@@ -96,6 +98,7 @@ yet stored** — returned at defaults, pending the config write-paths.
 |---|---|---|
 | `Helpers/JobTotals` + `Helpers/RowPricing` | `internal/jobmath` (`RowGrossTotal`, `JobRowsTotal`, `dimensionFactor`, `Round2` = JS `Math.round`) | Unit (bit-parity vs Node) · Live |
 | `Helpers/EntryTotals` + `Helpers/RoundOff` | `internal/entrymath` (`Total`, `RoundOffWithAmount`) | Unit (Node-captured) · Live |
+| `JobInvoiceState`+`JobLock`+`JobDoneAlert`+`JobAlertState` | `internal/joblifecycle` (invoice state, lock, alert sha1 signature) | Unit (Node-captured sha1) · Live |
 | `Helpers/TokenHelper` (session + per-tab company) | `internal/auth` `Require` + `ResolveCompany` | Unit · Live |
 | `Helpers/RoleHelper` + `Helpers/Permissions` (flat-key rule) | `internal/auth` `RequireRole/Admin/Feature/Create/Delete`, `HasPermission` | Unit |
 | `Helpers/ReviewScores` `parseScores` | `internal/alerts/scores.go` | Unit (Node-captured) |

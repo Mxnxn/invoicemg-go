@@ -29,6 +29,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/invoice"
+	"github.com/mxnxn/invoicemg-go/internal/lifecycle"
 	"github.com/mxnxn/invoicemg-go/internal/lookups"
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
@@ -149,6 +150,7 @@ func routes(db store.Store) http.Handler {
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
+	lifecycleHandler := lifecycle.New(db.Jobs())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -240,6 +242,10 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /lifecycle/lookups/clients", authed(lookupHandler.Clients))
 	mux.Handle("POST /lifecycle/lookups/materials", authed(lookupHandler.Materials))
 	mux.Handle("POST /lifecycle/lookups/people", authed(lookupHandler.People))
+
+	// The Jobs board. Behind the lifecycle feature. Only /jobs/list is ported.
+	mux.Handle("POST /lifecycle/jobs/list", feature("lifecycle", lifecycleHandler.List))
+	mux.Handle("GET /jobs", feature("lifecycle", lifecycleHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

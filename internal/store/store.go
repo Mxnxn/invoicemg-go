@@ -665,6 +665,111 @@ type Lookups interface {
 	People(ctx context.Context, uid ID) ([]LookupPerson, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Jobs (the Lifecycle board)
+// ---------------------------------------------------------------------------------------
+
+// JobPerson is a populated employee or vendor (name only).
+type JobPerson struct {
+	ID   ID
+	Name string
+}
+
+// JobClient is the populated client on a job.
+type JobClient struct {
+	ID             ID
+	ClientName     string
+	ClientFirm     string
+	ClientPhone    string
+	ClientAddress  string
+	NotifyOnCreate *bool
+	NotifyOnUpdate *bool
+}
+
+// JobRowEntry is the populated rows[].entry_id (has_issued/total/advance).
+type JobRowEntry struct {
+	ID        ID
+	HasIssued bool
+	Total     float64
+	Advance   float64
+}
+
+// JobRowQuotation is the populated rows[].quotation_id (quotationNumber).
+type JobRowQuotation struct {
+	ID              ID
+	QuotationNumber string
+}
+
+// JobRow is one card. It carries the pricing/queue fields joblifecycle needs, the populated
+// employee/quotation/entry, and EntryIssued (whether its entry is currently on an invoice).
+type JobRow struct {
+	ID            ID
+	RowID         string
+	Material      string
+	Description   string
+	Qty           float64
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Rate          float64
+	Cgst          float64
+	Sgst          float64
+	Igst          float64
+	Discount      float64
+	Charges       float64
+	Queue         string
+	Progress      string
+	QueueOrder    []string
+	Employee      *JobPerson
+	Quotation     *JobRowQuotation
+	Entry         *JobRowEntry
+	EntryIssued   bool
+	// InvoiceNumber is the number of the invoice this row's entry landed on, "" if none.
+	InvoiceNumber string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// JobAlertChannel is a stored alert channel (created or done).
+type JobAlertChannel struct {
+	Status    string
+	StatusAt  *time.Time
+	Error     string
+	SentAt    *time.Time
+	Count     int
+	RowIDs    []string
+	Signature string
+}
+
+// Job is one job with everything the board needs: fields, the populated parties, its rows, and
+// the two alert channels. The handler derives invoiceState/lock/alerts from it (joblifecycle).
+type Job struct {
+	ID            ID
+	ChallanNumber string
+	ReceivedDate  string
+	Total         float64
+	Advance       float64
+	Queue         string
+	Progress      string
+	QueueOrder    []string
+	Unlocked      bool
+	Client        *JobClient
+	Employee      *JobPerson
+	Vendor        *JobPerson
+	Rows          []JobRow
+	CreatedAlert  JobAlertChannel
+	DoneAlert     JobAlertChannel
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Version       int
+}
+
+type Jobs interface {
+	// List returns a company's jobs (newest first), all six populations resolved and each row's
+	// entry invoice-state filled, optionally filtered by clientID (""=no filter).
+	List(ctx context.Context, uid, companyID, clientID ID) ([]Job, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -681,6 +786,7 @@ type Store interface {
 	PurchaseInvoices() PurchaseInvoices
 	Invoices() Invoices
 	Lookups() Lookups
+	Jobs() Jobs
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
