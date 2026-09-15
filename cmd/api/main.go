@@ -42,6 +42,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
+	"github.com/mxnxn/invoicemg-go/internal/purchasereport"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/sheet"
 	"github.com/mxnxn/invoicemg-go/internal/statistics"
@@ -175,6 +176,7 @@ func routes(db store.Store) http.Handler {
 	quotationHandler := quotation.New(db.Quotations())
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
+	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
@@ -375,6 +377,8 @@ func routes(db store.Store) http.Handler {
 
 	mux.Handle("POST /ledger/client", feature("ledger", ledgerHandler.Client))
 	mux.Handle("POST /ledger/dues", feature("ledger", ledgerHandler.Dues))
+	mux.Handle("POST /purchase-report/dues", feature("purchase_invoices", purchaseReportHandler.Dues))
+	mux.Handle("POST /purchase-report/supplier", feature("purchase_invoices", purchaseReportHandler.Supplier))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 	mux.Handle("POST /wastage/materials", authed(wastageHandler.Materials))

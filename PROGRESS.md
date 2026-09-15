@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (119 of 209)
+## Routes ready (121 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -121,6 +121,8 @@ the 209 routes the Node API declares.
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |
 | `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |
 | `POST /ledger/dues` | all-client receivables; shared dues math (ties to /client); numbers not strings; deleted clients dropped; server-side totals | Live · Unit |
+| `POST /purchase-report/dues` | payables twin of /ledger/dues: per-supplier billed/paid/due + totals, due-sorted, numbers not strings | Live · Unit |
+| `POST /purchase-report/supplier` | one supplier's ledger: invoices+payments merged chronologically, opening/closing/current, from/to, _seq tiebreak; 422/404 | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing

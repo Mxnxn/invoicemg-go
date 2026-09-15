@@ -1901,6 +1901,60 @@ type Ledger interface {
 	ClientDues(ctx context.Context, companyID ID) (ClientDuesData, error)
 }
 
+// SupplierDueInvoice is one purchase invoice reduced to what the payables dues report needs.
+type SupplierDueInvoice struct {
+	SupplierID ID
+	Total      float64
+	Amount     float64
+}
+
+// SupplierInfo labels a supplier in the payables reports (Person, type Supplier, scoped by uid).
+type SupplierInfo struct {
+	ID      ID
+	Name    string
+	Firm    string
+	Phone   string
+	GST     string
+	Address string
+}
+
+// SupplierDuesData feeds /purchase-report/dues: the company's purchase invoices plus the uid's
+// supplier directory to label and filter them.
+type SupplierDuesData struct {
+	Invoices  []SupplierDueInvoice
+	Suppliers map[string]SupplierInfo
+}
+
+// SupplierLedgerInvoice / SupplierLedgerPayment are the chronological inputs of one supplier's
+// ledger (/purchase-report/supplier).
+type SupplierLedgerInvoice struct {
+	Date          string
+	InvoiceNumber string
+	Total         float64
+}
+type SupplierLedgerPayment struct {
+	Date   string
+	Amount float64
+	Note   string
+}
+
+// SupplierStatementData is one supplier's ledger inputs; Found is false for an unknown supplier.
+type SupplierStatementData struct {
+	Found    bool
+	Supplier SupplierInfo
+	Invoices []SupplierLedgerInvoice
+	Payments []SupplierLedgerPayment
+}
+
+// PurchaseReport is the payables side of the reporting routes (routes/PurchaseReport.js), the
+// mirror of Ledger: it returns raw aggregates and the handler formats them.
+type PurchaseReport interface {
+	// SupplierDues returns the company's purchase invoices and the uid's supplier directory.
+	SupplierDues(ctx context.Context, uid, companyID ID) (SupplierDuesData, error)
+	// SupplierStatement returns one supplier's invoices and payments for its running ledger.
+	SupplierStatement(ctx context.Context, uid, companyID, supplierID ID) (SupplierStatementData, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -1931,6 +1985,7 @@ type Store interface {
 	Inventory() Inventory
 	Statistics() Statistics
 	Ledger() Ledger
+	PurchaseReport() PurchaseReport
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
