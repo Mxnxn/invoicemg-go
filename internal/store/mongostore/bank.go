@@ -73,3 +73,25 @@ func (b *banks) List(ctx context.Context, companyID store.ID) ([]store.Bank, err
 	}
 	return out, nil
 }
+
+func (b *banks) Create(ctx context.Context, companyID, uid store.ID, name string) (store.Bank, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Bank{}, err
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Bank{}, err
+	}
+	now := time.Now().UTC()
+	doc := bson.M{"uid": uidOID, "company_id": companyOID, "name": name, "openingBalance": 0, "createdAt": now, "updatedAt": now, "__v": 0}
+	res, err := b.db.Collection(colBanks).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Bank{}, fmt.Errorf("insert bank: %w", err)
+	}
+	out := store.Bank{UID: uid, CompanyID: companyID, Name: name, CreatedAt: now, UpdatedAt: now}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		out.ID = idOf(oid)
+	}
+	return out, nil
+}

@@ -335,6 +335,9 @@ type Bank struct {
 type Banks interface {
 	// List returns a company's bank accounts in name order.
 	List(ctx context.Context, companyID ID) ([]Bank, error)
+	// Create inserts a company-scoped bank account (name only; openingBalance defaults to 0),
+	// owned by uid, and returns the stored record.
+	Create(ctx context.Context, companyID, uid ID, name string) (Bank, error)
 }
 
 // ---------------------------------------------------------------------------------------

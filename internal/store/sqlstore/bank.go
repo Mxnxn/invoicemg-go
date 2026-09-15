@@ -43,3 +43,21 @@ func (b *banks) List(ctx context.Context, companyID store.ID) ([]store.Bank, err
 	}
 	return out, rows.Err()
 }
+
+func (b *banks) Create(ctx context.Context, companyID, uid store.ID, name string) (store.Bank, error) {
+	var out store.Bank
+	var companyCol *string
+	err := b.pool.QueryRow(ctx, `
+		INSERT INTO banks (uid, company_id, name)
+		VALUES ($1, $2, $3)
+		RETURNING id, uid, company_id, name, opening_balance, created_at, updated_at`,
+		string(uid), string(companyID), name).
+		Scan(&out.ID, &out.UID, &companyCol, &out.Name, &out.OpeningBalance, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.Bank{}, fmt.Errorf("insert bank: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	return out, nil
+}

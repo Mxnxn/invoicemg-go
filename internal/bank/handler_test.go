@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	neturl "net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,14 +14,21 @@ import (
 )
 
 type stubBanks struct {
-	banks []store.Bank
-	err   error
-	got   store.ID
+	banks     []store.Bank
+	err       error
+	got       store.ID
+	created   store.Bank
+	gotCreate string
 }
 
 func (s *stubBanks) List(_ context.Context, companyID store.ID) ([]store.Bank, error) {
 	s.got = companyID
 	return s.banks, s.err
+}
+
+func (s *stubBanks) Create(_ context.Context, companyID, uid store.ID, name string) (store.Bank, error) {
+	s.gotCreate = name
+	return s.created, s.err
 }
 
 func serve(t *testing.T, s store.Banks, companyID store.ID) (map[string]any, *stubBanks) {
@@ -83,5 +92,50 @@ func TestList_EmptyIsArray(t *testing.T) {
 	}
 	if len(rows) != 0 {
 		t.Errorf("want empty array, got %v", rows)
+	}
+}
+
+func postCreate(t *testing.T, s *stubBanks, name string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	if name != "\x00" { // sentinel: omit the field entirely
+		vals.Set("name", name)
+	}
+	req := httptest.NewRequest("POST", "/bank/create", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Create(rec, req)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return body
+}
+
+func TestCreate_Success(t *testing.T) {
+	s := &stubBanks{created: store.Bank{ID: "b1", UID: "u1", CompanyID: "co1", Name: "HDFC"}}
+	body := postCreate(t, s, "  HDFC  ") // trimmed
+	if body["code"] != float64(200) || body["message"] != "Bank created." {
+		t.Fatalf("envelope: %v", body)
+	}
+	if s.gotCreate != "HDFC" {
+		t.Errorf("name should be trimmed, got %q", s.gotCreate)
+	}
+	data := body["data"].(map[string]any)
+	if data["_id"] != "b1" || data["name"] != "HDFC" || data["__v"] != float64(0) {
+		t.Errorf("data: %v", data)
+	}
+	if _, ok := body["status"]; ok {
+		t.Errorf("create success sends no status field")
+	}
+}
+
+func TestCreate_BlankName(t *testing.T) {
+	for _, name := range []string{"", "   ", "\x00"} {
+		body := postCreate(t, &stubBanks{}, name)
+		if body["code"] != float64(422) || body["status"] != false || body["message"] != "Invalid request." {
+			t.Errorf("blank name %q should be 422: %v", name, body)
+		}
 	}
 }

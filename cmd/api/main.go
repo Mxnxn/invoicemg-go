@@ -221,6 +221,7 @@ func routes(db store.Store) http.Handler {
 	// ported; create/update/remove/report are not.
 	mux.Handle("POST /bank/list", feature("batch_receive", bankHandler.List))
 	mux.Handle("GET /banks", feature("batch_receive", bankHandler.List))
+	mux.Handle("POST /bank/create", feature("batch_receive", bankHandler.Create))
 
 	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes use
 	// company-only scope. The populate-heavy /client/get is not ported.

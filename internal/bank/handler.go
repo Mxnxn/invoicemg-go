@@ -4,6 +4,7 @@ package bank
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
@@ -53,4 +54,29 @@ type bankDTO struct {
 	CreatedAt      httpx.Time `json:"createdAt"`
 	UpdatedAt      httpx.Time `json:"updatedAt"`
 	Version        int        `json:"__v"`
+}
+
+// Create is POST /bank/create: add a bank account for the batch-receive dropdown. The name is
+// trimmed and required (blank/whitespace -> 422); the whole stored record comes back, as Node's
+// route does. Behind the batch_receive feature.
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	name := strings.TrimSpace(form.String("name"))
+	if name == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	saved, err := h.store.Create(ctx, sess.CompanyID, sess.UID, name)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Bank created.", Data: bankDTO{
+		ID: string(saved.ID), UID: string(saved.UID), CompanyID: string(saved.CompanyID),
+		Name: saved.Name, OpeningBalance: saved.OpeningBalance,
+		CreatedAt: httpx.NewTime(saved.CreatedAt), UpdatedAt: httpx.NewTime(saved.UpdatedAt), Version: saved.Version,
+	}})
 }

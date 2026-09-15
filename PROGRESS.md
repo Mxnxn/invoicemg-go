@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (57 of 209)
+## Routes ready (58 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -31,6 +31,7 @@ the 209 routes the Node API declares.
 | `GET /alert/{job_id}/job/{jobcard_id}/review` | public; `review:null` when none; no `__v` | Live · Unit |
 | `POST /alert/{job_id}/job/{jobcard_id}/review` | public write; parseScores; E11000 → 409; company fallback | Live · Unit |
 | `POST /bank/list` (+ `GET /banks`) | whole record incl `__v`, `createdAt` millis; no `status` | Live · Unit |
+| `POST /bank/create` | add a bank account (name trimmed/required); whole record echoed; no status field | Live · Unit |
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
 | `POST /client/getall` (+ `GET /clients`) | sharing-widened read; `borrowed` flag; `"Operation successful"` (no period) | Live · Unit |
 | `POST /client/only` (+ `GET /clients/only`) | lighter list + `openingBalance` | Live · Unit |
