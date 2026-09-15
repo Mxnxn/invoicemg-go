@@ -5,3 +5,7 @@
 # Local env overrides
 .env
 tmp/
+
+# Generated at runtime
+exports/
+uploads/

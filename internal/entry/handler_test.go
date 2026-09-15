@@ -8,6 +8,7 @@ import (
 	neturl "net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -34,6 +35,9 @@ func (s *stubEntries) Update(_ context.Context, _, _ store.ID, in store.EntryUpd
 }
 func (s *stubEntries) Get(_ context.Context, _, _, _ store.ID) (store.Entry, bool, error) {
 	return s.got, s.getFound, nil
+}
+func (s *stubEntries) SinceForClient(_ context.Context, _, _, _ store.ID, _ time.Time) ([]store.ClientEntryView, error) {
+	return nil, nil
 }
 func (s *stubEntries) List(_ context.Context, _, _ store.ID) ([]store.Entry, error) {
 	return s.list, nil

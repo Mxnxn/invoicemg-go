@@ -92,7 +92,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: routes(db, cfg.UploadsDir),
+		Handler: routes(db, cfg.UploadsDir, cfg.ExportsDir),
 		// A request that has not finished in this long is not going to. The Node app has no
 		// equivalent, which is why one slow query there can hold a connection open
 		// indefinitely.
@@ -136,7 +136,7 @@ func openStore(ctx context.Context, cfg config.Config) (store.Store, error) {
 	}
 }
 
-func routes(db store.Store, uploadsDir string) http.Handler {
+func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	_ = os.MkdirAll(uploadsDir, 0o755)
 	mux := http.NewServeMux()
 
@@ -164,7 +164,7 @@ func routes(db store.Store, uploadsDir string) http.Handler {
 	supplierPaymentHandler := supplierpayment.New(db.SupplierPayments())
 	trashHandler := trash.New(db.Trash())
 	inventoryHandler := inventory.New(db.Inventory(), db.Companies())
-	statsHandler := statistics.New(db.Statistics())
+	statsHandler := statistics.New(db.Statistics(), db.Entries(), db.Clients(), exportsDir)
 	ledgerHandler := ledger.New(db.Ledger())
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
@@ -178,7 +178,7 @@ func routes(db store.Store, uploadsDir string) http.Handler {
 	personHandler := person.New(db.People(), db.Users())
 	quotationHandler := quotation.New(db.Quotations())
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
-	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
+	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users(), db.Clients(), exportsDir)
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
@@ -308,6 +308,8 @@ func routes(db store.Store, uploadsDir string) http.Handler {
 	mux.Handle("POST /invoice/getAll", feature("invoices", invoiceHandler.List))
 	mux.Handle("POST /invoice/get", feature("invoices", invoiceHandler.Get))
 	mux.Handle("POST /invoice/getClientInvoices", feature("invoices", invoiceHandler.GetClientInvoices))
+	mux.Handle("GET /invoice/export/{cid}/{uid}", feature("invoices", invoiceHandler.Export))
+	mux.Handle("GET /invoice/download/{fname}", feature("invoices", invoiceHandler.Download))
 	mux.Handle("GET /invoices", feature("invoices", invoiceHandler.List))
 	mux.Handle("POST /invoice/next-invoice-number", feature("invoices", invoiceHandler.NextNumber))
 	mux.Handle("POST /invoice/entries-jobs", feature("invoices", invoiceHandler.EntriesJobs))
@@ -382,6 +384,8 @@ func routes(db store.Store, uploadsDir string) http.Handler {
 
 	mux.Handle("POST /stats/get", feature("dashboard", statsHandler.Get))
 	mux.Handle("GET /stats/clients", feature("dashboard", statsHandler.Clients))
+	mux.Handle("GET /stats/exports/{uid}/{mode}", feature("dashboard", statsHandler.Exports))
+	mux.Handle("GET /stats/download/{fname}", feature("dashboard", statsHandler.Download))
 
 	mux.Handle("POST /ledger/client", feature("ledger", ledgerHandler.Client))
 	mux.Handle("POST /ledger/dues", feature("ledger", ledgerHandler.Dues))

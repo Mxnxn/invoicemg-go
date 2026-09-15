@@ -16,9 +16,16 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type Handler struct{ store store.Statistics }
+type Handler struct {
+	store      store.Statistics
+	entries    store.Entries
+	clients    store.Clients
+	exportsDir string
+}
 
-func New(s store.Statistics) *Handler { return &Handler{store: s} }
+func New(s store.Statistics, entries store.Entries, clients store.Clients, exportsDir string) *Handler {
+	return &Handler{store: s, entries: entries, clients: clients, exportsDir: exportsDir}
+}
 
 var months = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 

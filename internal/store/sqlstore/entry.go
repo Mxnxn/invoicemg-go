@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -208,6 +209,50 @@ func (en *entries) List(ctx context.Context, uid, companyID store.ID) ([]store.E
 			return nil, err
 		}
 		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// SinceForClient returns a client's entries created at or after since (zero = no bound), newest
+// first, each with its issued-invoice number - the /stats/exports input.
+func (en *entries) SinceForClient(ctx context.Context, uid, companyID, clientID store.ID, since time.Time) ([]store.ClientEntryView, error) {
+	var sinceArg any
+	if !since.IsZero() {
+		sinceArg = since
+	}
+	rows, err := en.pool.Query(ctx, `
+		SELECT e.id, e.uid, e.company_id, e.client_id, e.invoice_id, e.material, e.hsn, e.description,
+			e.length, e.width, e.date, e.qty, e.rate, e.cgst, e.sgst, e.igst, e.discount, e.charges,
+			e.amount, e.advance, e.total, e.has_issued, e.created_at, e.updated_at, i.invoice_id
+		  FROM entries e
+		  LEFT JOIN invoices i ON i.id = e.invoice_id
+		 WHERE e.company_id = $1 AND e.client_id = $2 AND ($3::timestamptz IS NULL OR e.created_at >= $3)
+		 ORDER BY e.created_at DESC, e.id DESC`,
+		string(companyID), string(clientID), sinceArg)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]store.ClientEntryView, 0)
+	for rows.Next() {
+		var v store.ClientEntryView
+		var company, client, entryInvoiceID, invoiceNo *string
+		if err := rows.Scan(&v.ID, &v.UID, &company, &client, &entryInvoiceID, &v.Material, &v.Hsn,
+			&v.Description, &v.Length, &v.Width, &v.Date, &v.Qty, &v.Rate, &v.Cgst, &v.Sgst, &v.Igst,
+			&v.Discount, &v.Charges, &v.Amount, &v.Advance, &v.Total, &v.HasIssued,
+			&v.CreatedAt, &v.UpdatedAt, &invoiceNo); err != nil {
+			return nil, err
+		}
+		if company != nil {
+			v.CompanyID = store.ID(*company)
+		}
+		if client != nil {
+			v.ClientID = store.ID(*client)
+		}
+		if invoiceNo != nil {
+			v.IssuedInvoiceID = *invoiceNo
+		}
+		out = append(out, v)
 	}
 	return out, rows.Err()
 }

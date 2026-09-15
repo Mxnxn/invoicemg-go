@@ -1008,6 +1008,10 @@ type Entries interface {
 	Update(ctx context.Context, uid, companyID ID, in EntryUpdate) (Entry, bool, error)
 	Get(ctx context.Context, uid, companyID, entryID ID) (Entry, bool, error)
 	List(ctx context.Context, uid, companyID ID) ([]Entry, error)
+	// SinceForClient returns a client's entries created at or after `since`, newest first, each
+	// carrying its issued-invoice number - the input to the /stats/exports spreadsheet. A zero
+	// `since` means no lower bound (the "ft" full-time mode).
+	SinceForClient(ctx context.Context, uid, companyID, clientID ID, since time.Time) ([]ClientEntryView, error)
 }
 
 // Sheets is the /sheet domain. Only /sheet/get is real (update/remove/getall are empty Node

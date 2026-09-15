@@ -54,6 +54,9 @@ type Config struct {
 	// Where uploaded company logos are stored and served from (routes/UserInfo /upload and the
 	// public /uploads mount). Defaults to "uploads" beside the binary.
 	UploadsDir string
+
+	// Where generated .xlsx exports are written and streamed from. Defaults to "exports".
+	ExportsDir string
 }
 
 func Load() (Config, error) {
@@ -62,6 +65,7 @@ func Load() (Config, error) {
 		Store:          env("STORE", StoreMongo),
 		APIStyle:       env("API_STYLE", "legacy"),
 		UploadsDir:     env("UPLOADS_DIR", "uploads"),
+		ExportsDir:     env("EXPORTS_DIR", "exports"),
 		PostgresURL:    env("POSTGRES_URL", ""),
 		MongoURI:       env("MONGO_URI", "mongodb://127.0.0.1:27018"),
 		MongoDB:        env("MONGO_DB", "invoicemg_new"),

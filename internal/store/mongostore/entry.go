@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
@@ -273,4 +274,52 @@ func (en *entries) List(ctx context.Context, uid, companyID store.ID) ([]store.E
 		out = append(out, d.toStore())
 	}
 	return out, nil
+}
+
+// SinceForClient returns a client's entries created at or after since (zero = no bound), newest
+// first, each with its issued-invoice number - the /stats/exports input.
+func (en *entries) SinceForClient(ctx context.Context, uid, companyID, clientID store.ID, since time.Time) ([]store.ClientEntryView, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"company_id": companyOID, "client_id": clientOID}
+	if !since.IsZero() {
+		filter["createdAt"] = bson.M{"$gte": since}
+	}
+	cur, err := en.db.Collection(colEntries).Find(ctx, filter,
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	var docs []struct {
+		fullEntryDoc `bson:",inline"`
+		Issued       *primitive.ObjectID `bson:"issued"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.ClientEntryView, 0, len(docs))
+	for _, d := range docs {
+		v := store.ClientEntryView{Entry: d.fullEntryDoc.toStore()}
+		if d.Issued != nil {
+			v.IssuedID = idOf(*d.Issued)
+			v.IssuedInvoiceID = en.invoiceNumber(ctx, *d.Issued)
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// invoiceNumber reads an invoice's human number by id (for the issued populate).
+func (en *entries) invoiceNumber(ctx context.Context, id primitive.ObjectID) string {
+	var doc struct {
+		InvoiceID string `bson:"invoiceId"`
+	}
+	_ = en.db.Collection(colInvoices).FindOne(ctx, bson.M{"_id": id}).Decode(&doc)
+	return doc.InvoiceID
 }

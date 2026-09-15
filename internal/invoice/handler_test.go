@@ -89,7 +89,7 @@ func (s *stubUsers) CreateSession(_ context.Context, _ store.NewSession) (store.
 
 func serve(t *testing.T, inv []store.Invoice, c store.Company, u store.User) map[string]any {
 	t.Helper()
-	h := New(&stubInvoices{list: inv}, &stubCompanies{c: c}, &stubUsers{u: u})
+	h := New(&stubInvoices{list: inv}, &stubCompanies{c: c}, &stubUsers{u: u}, stubClientsX{}, "")
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
@@ -173,7 +173,7 @@ func postInv(t *testing.T, s *stubInvoices, fn func(*Handler) http.HandlerFunc, 
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	fn(New(s, &stubCompanies{}, &stubUsers{}))(rec, r)
+	fn(New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, ""))(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -183,7 +183,7 @@ func postInv(t *testing.T, s *stubInvoices, fn func(*Handler) http.HandlerFunc, 
 
 func TestNextNumber(t *testing.T) {
 	s := &stubInvoices{numbers: []string{"MG/26-27/INV-00002"}}
-	h := New(s, &stubCompanies{}, &stubUsers{})
+	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, "")
 	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
 	defer func() { now = func() time.Time { return time.Now().UTC() } }()
 	r := httptest.NewRequest("POST", "/", nil)
@@ -288,7 +288,7 @@ func TestGet_RawShapeWithProfile(t *testing.T) {
 	}}
 	h := New(&stubInvoices{list: inv},
 		&stubCompanies{c: store.Company{Firm: "Manan LLP", Gst: "GST1", BankName: "HDFC"}},
-		&stubUsers{u: store.User{Name: "Owner", Email: "o@x.test"}})
+		&stubUsers{u: store.User{Name: "Owner", Email: "o@x.test"}}, stubClientsX{}, "")
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
@@ -321,7 +321,7 @@ func TestGetClientInvoices(t *testing.T) {
 			Entries: []store.Entry{{ID: "e9", Amount: 999}}},
 	}
 	s := &stubInvoices{list: inv, receivedByClient: []store.InvoiceReceivedRow{{ID: "r1", Amount: 300, Date: "2026-09-12"}}}
-	h := New(s, &stubCompanies{}, &stubUsers{})
+	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, "")
 	r := httptest.NewRequest("POST", "/", strings.NewReader("cid=c1"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
@@ -353,4 +353,28 @@ func TestGetClientInvoices(t *testing.T) {
 	if out["code"] != float64(422) {
 		t.Errorf("missing cid should 422: %v", out)
 	}
+}
+
+// stubClientsX satisfies store.Clients for the export handler (only Get is exercised, and only
+// the export tests drive it - the other tests never call it).
+type stubClientsX struct {
+	detail store.ClientDetail
+	found  bool
+}
+
+func (s stubClientsX) Visible(context.Context, store.ID, store.ID) ([]store.Client, error) {
+	return nil, nil
+}
+func (s stubClientsX) Create(context.Context, store.ID, store.ID, int64, store.ClientWrite) (store.Client, store.Dup, error) {
+	return store.Client{}, "", nil
+}
+func (s stubClientsX) Update(context.Context, store.ID, store.ID, store.ClientWrite) (store.Client, store.Dup, bool, error) {
+	return store.Client{}, "", false, nil
+}
+func (s stubClientsX) Delete(context.Context, store.ID, store.ID) (bool, error) { return false, nil }
+func (s stubClientsX) EnsureSupplier(context.Context, store.ID, store.ClientWrite) (bool, error) {
+	return false, nil
+}
+func (s stubClientsX) Get(context.Context, store.ID, store.ID) (store.ClientDetail, bool, error) {
+	return s.detail, s.found, nil
 }

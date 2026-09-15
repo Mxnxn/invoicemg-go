@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (129 of 209)
+## Routes ready (133 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -85,6 +85,10 @@ the 209 routes the Node API declares.
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
 | `POST /invoice/get` | all company invoices raw, entries+client populated, uid replaced by the issuer letterhead (sourced from Company per this port); msg "Successfully retreived!" | Live · Unit |
 | `POST /invoice/getClientInvoices` | one client's invoices with taxed/untaxed/received/due (flat *1.18, RoundOffWithAmount), totals, receivedHistory; 422 | Live · Unit |
+| `GET /invoice/export/{cid}/{uid}` | build a client's invoice-ledger .xlsx (excelize) under the exports dir, return the filename; 402/404 | Live · Unit |
+| `GET /invoice/download/{fname}` | stream a generated export; filename carries the owning company id; foreign/traversal name → 404 | Live · Unit |
+| `GET /stats/exports/{uid}/{mode}` | build a client's line-items .xlsx for a window (tm/ltm/lsm/ft); 204 no data, 400 bad mode, 404 unknown client | Live · Unit |
+| `GET /stats/download/{fname}` | stream a generated export, same company-scoped guard | Live · Unit |
 | `POST /invoice/next-invoice-number` | next MG/FY/INV- number (docnumber) | Live · Unit |
 | `POST /invoice/entries-jobs` | map entry ids → job challan numbers (reverse lookup) | Live · Unit |
 | `POST /invoice/getReceived` | payments recorded against an invoice, bank populated | Live · Unit |

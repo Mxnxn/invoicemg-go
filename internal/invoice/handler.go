@@ -13,13 +13,15 @@ import (
 )
 
 type Handler struct {
-	invoices  store.Invoices
-	companies store.Companies
-	users     store.Users
+	invoices   store.Invoices
+	companies  store.Companies
+	users      store.Users
+	clients    store.Clients
+	exportsDir string
 }
 
-func New(i store.Invoices, c store.Companies, u store.Users) *Handler {
-	return &Handler{invoices: i, companies: c, users: u}
+func New(i store.Invoices, c store.Companies, u store.Users, cl store.Clients, exportsDir string) *Handler {
+	return &Handler{invoices: i, companies: c, users: u, clients: cl, exportsDir: exportsDir}
 }
 
 // List is POST /invoice/getAll. The message is "Successful!" (with the bang), exactly as Node
