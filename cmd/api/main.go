@@ -262,6 +262,12 @@ func routes(db store.Store) http.Handler {
 	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
 	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))
 	mux.Handle("GET /quotations", feature("quotations", quotationHandler.List))
+	mux.Handle("POST /quotation/next-quotation-number", feature("quotations", quotationHandler.NextNumber))
+	mux.Handle("POST /quotation/get", feature("quotations", quotationHandler.Get))
+	mux.Handle("POST /quotation/create", feature("quotations", quotationHandler.Create, auth.RequireCreate("quotations")))
+	mux.Handle("POST /quotation/update", feature("quotations", quotationHandler.Update))
+	mux.Handle("POST /quotation/delete", feature("quotations", quotationHandler.Delete, auth.RequireDelete("quotations")))
+	mux.Handle("POST /quotation/row/delete", feature("quotations", quotationHandler.RowDelete, auth.RequireDelete("quotations")))
 
 	// Purchase invoices (supplier bills), behind the purchase_invoices feature. supplier_id is
 	// populated. Only /list is ported.

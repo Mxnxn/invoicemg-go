@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (66 of 209)
+## Routes ready (72 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -54,6 +54,12 @@ the 209 routes the Node API declares.
 | `POST /person/update` | partial edit (present-key semantics); password kept unless resupplied; email cleared to NULL when blank; 404 on miss | Live · Unit |
 | `POST /person/delete` | hard delete, owner-scoped; 404 on miss | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
+| `POST /quotation/next-quotation-number` | next MG/FY/QT- number (docnumber) | Live · Unit |
+| `POST /quotation/get` | one quotation, populated; 404 on miss | Live · Unit |
+| `POST /quotation/create` | rows parsed/coerced; length/width default "1"; dup number 422 | Live · Unit |
+| `POST /quotation/update` | partial edit; rows replace set, keeping matched rows' _id + job_id; dup 422; 404 | Live · Unit |
+| `POST /quotation/delete` | owner+company scoped; 404 on miss | Live · Unit |
+| `POST /quotation/row/delete` | drop one row (missing row = no-op), return populated quotation | Live · Unit |
 | `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
 | `POST /lifecycle/lookups/clients` | name picker; uid+company scoped (not sharing-widened) | Live · Unit |
@@ -125,6 +131,7 @@ yet stored** — returned at defaults, pending the config write-paths.
 | `Helpers/EntryTotals` + `Helpers/RoundOff` | `internal/entrymath` (`Total`, `RoundOffWithAmount`) | Unit (Node-captured) · Live |
 | `Helpers/ClientDues` `computeClientDues` / `roundMoney` | `internal/store` `ComputeClientDues` (+ `round2`) — shared by /ledger/client & /ledger/dues | Unit (Node-captured) · Live |
 | `Helpers/CashflowMetrics` `computeCashflow` / `computeProductMargins` | `internal/cashflow` (`Compute`, `ProductMargins`) | Unit (Node-captured) · Live |
+| `Helpers/DocumentNumbering` `currentFinancialYear` / `nextDocumentNumber` | `internal/docnumber` (`FinancialYear`, `Next`) — FY rollover, per-code sequence | Unit (Node-captured) · Live |
 | `JobInvoiceState`+`JobLock`+`JobDoneAlert`+`JobAlertState` | `internal/joblifecycle` (invoice state, lock, alert sha1 signature) | Unit (Node-captured sha1) · Live |
 | `Helpers/DateBuckets` | `internal/datebuckets` (weekly/monthly/yearly bucketing) | Unit (Node-captured) |
 | `Helpers/TokenHelper` (session + per-tab company) | `internal/auth` `Require` + `ResolveCompany` | Unit · Live |

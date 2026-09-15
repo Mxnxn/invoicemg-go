@@ -652,10 +652,57 @@ type Quotation struct {
 	Version         int
 }
 
+// QuotationRowInput is one submitted row (parseRows). ID is set only on update, to match an
+// existing row so its JobID linkage survives the rewrite; a blank ID is a brand-new row.
+type QuotationRowInput struct {
+	ID          ID
+	Material    string
+	Description string
+	Length      string
+	Width       string
+	Qty         float64
+	Rate        float64
+	Cgst        float64
+	Sgst        float64
+	Discount    float64
+	Charges     float64
+}
+
+// QuotationWrite is the field set of /quotation/create.
+type QuotationWrite struct {
+	ClientID        ID
+	QuotationNumber string
+	Date            string
+	Rows            []QuotationRowInput
+}
+
+// QuotationUpdate is /quotation/update's partial edit; a nil field was not submitted. Rows, when
+// present, replace the row set (preserving JobID for rows whose ID matches an existing one).
+type QuotationUpdate struct {
+	ClientID        *ID
+	QuotationNumber *string
+	Date            *string
+	Rows            *[]QuotationRowInput
+}
+
 type Quotations interface {
 	// List returns a company's quotations (newest first), client_id populated, optionally
 	// filtered by clientID (""=no filter).
 	List(ctx context.Context, uid, companyID, clientID ID) ([]Quotation, error)
+	// Numbers returns every quotation number for the owner+company, for the next-number helper.
+	Numbers(ctx context.Context, uid, companyID ID) ([]string, error)
+	// Get returns one populated quotation (owner+company scoped); found is false on a miss.
+	Get(ctx context.Context, uid, companyID, quotationID ID) (q Quotation, found bool, err error)
+	// Create inserts a quotation with its rows; dupNumber is true when the number already exists.
+	Create(ctx context.Context, uid, companyID ID, in QuotationWrite) (q Quotation, dupNumber bool, err error)
+	// Update applies a partial patch; replacing rows keeps each matched row's JobID. found is
+	// false on a miss, dupNumber true on a number collision.
+	Update(ctx context.Context, uid, companyID, quotationID ID, in QuotationUpdate) (q Quotation, dupNumber bool, found bool, err error)
+	// Delete removes a quotation (owner+company scoped). found is false on a miss.
+	Delete(ctx context.Context, uid, companyID, quotationID ID) (found bool, err error)
+	// RowDelete removes one row from a quotation and returns the re-populated quotation. found is
+	// false when the quotation is missing (a missing row is a no-op, matching Node's `?.deleteOne`).
+	RowDelete(ctx context.Context, uid, companyID, quotationID, rowID ID) (q Quotation, found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------

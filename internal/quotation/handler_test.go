@@ -3,7 +3,10 @@ package quotation
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,11 +17,44 @@ import (
 type stubQuotations struct {
 	list        []store.Quotation
 	gotClientID store.ID
+
+	numbers     []string
+	got         store.Quotation
+	found       bool
+	created     store.Quotation
+	updated     store.Quotation
+	dup         bool
+	deleteFound bool
+	rowDeleted  store.Quotation
+	gotCreate   store.QuotationWrite
+	gotUpdate   store.QuotationUpdate
+	gotRowID    store.ID
 }
 
 func (s *stubQuotations) List(_ context.Context, _, _, clientID store.ID) ([]store.Quotation, error) {
 	s.gotClientID = clientID
 	return s.list, nil
+}
+func (s *stubQuotations) Numbers(_ context.Context, _, _ store.ID) ([]string, error) {
+	return s.numbers, nil
+}
+func (s *stubQuotations) Get(_ context.Context, _, _, _ store.ID) (store.Quotation, bool, error) {
+	return s.got, s.found, nil
+}
+func (s *stubQuotations) Create(_ context.Context, _, _ store.ID, in store.QuotationWrite) (store.Quotation, bool, error) {
+	s.gotCreate = in
+	return s.created, s.dup, nil
+}
+func (s *stubQuotations) Update(_ context.Context, _, _, _ store.ID, in store.QuotationUpdate) (store.Quotation, bool, bool, error) {
+	s.gotUpdate = in
+	return s.updated, s.dup, s.found, nil
+}
+func (s *stubQuotations) Delete(_ context.Context, _, _, _ store.ID) (bool, error) {
+	return s.deleteFound, nil
+}
+func (s *stubQuotations) RowDelete(_ context.Context, _, _, _, rowID store.ID) (store.Quotation, bool, error) {
+	s.gotRowID = rowID
+	return s.rowDeleted, s.found, nil
 }
 
 func serve(t *testing.T, s store.Quotations) map[string]any {
@@ -88,5 +124,125 @@ func TestList_ClientFilterPassedThrough(t *testing.T) {
 	New(s).List(rec, r)
 	if s.gotClientID != "" {
 		t.Errorf("client filter should be empty, got %q", s.gotClientID)
+	}
+}
+
+func postQ(t *testing.T, s store.Quotations, fn func(*Handler) http.HandlerFunc, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	fn(New(s))(rec, r)
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return out
+}
+
+func TestNextNumber(t *testing.T) {
+	s := &stubQuotations{numbers: []string{"MG/26-27/QT-00002", "MG/26-27/QT-00001"}}
+	h := New(s)
+	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
+	defer func() { now = func() time.Time { return time.Now().UTC() } }()
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	h.NextNumber(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if body["data"].(map[string]any)["quotationNumber"] != "MG/26-27/QT-00003" {
+		t.Errorf("next number: %v", body["data"])
+	}
+}
+
+func TestCreate_ParsesRows(t *testing.T) {
+	s := &stubQuotations{created: store.Quotation{ID: "q1", QuotationNumber: "MG/26-27/QT-00001"}}
+	body := postQ(t, s, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"client_id": "c1", "date": "2026-09-15", "quotationNumber": "MG/26-27/QT-00001",
+		"rows": `[{"material":"Vinyl","qty":"10","rate":45,"length":"","width":"2"}]`,
+	})
+	if body["code"] != float64(200) || body["message"] != "Quotation created." {
+		t.Fatalf("envelope: %v", body)
+	}
+	if len(s.gotCreate.Rows) != 1 {
+		t.Fatalf("rows: %+v", s.gotCreate.Rows)
+	}
+	row := s.gotCreate.Rows[0]
+	// qty coerced from string, rate from number, blank length defaults to "1"
+	if row.Qty != 10 || row.Rate != 45 || row.Length != "1" || row.Width != "2" {
+		t.Errorf("row coercion: %+v", row)
+	}
+}
+
+func TestCreate_ValidationAndDup(t *testing.T) {
+	body := postQ(t, &stubQuotations{}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{"client_id": "c1"})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing fields: %v", body)
+	}
+	body = postQ(t, &stubQuotations{}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"client_id": "c1", "date": "d", "quotationNumber": "n", "rows": "{not an array}",
+	})
+	if body["code"] != float64(422) || body["message"] != "rows must be a JSON array." {
+		t.Errorf("bad rows: %v", body)
+	}
+	body = postQ(t, &stubQuotations{dup: true}, func(h *Handler) http.HandlerFunc { return h.Create }, map[string]string{
+		"client_id": "c1", "date": "d", "quotationNumber": "n", "rows": "[]",
+	})
+	if body["code"] != float64(422) || body["message"] != "This quotation number is already in use." {
+		t.Errorf("dup: %v", body)
+	}
+}
+
+func TestUpdate_PartialAndNotFound(t *testing.T) {
+	s := &stubQuotations{found: true, updated: store.Quotation{ID: "q1"}}
+	body := postQ(t, s, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{
+		"quotation_id": "q1", "date": "2026-10-01", "rows": `[{"material":"X","_id":"r1"}]`,
+	})
+	if body["code"] != float64(200) || body["message"] != "Quotation updated." {
+		t.Fatalf("envelope: %v", body)
+	}
+	if s.gotUpdate.Date == nil || *s.gotUpdate.Date != "2026-10-01" {
+		t.Errorf("date patch: %v", s.gotUpdate.Date)
+	}
+	if s.gotUpdate.ClientID != nil {
+		t.Errorf("client_id not submitted -> nil, got %v", s.gotUpdate.ClientID)
+	}
+	if s.gotUpdate.Rows == nil || len(*s.gotUpdate.Rows) != 1 || (*s.gotUpdate.Rows)[0].ID != "r1" {
+		t.Errorf("rows patch (with _id preserved): %v", s.gotUpdate.Rows)
+	}
+
+	body = postQ(t, &stubQuotations{}, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing id: %v", body)
+	}
+	body = postQ(t, &stubQuotations{found: false}, func(h *Handler) http.HandlerFunc { return h.Update }, map[string]string{"quotation_id": "q9"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestDeleteAndRowDelete(t *testing.T) {
+	body := postQ(t, &stubQuotations{deleteFound: true}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{"quotation_id": "q1"})
+	if body["code"] != float64(200) || body["status"] != true || body["message"] != "Quotation deleted." {
+		t.Errorf("delete: %v", body)
+	}
+	body = postQ(t, &stubQuotations{deleteFound: false}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{"quotation_id": "q1"})
+	if body["code"] != float64(404) {
+		t.Errorf("delete 404: %v", body)
+	}
+	s := &stubQuotations{found: true, rowDeleted: store.Quotation{ID: "q1"}}
+	body = postQ(t, s, func(h *Handler) http.HandlerFunc { return h.RowDelete }, map[string]string{"quotation_id": "q1", "row_id": "r5"})
+	if body["code"] != float64(200) || body["message"] != "Row removed." || s.gotRowID != "r5" {
+		t.Errorf("row delete: %v (rowID=%q)", body, s.gotRowID)
+	}
+	body = postQ(t, &stubQuotations{}, func(h *Handler) http.HandlerFunc { return h.RowDelete }, map[string]string{"quotation_id": "q1"})
+	if body["code"] != float64(422) {
+		t.Errorf("row delete missing row_id: %v", body)
 	}
 }
