@@ -859,9 +859,69 @@ type Entry struct {
 	Charges       float64
 	Advance       float64
 	Total         float64
+	HasIssued     bool
+	ClientID      ID
+	CompanyID     ID
+	UID           ID
+	QuotationID   ID
+	// Client is the populated client_id, set only where a route populates it (entry/add).
+	// Elsewhere it is nil and ClientID carries the raw id.
+	Client    *EntryClient
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Version   int
+}
+
+// EntryClient is the subset of a client populated onto an entry's client_id (entry/add).
+type EntryClient struct {
+	ID            ID
+	CompanyID     ID
+	UID           ID
+	LegacyID      *int64
+	ClientName    string
+	ClientFirm    string
+	ClientPhone   string
+	ClientGST     string
+	ClientAddress string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	Version       int
+}
+
+// EntryWrite is /entry/add: a fully specified line item. HSN is resolved from the material
+// name at write time (a snapshot), so it is not part of the input.
+type EntryWrite struct {
+	ClientID    ID
+	Date        string
+	Material    string
+	Description string
+	Length      string
+	Width       string
+	Qty         float64
+	Rate        float64
+	Amount      float64
+	Cgst        float64
+	Sgst        float64
+	Igst        float64
+	Discount    float64
+	Charges     float64
+	Total       float64
+	Advance     float64
+}
+
+// EntryUpdate is /entry/update: like EntryWrite plus the target id. A date change moves the
+// entry between the day-sheets (creating the new day's sheet if it does not exist).
+type EntryUpdate struct {
+	EntryID ID
+	EntryWrite
+}
+
+// Entries is the /entry domain: line items grouped into day-sheets. add/update keep the
+// sheet-of-day membership in step; remove (soft-delete to Trash) is deferred.
+type Entries interface {
+	Add(ctx context.Context, uid, companyID ID, in EntryWrite) (Entry, error)
+	Update(ctx context.Context, uid, companyID ID, in EntryUpdate) (Entry, bool, error)
+	Get(ctx context.Context, uid, companyID, entryID ID) (Entry, bool, error)
+	List(ctx context.Context, uid, companyID ID) ([]Entry, error)
 }
 
 // Invoice is one invoice with its client populated and its entries loaded.
@@ -1790,6 +1850,7 @@ type Store interface {
 	Quotations() Quotations
 	PurchaseInvoices() PurchaseInvoices
 	Invoices() Invoices
+	Entries() Entries
 	Lookups() Lookups
 	Jobs() Jobs
 	JobNotes() JobNotes

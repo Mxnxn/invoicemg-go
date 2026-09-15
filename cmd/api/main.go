@@ -30,6 +30,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/company"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
+	"github.com/mxnxn/invoicemg-go/internal/entry"
 	"github.com/mxnxn/invoicemg-go/internal/expense"
 	"github.com/mxnxn/invoicemg-go/internal/gstreport"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
@@ -165,6 +166,7 @@ func routes(db store.Store) http.Handler {
 	analyticsHandler := analytics.New(db.Analytics())
 	gstHandler := gstreport.New(db.Analytics())
 	wastageHandler := wastage.New(db.Wastages())
+	entryHandler := entry.New(db.Entries())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
@@ -200,6 +202,10 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /sheet/only", admin(dayHandler.Only))
 	mux.Handle("GET /days", admin(dayHandler.Only))
 	mux.Handle("POST /sheet/open-jobs", admin(dayHandler.OpenJobs))
+	mux.Handle("POST /entry/add", admin(entryHandler.Add))
+	mux.Handle("POST /entry/update", admin(entryHandler.Update))
+	mux.Handle("POST /entry/get", admin(entryHandler.Get))
+	mux.Handle("POST /entry/getall", admin(entryHandler.GetAll))
 	mux.Handle("GET /jobs/open", admin(dayHandler.OpenJobs))
 
 	mux.Handle("POST /unit/list", feature("products", unitHandler.List))

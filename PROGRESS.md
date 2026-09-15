@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (104 of 209)
+## Routes ready (108 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -101,6 +101,10 @@ the 209 routes the Node API declares.
 | `POST /batch-receive/create` | client lump payment; auto (oldest-first) or manual allocation; propagates to entries+invoices (applyJobPaymentDownstream) | Live · Unit |
 | `POST /batch-receive/delete` | reverses job advances + entry/invoice propagation, then removes; 404 on miss | Live · Unit |
 | `POST /wastage/getall` | company wastage log, newest first | Live · Unit |
+| `POST /entry/add` | admin; create a line item, snapshot material HSN, ensure the day-sheet exists, echo entry with client_id populated | Live · Unit |
+| `POST /entry/update` | admin; rewrite a line item, move it between day-sheets on a date change (old sheet kept); Node status:false quirk preserved | Live · Unit |
+| `POST /entry/get` | admin; one entry by id, company-scoped; 422 on missing id | Live · Unit |
+| `POST /entry/getall` | admin; every entry in the company | Live · Unit |
 | `POST /wastage/add` | log an offcut; numeric casts; purchase_rate/cost_total default 0; whole record echoed | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |
