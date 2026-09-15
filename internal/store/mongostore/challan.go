@@ -57,3 +57,28 @@ func (c *challans) List(ctx context.Context, companyID store.ID) ([]store.Challa
 	}
 	return out, nil
 }
+
+func (c *challans) Create(ctx context.Context, companyID, uid store.ID, in store.ChallanWrite) (store.Challan, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Challan{}, err
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Challan{}, err
+	}
+	doc := bson.M{
+		"uid": uidOID, "company_id": companyOID, "companyName": in.CompanyName,
+		"description": in.Description, "date": in.Date, "type": in.Type,
+		"quantity": in.Quantity, "amount": in.Amount, "__v": 0,
+	}
+	res, err := c.db.Collection(colChallans).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Challan{}, fmt.Errorf("insert challan: %w", err)
+	}
+	return store.Challan{
+		ID: idOf(res.InsertedID.(primitive.ObjectID)), UID: uid, CompanyID: companyID,
+		CompanyName: in.CompanyName, Description: in.Description, Date: in.Date, Type: in.Type,
+		Quantity: in.Quantity, Amount: in.Amount,
+	}, nil
+}

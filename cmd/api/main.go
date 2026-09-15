@@ -347,6 +347,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 
 	// Delivery challans, behind the challan feature. Only /getAll is ported.
 	mux.Handle("POST /challan/getAll", feature("challan", challanHandler.GetAll))
+	mux.Handle("POST /challan/new", feature("challan", challanHandler.New, auth.RequireCreate("challan")))
 
 	// Expenses, behind the batch_receive feature. Only /list is ported.
 	mux.Handle("POST /batch-receive/list", feature("batch_receive", batchReceiveHandler.List))

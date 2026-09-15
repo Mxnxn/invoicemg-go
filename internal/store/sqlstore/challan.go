@@ -36,3 +36,21 @@ func (c *challans) List(ctx context.Context, companyID store.ID) ([]store.Challa
 	}
 	return out, rows.Err()
 }
+
+func (c *challans) Create(ctx context.Context, companyID, uid store.ID, in store.ChallanWrite) (store.Challan, error) {
+	var out store.Challan
+	var companyCol *string
+	err := c.pool.QueryRow(ctx, `
+		INSERT INTO challans (uid, company_id, company_name, description, date, type, quantity, amount)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, uid, company_id, company_name, description, date, type, quantity, amount`,
+		string(uid), string(companyID), in.CompanyName, in.Description, in.Date, in.Type, in.Quantity, in.Amount).
+		Scan(&out.ID, &out.UID, &companyCol, &out.CompanyName, &out.Description, &out.Date, &out.Type, &out.Quantity, &out.Amount)
+	if err != nil {
+		return store.Challan{}, fmt.Errorf("insert challan: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	return out, nil
+}

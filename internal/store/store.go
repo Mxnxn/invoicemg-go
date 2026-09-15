@@ -1412,8 +1412,22 @@ type Challan struct {
 	Version     int
 }
 
+// ChallanWrite is /challan/new: a cash/billing delivery challan. Node's type-present branch is
+// a dead TDZ crash, so only the "In CASH" (no type) path ever creates one; the handler forces
+// the type accordingly.
+type ChallanWrite struct {
+	CompanyName string
+	Description string
+	Date        string
+	Type        string
+	Quantity    float64
+	Amount      float64
+}
+
 type Challans interface {
 	List(ctx context.Context, companyID ID) ([]Challan, error)
+	// Create inserts a company-scoped challan owned by uid, returning the stored record.
+	Create(ctx context.Context, companyID, uid ID, in ChallanWrite) (Challan, error)
 }
 
 // ---------------------------------------------------------------------------------------

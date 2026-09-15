@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (133 of 209)
+## Routes ready (134 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -122,6 +122,7 @@ the 209 routes the Node API declares.
 | `POST /batch-receive/create` | client lump payment; auto (oldest-first) or manual allocation; propagates to entries+invoices (applyJobPaymentDownstream) | Live · Unit |
 | `POST /batch-receive/delete` | reverses job advances + entry/invoice propagation, then removes; 404 on miss | Live · Unit |
 | `POST /wastage/getall` | company wastage log, newest first | Live · Unit |
+| `POST /challan/new` | record an "In CASH" delivery challan (no-type branch); 422 (status:true, a Node quirk) on a missing field; a `type` present reproduces Node's dead-code TDZ 500 | Live · Unit |
 | `POST /wastage/materials` | wastage form product picker; distinct products by lowercased name, averaged rates, name-sorted | Live · Unit |
 | `POST /entry/add` | admin; create a line item, snapshot material HSN, ensure the day-sheet exists, echo entry with client_id populated | Live · Unit |
 | `POST /entry/update` | admin; rewrite a line item, move it between day-sheets on a date change (old sheet kept); Node status:false quirk preserved | Live · Unit |
