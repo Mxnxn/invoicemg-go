@@ -44,6 +44,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store/mongostore"
 	"github.com/mxnxn/invoicemg-go/internal/store/sqlstore"
 	"github.com/mxnxn/invoicemg-go/internal/supplierpayment"
+	"github.com/mxnxn/invoicemg-go/internal/trash"
 	"github.com/mxnxn/invoicemg-go/internal/units"
 	"github.com/mxnxn/invoicemg-go/internal/userinfo"
 	"github.com/mxnxn/invoicemg-go/internal/users"
@@ -152,6 +153,7 @@ func routes(db store.Store) http.Handler {
 	bankHandler := bank.New(db.Banks())
 	batchReceiveHandler := batchreceive.New(db.BatchReceives())
 	supplierPaymentHandler := supplierpayment.New(db.SupplierPayments())
+	trashHandler := trash.New(db.Trash())
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
 	analyticsHandler := analytics.New(db.Analytics())
@@ -285,6 +287,9 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /analytics/payout-weekday", feature("analytics", analyticsHandler.PayoutWeekday))
 
 	mux.Handle("POST /gst-report", feature("gst_report", gstHandler.Report))
+
+	mux.Handle("POST /trash/get", feature("trash", trashHandler.Get))
+	mux.Handle("POST /trash/setPassword", feature("trash", trashHandler.SetPassword))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 

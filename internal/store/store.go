@@ -1013,6 +1013,42 @@ type SupplierPayments interface {
 	List(ctx context.Context, uid, companyID ID) ([]SupplierPayment, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Trash (the delete vault)
+// ---------------------------------------------------------------------------------------
+
+// TrashRecord is one deleted entry snapshot, client populated.
+type TrashRecord struct {
+	ID            ID
+	ClientID      ID
+	ClientName    string
+	ClientFirm    string
+	Description   string
+	Material      string
+	Rate          float64
+	Qty           float64
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Date          string
+	Amount        float64
+	Cgst          float64
+	Sgst          float64
+	Igst          float64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Version       int
+}
+
+type Trash interface {
+	// PasswordHash returns the vault password hash for a user, or "" if the vault is unset.
+	PasswordHash(ctx context.Context, uid ID) (string, error)
+	// SetPassword upserts the vault password hash.
+	SetPassword(ctx context.Context, uid ID, hash string) error
+	// List returns a company's trashed records, client populated.
+	List(ctx context.Context, companyID ID) ([]TrashRecord, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -1036,6 +1072,7 @@ type Store interface {
 	Wastages() Wastages
 	BatchReceives() BatchReceives
 	SupplierPayments() SupplierPayments
+	Trash() Trash
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

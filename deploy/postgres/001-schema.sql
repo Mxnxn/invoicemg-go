@@ -514,6 +514,37 @@ CREATE TABLE supplier_payments (
 );
 CREATE INDEX supplier_payments_company_idx ON supplier_payments (company_id);
 
+-- The Trash vault: a per-user password gate, and deleted entry snapshots.
+CREATE TABLE trash_users (
+    id         text PRIMARY KEY DEFAULT gen_ulid(),
+    uid        text NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    password   text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE trash (
+    id            text PRIMARY KEY DEFAULT gen_ulid(),
+    uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id    text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id     text REFERENCES clients(id) ON DELETE SET NULL,
+    description   text NOT NULL DEFAULT '',
+    material      text NOT NULL DEFAULT '',
+    rate          numeric(14,2) NOT NULL DEFAULT 0,
+    qty           numeric(14,3) NOT NULL DEFAULT 0,
+    has_dimensions boolean NOT NULL DEFAULT true,
+    length        text NOT NULL DEFAULT '0',
+    width         text NOT NULL DEFAULT '0',
+    date          text NOT NULL DEFAULT '',
+    amount        numeric(14,2) NOT NULL DEFAULT 0,
+    cgst          numeric(6,2) NOT NULL DEFAULT 0,
+    sgst          numeric(6,2) NOT NULL DEFAULT 0,
+    igst          numeric(6,2) NOT NULL DEFAULT 0,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX trash_company_idx ON trash (company_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
