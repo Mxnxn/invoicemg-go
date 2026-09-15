@@ -130,3 +130,77 @@ func (l *ledger) ClientStatement(ctx context.Context, companyID, clientID store.
 	}
 	return out, nil
 }
+
+func (l *ledger) ClientDues(ctx context.Context, companyID store.ID) (store.ClientDuesData, error) {
+	var out store.ClientDuesData
+	oid, err := objectID(companyID)
+	if err != nil {
+		return out, err
+	}
+	scope := bson.M{"company_id": oid}
+
+	invoices, err := l.clientAmounts(ctx, colInvoices, scope, "totalAmount")
+	if err != nil {
+		return out, fmt.Errorf("dues invoices: %w", err)
+	}
+	received, err := l.clientAmounts(ctx, colInvoiceReceived, scope, "amount")
+	if err != nil {
+		return out, fmt.Errorf("dues received: %w", err)
+	}
+	batch, err := l.clientAmounts(ctx, colBatchReceives, scope, "amount")
+	if err != nil {
+		return out, fmt.Errorf("dues batch: %w", err)
+	}
+	out.Dues = store.ComputeClientDues(invoices, received, batch)
+
+	out.Clients = map[string]store.ClientBrief{}
+	cur, err := l.db.Collection(colClients).Find(ctx, scope,
+		options.Find().SetProjection(bson.M{"clientName": 1, "clientFirm": 1, "clientPhone": 1}))
+	if err != nil {
+		return out, fmt.Errorf("dues clients: %w", err)
+	}
+	var clients []struct {
+		ID    primitive.ObjectID `bson:"_id"`
+		Name  string             `bson:"clientName"`
+		Firm  string             `bson:"clientFirm"`
+		Phone string             `bson:"clientPhone"`
+	}
+	if err := cur.All(ctx, &clients); err != nil {
+		return out, err
+	}
+	for _, c := range clients {
+		out.Clients[c.ID.Hex()] = store.ClientBrief{Name: c.Name, Firm: c.Firm, Phone: c.Phone}
+	}
+	return out, nil
+}
+
+// clientAmounts projects the `client` ref and one amount field, keying by hex id ("" when the
+// ref is absent, which aggregates nothing - Node's clientKey of a missing client).
+func (l *ledger) clientAmounts(ctx context.Context, coll string, scope bson.M, amountField string) ([]store.ClientAmount, error) {
+	cur, err := l.db.Collection(coll).Find(ctx, scope, options.Find().SetProjection(bson.M{"client": 1, amountField: 1}))
+	if err != nil {
+		return nil, err
+	}
+	var raw []bson.M
+	if err := cur.All(ctx, &raw); err != nil {
+		return nil, err
+	}
+	out := make([]store.ClientAmount, 0, len(raw))
+	for _, r := range raw {
+		key := ""
+		if cid, ok := r["client"].(primitive.ObjectID); ok {
+			key = cid.Hex()
+		}
+		amount := 0.0
+		switch v := r[amountField].(type) {
+		case float64:
+			amount = v
+		case int32:
+			amount = float64(v)
+		case int64:
+			amount = float64(v)
+		}
+		out = append(out, store.ClientAmount{ClientID: key, Amount: amount})
+	}
+	return out, nil
+}

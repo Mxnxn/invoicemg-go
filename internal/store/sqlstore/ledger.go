@@ -87,3 +87,61 @@ func (l *ledger) ClientStatement(ctx context.Context, companyID, clientID store.
 	brRows.Close()
 	return out, brRows.Err()
 }
+
+func (l *ledger) ClientDues(ctx context.Context, companyID store.ID) (store.ClientDuesData, error) {
+	var out store.ClientDuesData
+	co := string(companyID)
+
+	invoices, err := clientAmounts(ctx, l.pool, `SELECT client_id, total_amount FROM invoices WHERE company_id = $1`, co)
+	if err != nil {
+		return out, fmt.Errorf("dues invoices: %w", err)
+	}
+	received, err := clientAmounts(ctx, l.pool, `SELECT client_id, amount FROM invoice_received WHERE company_id = $1`, co)
+	if err != nil {
+		return out, fmt.Errorf("dues received: %w", err)
+	}
+	batch, err := clientAmounts(ctx, l.pool, `SELECT client_id, amount FROM batch_receives WHERE company_id = $1`, co)
+	if err != nil {
+		return out, fmt.Errorf("dues batch: %w", err)
+	}
+	out.Dues = store.ComputeClientDues(invoices, received, batch)
+
+	out.Clients = map[string]store.ClientBrief{}
+	rows, err := l.pool.Query(ctx, `SELECT id, client_name, client_firm, client_phone FROM clients WHERE company_id = $1`, co)
+	if err != nil {
+		return out, fmt.Errorf("dues clients: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name, firm, phone string
+		if err := rows.Scan(&id, &name, &firm, &phone); err != nil {
+			return out, err
+		}
+		out.Clients[id] = store.ClientBrief{Name: name, Firm: firm, Phone: phone}
+	}
+	return out, rows.Err()
+}
+
+// clientAmounts runs a (client_id, amount) projection, dropping rows whose client is NULL
+// (a client detached on delete) - a "" key aggregates nothing, matching Node's clientKey.
+func clientAmounts(ctx context.Context, pool *pgxpool.Pool, sql, companyID string) ([]store.ClientAmount, error) {
+	rows, err := pool.Query(ctx, sql, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.ClientAmount
+	for rows.Next() {
+		var id *string
+		var amount float64
+		if err := rows.Scan(&id, &amount); err != nil {
+			return nil, err
+		}
+		key := ""
+		if id != nil {
+			key = *id
+		}
+		out = append(out, store.ClientAmount{ClientID: key, Amount: amount})
+	}
+	return out, rows.Err()
+}

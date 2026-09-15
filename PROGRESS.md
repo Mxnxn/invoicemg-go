@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (49 of 209)
+## Routes ready (50 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -50,6 +50,7 @@ the 209 routes the Node API declares.
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |
+| `POST /ledger/dues` | all-client receivables; shared dues math (ties to /client); numbers not strings; deleted clients dropped; server-side totals | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -105,6 +106,7 @@ yet stored** — returned at defaults, pending the config write-paths.
 |---|---|---|
 | `Helpers/JobTotals` + `Helpers/RowPricing` | `internal/jobmath` (`RowGrossTotal`, `JobRowsTotal`, `dimensionFactor`, `Round2` = JS `Math.round`) | Unit (bit-parity vs Node) · Live |
 | `Helpers/EntryTotals` + `Helpers/RoundOff` | `internal/entrymath` (`Total`, `RoundOffWithAmount`) | Unit (Node-captured) · Live |
+| `Helpers/ClientDues` `computeClientDues` / `roundMoney` | `internal/store` `ComputeClientDues` (+ `round2`) — shared by /ledger/client & /ledger/dues | Unit (Node-captured) · Live |
 | `JobInvoiceState`+`JobLock`+`JobDoneAlert`+`JobAlertState` | `internal/joblifecycle` (invoice state, lock, alert sha1 signature) | Unit (Node-captured sha1) · Live |
 | `Helpers/DateBuckets` | `internal/datebuckets` (weekly/monthly/yearly bucketing) | Unit (Node-captured) |
 | `Helpers/TokenHelper` (session + per-tab company) | `internal/auth` `Require` + `ResolveCompany` | Unit · Live |

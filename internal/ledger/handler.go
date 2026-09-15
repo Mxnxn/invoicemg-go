@@ -120,3 +120,48 @@ func (h *Handler) Client(w http.ResponseWriter, r *http.Request) {
 		"rows":           rows,
 	}})
 }
+
+// Dues is POST /ledger/dues - every client's outstanding balance in one table, the same
+// receivables math /client runs but unfiltered and collapsed to one row each. Money goes out
+// as numbers here (Node's roundMoney, not RoundOff's string). Rows for a client that was
+// deleted/trashed after being invoiced are dropped rather than printed with a blank name.
+func (h *Handler) Dues(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	data, err := h.store.ClientDues(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+
+	rows := make([]map[string]any, 0, len(data.Dues))
+	var sumBilled, sumReceived, sumDue float64
+	outstanding := 0
+	for _, d := range data.Dues {
+		c, ok := data.Clients[d.ClientID]
+		if !ok {
+			continue
+		}
+		rows = append(rows, map[string]any{
+			"clientId": d.ClientID, "billed": d.Billed, "received": d.Received, "due": d.Due,
+			"clientName": c.Name, "clientFirm": c.Firm, "clientPhone": c.Phone,
+		})
+		sumBilled += d.Billed
+		sumReceived += d.Received
+		if d.Due > 0 {
+			sumDue += d.Due
+			outstanding++
+		}
+	}
+
+	totals := map[string]any{
+		"billed":             roundMoney(sumBilled),
+		"received":           roundMoney(sumReceived),
+		"due":                roundMoney(sumDue),
+		"outstandingClients": outstanding,
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: map[string]any{"rows": rows, "totals": totals}})
+}
+
+// roundMoney is Node's ClientDues.roundMoney: Math.round(x*100)/100 as a number (not a string,
+// unlike the ledger's RoundOff), rounding a half toward +Inf.
+func roundMoney(n float64) float64 { return math.Floor(n*100+0.5) / 100 }

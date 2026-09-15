@@ -14,6 +14,7 @@ import (
 
 type stubLedger struct {
 	data      store.LedgerClientData
+	dues      store.ClientDuesData
 	gotCo     store.ID
 	gotClient store.ID
 }
@@ -21,6 +22,11 @@ type stubLedger struct {
 func (s *stubLedger) ClientStatement(_ context.Context, companyID, clientID store.ID) (store.LedgerClientData, error) {
 	s.gotCo, s.gotClient = companyID, clientID
 	return s.data, nil
+}
+
+func (s *stubLedger) ClientDues(_ context.Context, companyID store.ID) (store.ClientDuesData, error) {
+	s.gotCo = companyID
+	return s.dues, nil
 }
 
 func run(t *testing.T, s store.Ledger, form url.Values) map[string]any {
@@ -158,4 +164,55 @@ func TestClient_NegativeRounding(t *testing.T) {
 	if data["closingBalance"] != "-50.00" {
 		t.Errorf("negative round: want -50.00, got %v", data["closingBalance"])
 	}
+}
+
+func TestDues_RowsTotalsAndFilter(t *testing.T) {
+	s := &stubLedger{dues: store.ClientDuesData{
+		Dues: []store.ClientDue{
+			{ClientID: "a", Billed: 1250.01, Received: 500, Due: 750.01},
+			{ClientID: "c", Billed: 800, Received: 300, Due: 500},
+			{ClientID: "b", Billed: 500, Received: 500, Due: 0},
+			{ClientID: "gone", Billed: 900, Received: 0, Due: 900}, // deleted client -> dropped
+		},
+		Clients: map[string]store.ClientBrief{
+			"a": {Name: "Ann", Firm: "Ann Co", Phone: "111"},
+			"b": {Name: "Bob", Firm: "Bob Co", Phone: ""},
+			"c": {Name: "Cy", Firm: "Cy Co", Phone: "333"},
+		},
+	}}
+	body := run2(t, s)
+	if body["code"] != float64(200) || body["message"] != "Operation successful." {
+		t.Fatalf("envelope: %v", body)
+	}
+	data := body["data"].(map[string]any)
+	rows := data["rows"].([]any)
+	if len(rows) != 3 {
+		t.Fatalf("deleted client must be dropped; want 3 rows, got %d: %v", len(rows), rows)
+	}
+	r0 := rows[0].(map[string]any)
+	if r0["clientId"] != "a" || r0["clientName"] != "Ann" || r0["due"] != 750.01 || r0["clientPhone"] != "111" {
+		t.Errorf("row0: %v", r0)
+	}
+	totals := data["totals"].(map[string]any)
+	// billed sums all kept rows (1250.01+800+500=2550.01); due sums only positive-due (750.01+500=1250.01);
+	// outstandingClients counts positive-due rows (a, c) = 2.
+	if totals["billed"] != 2550.01 || totals["received"] != float64(1300) {
+		t.Errorf("totals billed/received: %v", totals)
+	}
+	if totals["due"] != 1250.01 || totals["outstandingClients"] != float64(2) {
+		t.Errorf("totals due/outstanding: %v", totals)
+	}
+}
+
+func run2(t *testing.T, s store.Ledger) map[string]any {
+	t.Helper()
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Dues(rec, r)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("not json: %v\n%s", err, rec.Body.String())
+	}
+	return body
 }

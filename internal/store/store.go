@@ -1150,6 +1150,9 @@ type LedgerClientData struct {
 
 type Ledger interface {
 	ClientStatement(ctx context.Context, companyID, clientID ID) (LedgerClientData, error)
+	// ClientDues is the all-client receivables report's inputs: per-client aggregates plus the
+	// client directory to label and filter them by (Helpers/ClientDues.js, /ledger/dues).
+	ClientDues(ctx context.Context, companyID ID) (ClientDuesData, error)
 }
 
 // Store is everything together, so main wires one value rather than six.

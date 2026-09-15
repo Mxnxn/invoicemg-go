@@ -303,6 +303,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("GET /stats/clients", feature("dashboard", statsHandler.Clients))
 
 	mux.Handle("POST /ledger/client", feature("ledger", ledgerHandler.Client))
+	mux.Handle("POST /ledger/dues", feature("ledger", ledgerHandler.Dues))
 
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 
