@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (124 of 209)
+## Routes ready (127 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -35,6 +35,8 @@ the 209 routes the Node API declares.
 | `POST /bank/list` (+ `GET /banks`) | whole record incl `__v`, `createdAt` millis; no `status` | Live · Unit |
 | `POST /bank/create` | add a bank account (name trimmed/required); whole record echoed; no status field | Live · Unit |
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
+| `POST /whatsapp/config` | company WhatsApp settings (phone/business ids, hasApiToken, configured); token never echoed; 404 | Live · Unit |
+| `POST /whatsapp/config/update` | admin; save phone/business ids and (only when non-blank) the api token; 404 | Live · Unit |
 | `POST /client/getall` (+ `GET /clients`) | sharing-widened read; `borrowed` flag; `"Operation successful"` (no period) | Live · Unit |
 | `POST /client/only` (+ `GET /clients/only`) | lighter list + `openingBalance` | Live · Unit |
 | `POST /client/add` | create; per-company GST/phone uniqueness; phone=10/gst=15 checks; also_supplier convenience; legacy client_id millis | Live · Unit |
@@ -53,6 +55,7 @@ the 209 routes the Node API declares.
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/update` | admin; save company letterhead + the user's own email/name; 422 "Invalid GST number."/404 | Live · Unit |
+| `POST /userinfo/set-template` | admin; choose the PDF template (invoice/quotation/ledger) on the company; 422 unknown docType/blank, 404 | Live · Unit |
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
 | `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |
 | `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |

@@ -12,15 +12,19 @@ import (
 	"net/http"
 
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
 type Handler struct {
 	// verifyToken is captured at construction from WHATSAPP_VERIFY_TOKEN. Node reads it per
 	// request, but the token is set once at deploy, so a boot-time value matches in practice.
 	verifyToken string
+	companies   store.Companies
 }
 
-func New(verifyToken string) *Handler { return &Handler{verifyToken: verifyToken} }
+func New(verifyToken string, companies store.Companies) *Handler {
+	return &Handler{verifyToken: verifyToken, companies: companies}
+}
 
 // Verify is GET /whatsapp/webhook: Meta's one-time subscription handshake. When the token
 // matches, echo hub.challenge back as a bare string with HTTP 200 (Express's res.send(string)

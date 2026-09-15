@@ -69,6 +69,16 @@ CREATE TABLE companies (
     account_no  text NOT NULL DEFAULT '',
     ifsc        text NOT NULL DEFAULT '',
     bank_name   text NOT NULL DEFAULT '',
+    -- Per-company PDF template choices (routes/UserInfo.js /set-template). Node stores these on
+    -- the Company as invoiceTemplate/quotationTemplate/ledgerTemplate, defaulting to "classic".
+    invoice_template   text NOT NULL DEFAULT 'classic',
+    quotation_template text NOT NULL DEFAULT 'classic',
+    ledger_template    text NOT NULL DEFAULT 'classic',
+    -- WhatsApp Cloud API credentials (routes/WhatsApp.js /config). Node nests these under
+    -- Company.whatsapp; the api token is write-only over the wire (only "is one set" is echoed).
+    wa_phone_number_id     text NOT NULL DEFAULT '',
+    wa_business_account_id text NOT NULL DEFAULT '',
+    wa_api_token           text NOT NULL DEFAULT '',
     is_active   boolean NOT NULL DEFAULT true,
     is_default  boolean NOT NULL DEFAULT false,
     created_at  timestamptz NOT NULL DEFAULT now(),

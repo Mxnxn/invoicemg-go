@@ -3,6 +3,7 @@ package userinfo
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -158,4 +159,41 @@ func TestUpdate(t *testing.T) {
 	if body["code"] != float64(422) {
 		t.Errorf("missing name should 422: %v", body)
 	}
+}
+
+func TestSetTemplate(t *testing.T) {
+	u := &stubUsers{user: store.User{Name: "Owner", Email: "o@x.test"}}
+	c := &stubCompanies{updateFound: true, updated: store.Company{ID: "co1", InvoiceTemplate: "modern"}}
+	body := postForm2(t, u, c, "docType=invoice&template=modern", func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.SetTemplate })
+	if body["code"] != float64(200) || body["message"] != "Template updated." {
+		t.Fatalf("set-template: %v", body)
+	}
+	if c.gotPatch.InvoiceTemplate == nil || *c.gotPatch.InvoiceTemplate != "modern" {
+		t.Errorf("patch: %+v", c.gotPatch)
+	}
+	if body["data"].(map[string]any)["invoiceTemplate"] != "modern" {
+		t.Errorf("profile template: %v", body["data"])
+	}
+	// unknown docType -> 422
+	body = postForm2(t, u, c, "docType=nope&template=x", func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.SetTemplate })
+	if body["code"] != float64(422) {
+		t.Errorf("unknown docType: %v", body)
+	}
+	// blank template -> 422
+	body = postForm2(t, u, c, "docType=invoice", func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.SetTemplate })
+	if body["code"] != float64(422) {
+		t.Errorf("blank template: %v", body)
+	}
+}
+
+func postForm2(t *testing.T, u store.Users, c store.Companies, form string, fn func(*Handler) func(http.ResponseWriter, *http.Request)) map[string]any {
+	t.Helper()
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	fn(New(u, c))(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	return body
 }

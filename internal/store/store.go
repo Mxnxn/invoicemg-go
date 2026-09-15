@@ -454,8 +454,15 @@ type Company struct {
 	AccountNo string
 	Ifsc      string
 	BankName  string
-	IsDefault bool
-	IsActive  bool
+	// Per-company PDF template choices (default "classic") and WhatsApp Cloud API credentials.
+	InvoiceTemplate     string
+	QuotationTemplate   string
+	LedgerTemplate      string
+	WaPhoneNumberID     string
+	WaBusinessAccountID string
+	WaAPIToken          string
+	IsDefault           bool
+	IsActive            bool
 }
 
 // CompanyWrite is the field set of /company/create.
@@ -472,14 +479,20 @@ type CompanyWrite struct {
 
 // CompanyPatch is /company/update's partial edit: a nil field is not submitted (left as-is).
 type CompanyPatch struct {
-	Name      *string
-	Firm      *string
-	Address   *string
-	Phone     *string
-	Gst       *string
-	AccountNo *string
-	Ifsc      *string
-	BankName  *string
+	Name                *string
+	Firm                *string
+	Address             *string
+	Phone               *string
+	Gst                 *string
+	AccountNo           *string
+	Ifsc                *string
+	BankName            *string
+	InvoiceTemplate     *string
+	QuotationTemplate   *string
+	LedgerTemplate      *string
+	WaPhoneNumberID     *string
+	WaBusinessAccountID *string
+	WaAPIToken          *string
 }
 
 // DeactivateResult is the outcome of /company/deactivate's guard rules.

@@ -109,6 +109,56 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: buildProfile(user, company)})
 }
 
+// orClassic mirrors Node's `company.invoiceTemplate || "classic"`.
+func orClassic(v string) string {
+	if v == "" {
+		return "classic"
+	}
+	return v
+}
+
+// templateField maps a docType to its CompanyPatch template field, matching Node's
+// TEMPLATE_FIELDS. A nil return means the docType is unknown.
+func templateField(docType, template string) *store.CompanyPatch {
+	patch := &store.CompanyPatch{}
+	switch docType {
+	case "invoice":
+		patch.InvoiceTemplate = &template
+	case "quotation":
+		patch.QuotationTemplate = &template
+	case "ledger":
+		patch.LedgerTemplate = &template
+	default:
+		return nil
+	}
+	return patch
+}
+
+// SetTemplate is POST /userinfo/set-template: choose the PDF template for a document type
+// (invoice/quotation/ledger) on the acting company. Returns the refreshed profile; 422 for an
+// unknown docType or blank template, 404 when the company is missing.
+func (h *Handler) SetTemplate(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	docType, template := form.String("docType"), form.String("template")
+	patch := templateField(docType, template)
+	if patch == nil || template == "" {
+		httpx.Invalid(w, "")
+		return
+	}
+	company, found, err := h.companies.Update(r.Context(), sess.UID, sess.CompanyID, *patch)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Company not found.", Status: httpx.False()})
+		return
+	}
+	user, _ := h.users.FindByID(r.Context(), sess.UID)
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Template updated.", Data: buildProfile(user, company)})
+}
+
 // buildProfile is Node's buildProfile plus the extra fields this port's shell reads (role,
 // activeUntil, upiQr, templates, font, scale) - the same shape /userinfo/get answers.
 func buildProfile(user store.User, company store.Company) profileDTO {
@@ -136,11 +186,12 @@ func buildProfile(user store.User, company store.Company) profileDTO {
 		Ifsc:              company.Ifsc,
 		BankName:          company.BankName,
 		CompanyID:         companyID,
-		InvoiceTemplate:   "classic",
-		QuotationTemplate: "classic",
-		LedgerTemplate:    "classic",
-		DocumentFont:      "open-sans",
-		DocumentScale:     "normal",
+		InvoiceTemplate:   orClassic(company.InvoiceTemplate),
+		QuotationTemplate: orClassic(company.QuotationTemplate),
+		LedgerTemplate:    orClassic(company.LedgerTemplate),
+		// Not stored/edited here yet, so the Mongoose defaults.
+		DocumentFont:  "open-sans",
+		DocumentScale: "normal",
 	}
 }
 

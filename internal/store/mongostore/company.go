@@ -20,19 +20,27 @@ func (s *Store) Companies() store.Companies { return &companies{db: s.db} }
 
 // companyDoc is the PUBLIC_FIELDS subset of Model/Company.js the shell needs.
 type companyDoc struct {
-	ID        primitive.ObjectID `bson:"_id"`
-	Name      string             `bson:"name"`
-	Firm      string             `bson:"firm"`
-	Address   string             `bson:"address"`
-	Phone     string             `bson:"phone"`
-	Gst       string             `bson:"gst"`
-	URL       string             `bson:"url"`
-	UpiQr     string             `bson:"upiQr"`
-	AccountNo string             `bson:"account_no"`
-	Ifsc      string             `bson:"ifsc"`
-	BankName  string             `bson:"bank_name"`
-	IsDefault bool               `bson:"is_default"`
-	IsActive  bool               `bson:"is_active"`
+	ID                primitive.ObjectID `bson:"_id"`
+	Name              string             `bson:"name"`
+	Firm              string             `bson:"firm"`
+	Address           string             `bson:"address"`
+	Phone             string             `bson:"phone"`
+	Gst               string             `bson:"gst"`
+	URL               string             `bson:"url"`
+	UpiQr             string             `bson:"upiQr"`
+	AccountNo         string             `bson:"account_no"`
+	Ifsc              string             `bson:"ifsc"`
+	BankName          string             `bson:"bank_name"`
+	InvoiceTemplate   string             `bson:"invoiceTemplate"`
+	QuotationTemplate string             `bson:"quotationTemplate"`
+	LedgerTemplate    string             `bson:"ledgerTemplate"`
+	Whatsapp          struct {
+		PhoneNumberID     string `bson:"phoneNumberId"`
+		BusinessAccountID string `bson:"businessAccountId"`
+		ApiToken          string `bson:"apiToken"`
+	} `bson:"whatsapp"`
+	IsDefault bool `bson:"is_default"`
+	IsActive  bool `bson:"is_active"`
 }
 
 func (d companyDoc) toStore() store.Company {
@@ -40,6 +48,8 @@ func (d companyDoc) toStore() store.Company {
 		ID: idOf(d.ID), Name: d.Name, Firm: d.Firm, Address: d.Address, Phone: d.Phone,
 		Gst: d.Gst, URL: d.URL, UpiQr: d.UpiQr, AccountNo: d.AccountNo, Ifsc: d.Ifsc,
 		BankName: d.BankName, IsDefault: d.IsDefault, IsActive: d.IsActive,
+		InvoiceTemplate: d.InvoiceTemplate, QuotationTemplate: d.QuotationTemplate, LedgerTemplate: d.LedgerTemplate,
+		WaPhoneNumberID: d.Whatsapp.PhoneNumberID, WaBusinessAccountID: d.Whatsapp.BusinessAccountID, WaAPIToken: d.Whatsapp.ApiToken,
 	}
 }
 
@@ -146,6 +156,8 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 	for key, p := range map[string]*string{
 		"name": patch.Name, "firm": patch.Firm, "address": patch.Address, "phone": patch.Phone,
 		"gst": patch.Gst, "account_no": patch.AccountNo, "ifsc": patch.Ifsc, "bank_name": patch.BankName,
+		"invoiceTemplate": patch.InvoiceTemplate, "quotationTemplate": patch.QuotationTemplate, "ledgerTemplate": patch.LedgerTemplate,
+		"whatsapp.phoneNumberId": patch.WaPhoneNumberID, "whatsapp.businessAccountId": patch.WaBusinessAccountID, "whatsapp.apiToken": patch.WaAPIToken,
 	} {
 		if p != nil {
 			set[key] = *p

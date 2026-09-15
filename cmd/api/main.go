@@ -181,7 +181,7 @@ func routes(db store.Store) http.Handler {
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
-	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
+	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"), db.Companies())
 
 	// Every route is registered TWICE, under two surfaces.
 	//
@@ -262,6 +262,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 	mux.Handle("POST /userinfo/update", admin(userinfoHandler.Update))
+	mux.Handle("POST /userinfo/set-template", admin(userinfoHandler.SetTemplate))
 
 	// Products, behind the products feature as routes/Material.js is. Read widens by sharing
 	// (#1); the writes and /material/get are not ported.
@@ -400,6 +401,8 @@ func routes(db store.Store) http.Handler {
 	// it answers with a real status and a bare body, not the envelope (#23). The POST callback
 	// (HMAC over the raw body) is not ported yet.
 	mux.HandleFunc("GET /whatsapp/webhook", whatsappHandler.Verify)
+	mux.Handle("POST /whatsapp/config", feature("whatsapp", whatsappHandler.Config))
+	mux.Handle("POST /whatsapp/config/update", feature("whatsapp", whatsappHandler.ConfigUpdate, auth.RequireAdmin))
 
 	mux.HandleFunc("GET /healthz", health(db))
 

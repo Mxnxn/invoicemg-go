@@ -9,7 +9,7 @@ func serve(t *testing.T, token, query string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/whatsapp/webhook?"+query, nil)
 	rec := httptest.NewRecorder()
-	New(token).Verify(rec, req)
+	New(token, nil).Verify(rec, req)
 	return rec
 }
 
