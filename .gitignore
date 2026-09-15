@@ -4,3 +4,4 @@
 
 # Local env overrides
 .env
+tmp/

@@ -1,0 +1,17 @@
+# Hot-reload dev loop: run the Go API (air) and the frontend (Vite) on the HOST for instant
+# reload, against a Postgres in Docker. This file only adds a published port to that Postgres so
+# the host processes can reach it - nothing else runs in Docker for this loop.
+#
+#   docker compose -f docker-compose.local.yml -f docker-compose.dev.yml up -d postgres
+#   air                                                   # Go API on :5002, live-reloads on save
+#   cd web && GO_API_URL=http://localhost:5002 npm start -- --port 3005   # SPA with HMR
+#   open http://localhost:3005     owner@local.test / password123
+#
+# 5433 on the host, not 5432, so it cannot collide with a local Postgres install.
+
+name: invoicemg-local
+
+services:
+  postgres:
+    ports:
+      - "5433:5432"

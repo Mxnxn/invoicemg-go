@@ -4,6 +4,8 @@ A running tally of what has been ported from the Node/Mongo app into this servic
 hand alongside the work, so treat it as a snapshot; `ROUTES.md` is the authoritative inventory of
 the 209 routes the Node API declares.
 
+**Hot-reload dev loop** (for development): `docker compose -f docker-compose.local.yml -f docker-compose.dev.yml up -d postgres`, then `air` (Go API on :5002, live-reload) and `cd web && GO_API_URL=http://localhost:5002 npm start -- --port 3005` (SPA with HMR). Open http://localhost:3005. See `.air.toml`.
+
 **Verification levels used below**
 - **Live** — exercised against real Postgres in the running all-in-one stack (`docker compose -f
   docker-compose.local.yml up`), request and response inspected.
