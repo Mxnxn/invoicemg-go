@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
@@ -93,4 +94,139 @@ func (c *clients) Visible(ctx context.Context, uid, companyID store.ID) ([]store
 		out = append(out, d.toStore())
 	}
 	return out, nil
+}
+
+func (c *clients) Create(ctx context.Context, companyID, uid store.ID, legacyID int64, in store.ClientWrite) (store.Client, store.Dup, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Client{}, store.DupNone, err
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Client{}, store.DupNone, err
+	}
+	if dup, err := c.dupCheck(ctx, companyOID, nil, in.ClientGST, in.ClientPhone); err != nil || dup != store.DupNone {
+		return store.Client{}, dup, err
+	}
+	doc := bson.M{
+		"uid": uidOID, "company_id": companyOID, "client_id": legacyID,
+		"clientName": in.ClientName, "clientFirm": in.ClientFirm, "clientPhone": in.ClientPhone,
+		"clientGST": in.ClientGST, "clientAddress": in.ClientAddress,
+	}
+	res, err := c.db.Collection(colClients).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Client{}, store.DupNone, fmt.Errorf("insert client: %w", err)
+	}
+	lid := legacyID
+	out := store.Client{
+		UID: uid, CompanyID: companyID, LegacyID: &lid,
+		ClientName: in.ClientName, ClientFirm: in.ClientFirm, ClientPhone: in.ClientPhone,
+		ClientGST: in.ClientGST, ClientAddress: in.ClientAddress,
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		out.ID = idOf(oid)
+	}
+	return out, store.DupNone, nil
+}
+
+func (c *clients) Update(ctx context.Context, companyID, clientID store.ID, in store.ClientWrite) (store.Client, store.Dup, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Client{}, store.DupNone, false, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return store.Client{}, store.DupNone, false, nil // a malformed id is just "not found"
+	}
+	if dup, err := c.dupCheck(ctx, companyOID, &clientOID, in.ClientGST, in.ClientPhone); err != nil || dup != store.DupNone {
+		return store.Client{}, dup, false, err
+	}
+	set := bson.M{
+		"clientName": in.ClientName, "clientFirm": in.ClientFirm, "clientPhone": in.ClientPhone,
+		"clientGST": in.ClientGST, "clientAddress": in.ClientAddress,
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var doc struct {
+		clientDoc `bson:",inline"`
+		LegacyID  *int64 `bson:"client_id"`
+	}
+	err = c.db.Collection(colClients).FindOneAndUpdate(ctx,
+		bson.M{"_id": clientOID, "company_id": companyOID}, bson.M{"$set": set}, opts).Decode(&doc)
+	if err == mongo.ErrNoDocuments {
+		return store.Client{}, store.DupNone, false, nil
+	}
+	if err != nil {
+		return store.Client{}, store.DupNone, false, fmt.Errorf("update client: %w", err)
+	}
+	out := doc.clientDoc.toStore()
+	out.LegacyID = doc.LegacyID
+	return out, store.DupNone, true, nil
+}
+
+func (c *clients) Delete(ctx context.Context, companyID, clientID store.ID) (bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return false, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return false, nil
+	}
+	res, err := c.db.Collection(colClients).DeleteOne(ctx, bson.M{"_id": clientOID, "company_id": companyOID})
+	if err != nil {
+		return false, fmt.Errorf("delete client: %w", err)
+	}
+	return res.DeletedCount > 0, nil
+}
+
+func (c *clients) dupCheck(ctx context.Context, companyOID primitive.ObjectID, excludeOID *primitive.ObjectID, gst, phone string) (store.Dup, error) {
+	build := func(field, value string) bson.M {
+		f := bson.M{field: value, "company_id": companyOID}
+		if excludeOID != nil {
+			f["_id"] = bson.M{"$ne": *excludeOID}
+		}
+		return f
+	}
+	n, err := c.db.Collection(colClients).CountDocuments(ctx, build("clientGST", gst))
+	if err != nil {
+		return store.DupNone, fmt.Errorf("gst dup check: %w", err)
+	}
+	if n > 0 {
+		return store.DupGST, nil
+	}
+	n, err = c.db.Collection(colClients).CountDocuments(ctx, build("clientPhone", phone))
+	if err != nil {
+		return store.DupNone, fmt.Errorf("phone dup check: %w", err)
+	}
+	if n > 0 {
+		return store.DupPhone, nil
+	}
+	return store.DupNone, nil
+}
+
+func (c *clients) EnsureSupplier(ctx context.Context, uid store.ID, in store.ClientWrite) (bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return false, err
+	}
+	match := bson.M{"uid": uidOID, "type": "Supplier"}
+	if in.ClientGST != "" {
+		match["gst"] = in.ClientGST
+	} else {
+		match["phone"] = in.ClientPhone
+	}
+	n, err := c.db.Collection(colPersons).CountDocuments(ctx, match)
+	if err != nil {
+		return false, fmt.Errorf("supplier match: %w", err)
+	}
+	if n > 0 {
+		return false, nil
+	}
+	if _, err := c.db.Collection(colPersons).InsertOne(ctx, bson.M{
+		"uid": uidOID, "type": "Supplier", "name": in.ClientName, "firm": in.ClientFirm,
+		"phone": in.ClientPhone, "gst": in.ClientGST, "address": in.ClientAddress,
+	}); err != nil {
+		return false, fmt.Errorf("insert supplier: %w", err)
+	}
+	return true, nil
 }

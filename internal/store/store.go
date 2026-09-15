@@ -349,6 +349,7 @@ type Client struct {
 	ID             ID
 	UID            ID
 	CompanyID      ID
+	LegacyID       *int64 // Client.client_id, the Date.now() millis Node stamps; nil when unset
 	ClientName     string
 	ClientFirm     string
 	ClientPhone    string
@@ -358,11 +359,41 @@ type Client struct {
 	Sharing        *[]ID
 }
 
+// ClientWrite is the writable field set of /client/add and /client/update.
+type ClientWrite struct {
+	ClientName    string
+	ClientFirm    string
+	ClientPhone   string
+	ClientGST     string
+	ClientAddress string
+}
+
+// Dup names the field a client uniqueness check tripped on: "" (none), "client_gst", or
+// "client_phone". GST is checked before phone, matching routes/Client.js.
+type Dup string
+
+const (
+	DupNone  Dup = ""
+	DupGST   Dup = "client_gst"
+	DupPhone Dup = "client_phone"
+)
+
 type Clients interface {
 	// Visible returns the clients (uid) may READ from company companyID: its own, legacy rows
 	// with a null company, and rows shared with it. This is the read side of #1 - reads widen;
 	// a write path uses company-only scope and never calls this.
 	Visible(ctx context.Context, uid, companyID ID) ([]Client, error)
+	// Create inserts a company-scoped client, stamping LegacyID with the given millis. A
+	// per-company GST or phone collision inserts nothing and returns the tripped Dup.
+	Create(ctx context.Context, companyID, uid ID, legacyID int64, in ClientWrite) (Client, Dup, error)
+	// Update mutates a company-scoped client's writable fields. found is false when no such row;
+	// a collision with a DIFFERENT row returns the tripped Dup and writes nothing.
+	Update(ctx context.Context, companyID, clientID ID, in ClientWrite) (c Client, dup Dup, found bool, err error)
+	// Delete hard-deletes a company-scoped client (Node's findOneAndDelete). found is false on a miss.
+	Delete(ctx context.Context, companyID, clientID ID) (found bool, err error)
+	// EnsureSupplier creates a Supplier person for uid from these client details, unless one
+	// already matches on GST (or on phone when the GST is empty). Reports whether it created one.
+	EnsureSupplier(ctx context.Context, uid ID, in ClientWrite) (created bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------

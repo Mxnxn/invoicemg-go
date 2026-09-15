@@ -115,6 +115,9 @@ CREATE TABLE clients (
     id           text PRIMARY KEY DEFAULT gen_ulid(),
     company_id   text REFERENCES companies(id) ON DELETE CASCADE,
     uid          text REFERENCES users(id) ON DELETE SET NULL,
+    -- A legacy display id: Node stamps Date.now() millis at creation (Client.client_id). Nothing
+    -- keys off it - the row id is `id` - but /client/add and /update echo it back, so it is kept.
+    client_id    bigint,
     client_name  text NOT NULL DEFAULT '',
     client_firm  text NOT NULL DEFAULT '',
     client_phone text NOT NULL DEFAULT '',

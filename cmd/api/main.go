@@ -222,12 +222,15 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /bank/list", feature("batch_receive", bankHandler.List))
 	mux.Handle("GET /banks", feature("batch_receive", bankHandler.List))
 
-	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes
-	// (add/update/remove) and the populate-heavy /client/get are not ported.
+	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes use
+	// company-only scope. The populate-heavy /client/get is not ported.
 	mux.Handle("POST /client/getall", feature("customers", clientHandler.Getall))
 	mux.Handle("GET /clients", feature("customers", clientHandler.Getall))
 	mux.Handle("POST /client/only", feature("customers", clientHandler.Only))
 	mux.Handle("GET /clients/only", feature("customers", clientHandler.Only))
+	mux.Handle("POST /client/add", feature("customers", clientHandler.Add, auth.RequireCreate("customers")))
+	mux.Handle("POST /client/update", feature("customers", clientHandler.Update))
+	mux.Handle("POST /client/remove", feature("customers", clientHandler.Remove, auth.RequireDelete("customers")))
 
 	// The shell bootstrap: the company switcher, the active-company letterhead, and the admin
 	// profile. /company/* need only a session; /userinfo/get is admin-only.

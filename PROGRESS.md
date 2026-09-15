@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (51 of 209)
+## Routes ready (54 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -34,6 +34,9 @@ the 209 routes the Node API declares.
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
 | `POST /client/getall` (+ `GET /clients`) | sharing-widened read; `borrowed` flag; `"Operation successful"` (no period) | Live · Unit |
 | `POST /client/only` (+ `GET /clients/only`) | lighter list + `openingBalance` | Live · Unit |
+| `POST /client/add` | create; per-company GST/phone uniqueness; phone=10/gst=15 checks; also_supplier convenience; legacy client_id millis | Live · Unit |
+| `POST /client/update` | edit; same uniqueness (excludes self); 404 on miss; dup check precedes not-found | Live · Unit |
+| `POST /client/remove` | hard delete (not via Trash), company-scoped; 404 on miss | Live · Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
@@ -69,7 +72,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `users` | + `company_limit`, `active_until`, `totp_*` |
 | `companies` | + letterhead (`firm/phone/gst/address/url`), banking (`upi_qr/account_no/ifsc/bank_name`), `is_active` |
 | `user_sessions`, `company_sessions` | token + per-tab company binding |
-| `clients` | + `opening_balance`, `shared_company_ids text[]` (sharing) |
+| `clients` | + `opening_balance`, `shared_company_ids text[]` (sharing), `client_id bigint` (legacy Date.now() millis, echoed by writes) |
 | `jobs`, `job_rows` | rows are their own table (money columns, tax CHECK) |
 | `sheets` | day/date rows |
 | `units` | unique `(company_id, key)` |

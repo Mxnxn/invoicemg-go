@@ -52,3 +52,104 @@ func (c *clients) Visible(ctx context.Context, uid, companyID store.ID) ([]store
 	}
 	return out, rows.Err()
 }
+
+func (c *clients) Create(ctx context.Context, companyID, uid store.ID, legacyID int64, in store.ClientWrite) (store.Client, store.Dup, error) {
+	if dup, err := c.dupCheck(ctx, companyID, "", in.ClientGST, in.ClientPhone); err != nil || dup != store.DupNone {
+		return store.Client{}, dup, err
+	}
+	var id string
+	err := c.pool.QueryRow(ctx, `
+		INSERT INTO clients (company_id, uid, client_id, client_name, client_firm, client_phone, client_gst, client_address)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		string(companyID), string(uid), legacyID, in.ClientName, in.ClientFirm, in.ClientPhone, in.ClientGST, in.ClientAddress).Scan(&id)
+	if err != nil {
+		return store.Client{}, store.DupNone, fmt.Errorf("insert client: %w", err)
+	}
+	lid := legacyID
+	return store.Client{
+		ID: store.ID(id), UID: uid, CompanyID: companyID, LegacyID: &lid,
+		ClientName: in.ClientName, ClientFirm: in.ClientFirm, ClientPhone: in.ClientPhone,
+		ClientGST: in.ClientGST, ClientAddress: in.ClientAddress,
+	}, store.DupNone, nil
+}
+
+func (c *clients) Update(ctx context.Context, companyID, clientID store.ID, in store.ClientWrite) (store.Client, store.Dup, bool, error) {
+	if dup, err := c.dupCheck(ctx, companyID, clientID, in.ClientGST, in.ClientPhone); err != nil || dup != store.DupNone {
+		return store.Client{}, dup, false, err
+	}
+	var out store.Client
+	var legacy *int64
+	var companyCol *string
+	err := c.pool.QueryRow(ctx, `
+		UPDATE clients SET client_name=$3, client_firm=$4, client_phone=$5, client_gst=$6, client_address=$7, updated_at=now()
+		 WHERE id=$1 AND company_id=$2
+		 RETURNING id, uid, company_id, client_id, client_name, client_firm, client_phone, client_gst, client_address`,
+		string(clientID), string(companyID), in.ClientName, in.ClientFirm, in.ClientPhone, in.ClientGST, in.ClientAddress).
+		Scan(&out.ID, &out.UID, &companyCol, &legacy, &out.ClientName, &out.ClientFirm, &out.ClientPhone, &out.ClientGST, &out.ClientAddress)
+	if noRows(err) {
+		return store.Client{}, store.DupNone, false, nil
+	}
+	if err != nil {
+		return store.Client{}, store.DupNone, false, fmt.Errorf("update client: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	out.LegacyID = legacy
+	return out, store.DupNone, true, nil
+}
+
+func (c *clients) Delete(ctx context.Context, companyID, clientID store.ID) (bool, error) {
+	tag, err := c.pool.Exec(ctx, `DELETE FROM clients WHERE id=$1 AND company_id=$2`, string(clientID), string(companyID))
+	if err != nil {
+		return false, fmt.Errorf("delete client: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// dupCheck reports a per-company GST or phone collision (GST first, matching Node). excludeID,
+// when set, is the row being updated - so a client keeping its own GST/phone is not a collision.
+func (c *clients) dupCheck(ctx context.Context, companyID, excludeID store.ID, gst, phone string) (store.Dup, error) {
+	var n int
+	if err := c.pool.QueryRow(ctx, `SELECT count(*) FROM clients WHERE company_id=$1 AND client_gst=$2 AND id <> $3`,
+		string(companyID), gst, string(excludeID)).Scan(&n); err != nil {
+		return store.DupNone, fmt.Errorf("gst dup check: %w", err)
+	}
+	if n > 0 {
+		return store.DupGST, nil
+	}
+	if err := c.pool.QueryRow(ctx, `SELECT count(*) FROM clients WHERE company_id=$1 AND client_phone=$2 AND id <> $3`,
+		string(companyID), phone, string(excludeID)).Scan(&n); err != nil {
+		return store.DupNone, fmt.Errorf("phone dup check: %w", err)
+	}
+	if n > 0 {
+		return store.DupPhone, nil
+	}
+	return store.DupNone, nil
+}
+
+func (c *clients) EnsureSupplier(ctx context.Context, uid store.ID, in store.ClientWrite) (bool, error) {
+	// Match an existing supplier on GST, or on phone when no GST - the same key Node uses.
+	var match string
+	var arg string
+	if in.ClientGST != "" {
+		match, arg = "gst", in.ClientGST
+	} else {
+		match, arg = "phone", in.ClientPhone
+	}
+	var n int
+	q := fmt.Sprintf(`SELECT count(*) FROM persons WHERE uid=$1 AND type='Supplier' AND %s=$2`, match)
+	if err := c.pool.QueryRow(ctx, q, string(uid), arg).Scan(&n); err != nil {
+		return false, fmt.Errorf("supplier match: %w", err)
+	}
+	if n > 0 {
+		return false, nil
+	}
+	if _, err := c.pool.Exec(ctx, `
+		INSERT INTO persons (uid, type, name, firm, phone, gst, address)
+		VALUES ($1, 'Supplier', $2, $3, $4, $5, $6)`,
+		string(uid), in.ClientName, in.ClientFirm, in.ClientPhone, in.ClientGST, in.ClientAddress); err != nil {
+		return false, fmt.Errorf("insert supplier: %w", err)
+	}
+	return true, nil
+}
