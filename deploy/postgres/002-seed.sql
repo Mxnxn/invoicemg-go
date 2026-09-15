@@ -120,3 +120,8 @@ INSERT INTO entries (uid, company_id, client_id, invoice_id, description, materi
      'Window decals', 'Vinyl Sticker', '4911', 45, 10, false, '1', '1', '2026-09-11', 4500, 9, 9, 3000, 5310, true),
     ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'c00000000000000000000001', '20000000000000000000000a',
      'Entrance banner', 'Flex Banner', '4911', 2500, 1, false, '1', '1', '2026-09-11', 2500, 9, 9, 2000, 950, true);
+
+-- A couple of challans so the Challan tab has content.
+INSERT INTO challans (uid, company_id, company_name, description, date, type, quantity, amount) VALUES
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Acme Signs','Delivered banners','2026-09-12','Delivery',5,4500),
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','Bolt Print','Returned samples','2026-09-13','Return',2,0);

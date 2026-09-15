@@ -398,6 +398,20 @@ CREATE TABLE invoices (
 );
 CREATE INDEX invoices_company_idx ON invoices (company_id);
 
+-- Delivery challans (a simple standalone log; no timestamps in the Mongo model).
+CREATE TABLE challans (
+    id           text PRIMARY KEY DEFAULT gen_ulid(),
+    uid          text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id   text REFERENCES companies(id) ON DELETE CASCADE,
+    company_name text NOT NULL DEFAULT '',
+    description  text NOT NULL DEFAULT '',
+    date         text NOT NULL DEFAULT '',
+    type         text NOT NULL DEFAULT '',
+    quantity     numeric(14,3) NOT NULL DEFAULT 0,
+    amount       numeric(14,2) NOT NULL DEFAULT 0
+);
+CREATE INDEX challans_company_idx ON challans (company_id);
+
 CREATE TABLE entries (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,

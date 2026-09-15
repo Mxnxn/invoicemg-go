@@ -770,6 +770,28 @@ type Jobs interface {
 	List(ctx context.Context, uid, companyID, clientID ID) ([]Job, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Challans
+// ---------------------------------------------------------------------------------------
+
+// Challan is one delivery-challan log row (Model/Challan.js has no timestamps).
+type Challan struct {
+	ID          ID
+	UID         ID
+	CompanyID   ID
+	CompanyName string
+	Description string
+	Date        string
+	Type        string
+	Quantity    float64
+	Amount      float64
+	Version     int
+}
+
+type Challans interface {
+	List(ctx context.Context, companyID ID) ([]Challan, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -787,6 +809,7 @@ type Store interface {
 	Invoices() Invoices
 	Lookups() Lookups
 	Jobs() Jobs
+	Challans() Challans
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

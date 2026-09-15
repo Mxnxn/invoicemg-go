@@ -23,6 +23,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/alerts"
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/bank"
+	"github.com/mxnxn/invoicemg-go/internal/challan"
 	"github.com/mxnxn/invoicemg-go/internal/client"
 	"github.com/mxnxn/invoicemg-go/internal/company"
 	"github.com/mxnxn/invoicemg-go/internal/config"
@@ -143,6 +144,7 @@ func routes(db store.Store) http.Handler {
 	userHandler := users.New(db.Users())
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
+	challanHandler := challan.New(db.Challans())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
@@ -246,6 +248,9 @@ func routes(db store.Store) http.Handler {
 	// The Jobs board. Behind the lifecycle feature. Only /jobs/list is ported.
 	mux.Handle("POST /lifecycle/jobs/list", feature("lifecycle", lifecycleHandler.List))
 	mux.Handle("GET /jobs", feature("lifecycle", lifecycleHandler.List))
+
+	// Delivery challans, behind the challan feature. Only /getAll is ported.
+	mux.Handle("POST /challan/getAll", feature("challan", challanHandler.GetAll))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since
