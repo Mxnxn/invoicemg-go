@@ -109,3 +109,14 @@ INSERT INTO purchase_invoices (id, uid, company_id, supplier_id, date, invoice_n
      'f00000000000000000000001', '2026-09-08', 'MP-4471', 11800, 5000);
 INSERT INTO purchase_invoice_rows (invoice_id, position, description, material, hsn, gst, rate, qty, unit) VALUES
     ('10000000000000000000000a', 1, 'Art paper 300gsm', 'Art Paper', '4802', 18, 100, 100, 'Sheet');
+
+-- An invoice for Priya with two billed entries, so the Invoices screen has content.
+INSERT INTO invoices (id, uid, company_id, client_id, invoice_id, amount, total_amount, date) VALUES
+    ('20000000000000000000000a', '6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9',
+     'c00000000000000000000001', 'INV/26-27/000001', 5000, 11800, '2026-09-11');
+INSERT INTO entries (uid, company_id, client_id, invoice_id, description, material, hsn, rate, qty,
+                     has_dimensions, length, width, date, amount, cgst, sgst, advance, total, has_issued) VALUES
+    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'c00000000000000000000001', '20000000000000000000000a',
+     'Window decals', 'Vinyl Sticker', '4911', 45, 10, false, '1', '1', '2026-09-11', 4500, 9, 9, 3000, 5310, true),
+    ('6a8b8c48ae946c0049e824a8', '6a8b8c48ae946c0049e824a9', 'c00000000000000000000001', '20000000000000000000000a',
+     'Entrance banner', 'Flex Banner', '4911', 2500, 1, false, '1', '1', '2026-09-11', 2500, 9, 9, 2000, 950, true);

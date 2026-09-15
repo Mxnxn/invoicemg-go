@@ -14,7 +14,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (21 of 209)
+## Routes ready (22 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -39,6 +39,7 @@ the 209 routes the Node API declares.
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
 | `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |
+| `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -66,6 +67,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `persons` | added for `/person/list` (nullable notify_po_* = absent-on-wire) |
 | `quotations`, `quotation_rows` | added for `/quotation/list` (populate via LEFT JOIN + batched rows) |
 | `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
+| `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.
@@ -88,6 +90,7 @@ yet stored** — returned at defaults, pending the config write-paths.
 | Node | Go | Verified |
 |---|---|---|
 | `Helpers/JobTotals` + `Helpers/RowPricing` | `internal/jobmath` (`RowGrossTotal`, `JobRowsTotal`, `dimensionFactor`, `Round2` = JS `Math.round`) | Unit (bit-parity vs Node) · Live |
+| `Helpers/EntryTotals` + `Helpers/RoundOff` | `internal/entrymath` (`Total`, `RoundOffWithAmount`) | Unit (Node-captured) · Live |
 | `Helpers/TokenHelper` (session + per-tab company) | `internal/auth` `Require` + `ResolveCompany` | Unit · Live |
 | `Helpers/RoleHelper` + `Helpers/Permissions` (flat-key rule) | `internal/auth` `RequireRole/Admin/Feature/Create/Delete`, `HasPermission` | Unit |
 | `Helpers/ReviewScores` `parseScores` | `internal/alerts/scores.go` | Unit (Node-captured) |

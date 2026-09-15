@@ -28,6 +28,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/invoice"
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
@@ -145,6 +146,7 @@ func routes(db store.Store) http.Handler {
 	personHandler := person.New(db.People())
 	quotationHandler := quotation.New(db.Quotations())
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
+	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
 	companyHandler := company.New(db.Companies(), db.Users())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -225,6 +227,11 @@ func routes(db store.Store) http.Handler {
 	// populated. Only /list is ported.
 	mux.Handle("POST /purchase-invoice/list", feature("purchase_invoices", purchaseInvoiceHandler.List))
 	mux.Handle("GET /purchase-invoices", feature("purchase_invoices", purchaseInvoiceHandler.List))
+
+	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
+	// the populated entries and computed totals. Only /getAll is ported.
+	mux.Handle("POST /invoice/getAll", feature("invoices", invoiceHandler.List))
+	mux.Handle("GET /invoices", feature("invoices", invoiceHandler.List))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

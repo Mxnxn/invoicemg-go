@@ -573,6 +573,63 @@ type PurchaseInvoices interface {
 	List(ctx context.Context, uid, companyID ID) ([]PurchaseInvoice, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Invoices
+// ---------------------------------------------------------------------------------------
+
+// InvoiceClient is the populated client on an invoice.
+type InvoiceClient struct {
+	ID            ID
+	UID           ID
+	ClientName    string
+	ClientFirm    string
+	ClientPhone   string
+	ClientAddress string
+	ClientGST     string
+}
+
+// Entry is one billed line on an invoice (Model/Entry.js), the pricing fields plus display.
+type Entry struct {
+	ID            ID
+	Description   string
+	Material      string
+	Hsn           string
+	Rate          float64
+	Qty           float64
+	HasDimensions *bool
+	Length        string
+	Width         string
+	Date          string
+	Amount        float64
+	Cgst          float64
+	Sgst          float64
+	Igst          float64
+	Discount      float64
+	Charges       float64
+	Advance       float64
+	Total         float64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Version       int
+}
+
+// Invoice is one invoice with its client populated and its entries loaded.
+type Invoice struct {
+	ID          ID
+	InvoiceID   string
+	Date        string
+	Amount      float64
+	TotalAmount float64
+	Client      *InvoiceClient
+	Entries     []Entry
+	CreatedAt   time.Time
+}
+
+type Invoices interface {
+	// List returns a company's invoices with client populated and entries loaded (#6 batched).
+	List(ctx context.Context, companyID ID) ([]Invoice, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -587,6 +644,7 @@ type Store interface {
 	People() People
 	Quotations() Quotations
 	PurchaseInvoices() PurchaseInvoices
+	Invoices() Invoices
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

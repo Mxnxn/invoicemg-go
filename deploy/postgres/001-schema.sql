@@ -370,6 +370,54 @@ CREATE TABLE purchase_invoice_rows (
 );
 CREATE INDEX purchase_invoice_rows_invoice_idx ON purchase_invoice_rows (invoice_id);
 
+-- Invoices and their entries. An invoice bills a set of entries (Invoice.entries in Mongo is
+-- an ordered array of Entry ids); here an entry carries invoice_id (its `issued` ref) and the
+-- list joins them back. invoiceId is the printed document number.
+CREATE TABLE invoices (
+    id           text PRIMARY KEY DEFAULT gen_ulid(),
+    uid          text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id   text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id    text REFERENCES clients(id) ON DELETE SET NULL,
+    invoice_id   text NOT NULL,
+    amount       numeric(14,2) NOT NULL DEFAULT 0,
+    total_amount numeric(14,2) NOT NULL DEFAULT 0,
+    date         text NOT NULL,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX invoices_company_idx ON invoices (company_id);
+
+CREATE TABLE entries (
+    id            text PRIMARY KEY DEFAULT gen_ulid(),
+    uid           text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id    text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id     text REFERENCES clients(id) ON DELETE SET NULL,
+    -- The invoice this entry was billed on (Entry.issued). NULL until invoiced.
+    invoice_id    text REFERENCES invoices(id) ON DELETE SET NULL,
+    description   text NOT NULL DEFAULT '',
+    material      text NOT NULL DEFAULT '',
+    hsn           text NOT NULL DEFAULT '',
+    rate          numeric(14,2) NOT NULL DEFAULT 0,
+    qty           numeric(14,3) NOT NULL DEFAULT 0,
+    has_dimensions boolean NOT NULL DEFAULT true,
+    length        text NOT NULL DEFAULT '0',
+    width         text NOT NULL DEFAULT '0',
+    date          text NOT NULL DEFAULT '',
+    amount        numeric(14,2) NOT NULL DEFAULT 0,
+    cgst          numeric(6,2) NOT NULL DEFAULT 0,
+    sgst          numeric(6,2) NOT NULL DEFAULT 0,
+    igst          numeric(6,2) NOT NULL DEFAULT 0,
+    discount      numeric(14,2) NOT NULL DEFAULT 0,
+    charges       numeric(14,2) NOT NULL DEFAULT 0,
+    advance       numeric(14,2) NOT NULL DEFAULT 0,
+    total         numeric(14,2) NOT NULL DEFAULT 0,
+    has_issued    boolean NOT NULL DEFAULT false,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX entries_invoice_idx ON entries (invoice_id);
+CREATE INDEX entries_company_idx ON entries (company_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
