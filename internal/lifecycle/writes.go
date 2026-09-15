@@ -268,3 +268,50 @@ func (r *jobUpdateRawRow) UnmarshalJSON(b []byte) error {
 	r.ID = m.ID
 	return nil
 }
+
+// ConvertToEntries is POST /lifecycle/jobs/convert-to-entries (admin): turn Done job rows into
+// billable entries.
+func (h *Handler) ConvertToEntries(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	if !form.Has("job_ids") {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	var ids []string
+	if err := form.JSON("job_ids", &ids); err != nil {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "job_ids must be a JSON array of ids.", Status: httpx.False()})
+		return
+	}
+	if len(ids) == 0 {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "job_ids must be a non-empty array.", Status: httpx.False()})
+		return
+	}
+	jobIDs := make([]store.ID, len(ids))
+	for i, s := range ids {
+		jobIDs[i] = store.ID(s)
+	}
+	entries, jobs, found, err := h.store.ConvertToEntries(r.Context(), sess.UID, sess.CompanyID, jobIDs, actorOf(sess))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "No convertible jobs found - jobs must have at least one Done, unconverted row.", Status: httpx.False()})
+		return
+	}
+	entryDTO := make([]map[string]any, 0, len(entries))
+	for _, e := range entries {
+		entryDTO = append(entryDTO, map[string]any{
+			"_id": string(e.ID), "description": e.Description, "material": e.Material, "hsn": e.Hsn,
+			"rate": e.Rate, "qty": e.Qty, "length": e.Length, "width": e.Width, "date": e.Date,
+			"amount": e.Amount, "cgst": e.Cgst, "sgst": e.Sgst, "igst": e.Igst,
+			"discount": e.Discount, "charges": e.Charges, "advance": e.Advance, "total": e.Total, "has_issued": false,
+		})
+	}
+	jobsOut := make([]jobDTO, 0, len(jobs))
+	for _, jb := range jobs {
+		jobsOut = append(jobsOut, build(jb))
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Converted to entries.", Data: map[string]any{"entries": entryDTO, "jobs": jobsOut}})
+}

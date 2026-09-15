@@ -308,6 +308,7 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /lifecycle/jobs/rows/queue", feature("lifecycle", lifecycleHandler.RowQueue))
 	mux.Handle("POST /lifecycle/jobs/rows/queue-order", feature("lifecycle", lifecycleHandler.RowQueueOrder))
 	mux.Handle("POST /lifecycle/jobs/rows/progress", feature("lifecycle", lifecycleHandler.RowProgress))
+	mux.Handle("POST /lifecycle/jobs/convert-to-entries", feature("lifecycle", lifecycleHandler.ConvertToEntries, auth.RequireAdmin))
 	mux.Handle("POST /lifecycle/notes/list", feature("lifecycle", lifecycleHandler.NotesList))
 	mux.Handle("POST /lifecycle/notes/create", feature("lifecycle", lifecycleHandler.NoteCreate))
 	mux.Handle("POST /lifecycle/notes/update", feature("lifecycle", lifecycleHandler.NoteUpdate))

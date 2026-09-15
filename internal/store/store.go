@@ -1106,6 +1106,11 @@ type Jobs interface {
 	RowQueueOrder(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, order []string) (Job, JobTxStatus, error)
 	// RowProgress moves one row's progress; "Complete" advances its stage (clearing its employee).
 	RowProgress(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, progress string) (Job, JobTxStatus, error)
+	// ConvertToEntries turns each Done, not-yet-converted row of the named jobs into a billable
+	// Entry (stamping the row with its entry_id), logs a "Converted to Entry" history entry per
+	// job, and returns the created entries and the re-populated jobs. found is false when none of
+	// the jobs has a convertible row.
+	ConvertToEntries(ctx context.Context, uid, companyID ID, jobIDs []ID, actor NoteActor) (entries []Entry, jobs []Job, found bool, err error)
 }
 
 // JobRowPatch is one row submitted to /lifecycle/jobs/update. ID (the existing row's id) matches

@@ -368,3 +368,173 @@ func nextStageM(cur string) (string, bool) {
 	}
 	return "", false
 }
+
+func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jobIDs []store.ID, actor store.NoteActor) ([]store.Entry, []store.Job, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	oids := make([]primitive.ObjectID, 0, len(jobIDs))
+	for _, id := range jobIDs {
+		if oid, err := objectID(id); err == nil {
+			oids = append(oids, oid)
+		}
+	}
+	cur, err := j.db.Collection(colJobs).Find(ctx, bson.M{
+		"_id": bson.M{"$in": oids}, "uid": uidOID, "company_id": companyOID,
+		"rows": bson.M{"$elemMatch": bson.M{"queue": "Done", "entry_id": nil}},
+	})
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("convertible jobs: %w", err)
+	}
+	var jobs []struct {
+		ID            primitive.ObjectID  `bson:"_id"`
+		UID           primitive.ObjectID  `bson:"uid"`
+		ClientID      *primitive.ObjectID `bson:"client_id"`
+		ChallanNumber string              `bson:"challanNumber"`
+		ReceivedDate  string              `bson:"receivedDate"`
+		Total         float64             `bson:"total"`
+		Advance       float64             `bson:"advance"`
+		Rows          []jobRowFull        `bson:"rows"`
+	}
+	if err := cur.All(ctx, &jobs); err != nil {
+		return nil, nil, false, err
+	}
+	if len(jobs) == 0 {
+		return nil, nil, false, nil
+	}
+
+	name := j.actorName(ctx, actor)
+	actorID, _ := objectID(actor.ActorID())
+	hsnCache := map[string]string{}
+	hsnFor := func(material string) string {
+		if material == "" {
+			return ""
+		}
+		if h, ok := hsnCache[material]; ok {
+			return h
+		}
+		var m struct {
+			Hsn string `bson:"hsn"`
+		}
+		_ = j.db.Collection(colMaterials).FindOne(ctx, bson.M{"material_name": material, "company_id": companyOID}).Decode(&m)
+		hsnCache[material] = m.Hsn
+		return m.Hsn
+	}
+
+	var created []store.Entry
+	for _, job := range jobs {
+		entryDate := job.ReceivedDate
+		if entryDate == "" {
+			entryDate = time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
+		}
+		converted := 0
+		newRows := make([]jobRowFull, len(job.Rows))
+		copy(newRows, job.Rows)
+		for i := range newRows {
+			row := newRows[i]
+			if row.EntryID != nil || row.Queue != "Done" {
+				continue
+			}
+			ce := store.ConvertRow(store.ConvertJobRow{
+				Material: row.Material, Description: row.Description, Rate: row.Rate, Qty: row.Qty,
+				Length: row.Length, Width: row.Width, Cgst: row.Cgst, Sgst: row.Sgst, Igst: row.Igst,
+				Discount: row.Discount, Charges: row.Charges,
+			}, job.Total, job.Advance, hsnFor(row.Material), job.ChallanNumber)
+			entryOID := primitive.NewObjectID()
+			now := time.Now().UTC()
+			doc := bson.M{
+				"_id": entryOID, "uid": job.UID, "company_id": companyOID, "client_id": job.ClientID,
+				"description": ce.Description, "material": ce.Material, "hsn": ce.Hsn, "rate": ce.Rate, "qty": ce.Qty,
+				"length": ce.Length, "width": ce.Width, "date": entryDate, "amount": ce.Amount,
+				"cgst": ce.Cgst, "sgst": ce.Sgst, "igst": ce.Igst, "discount": ce.Discount, "charges": ce.Charges,
+				"advance": ce.Advance, "total": ce.Total, "has_issued": false, "issued": nil,
+				"createdAt": now, "updatedAt": now, "__v": 0,
+			}
+			if row.QuotationID != nil {
+				doc["quotation_id"] = *row.QuotationID
+			}
+			if _, err := j.db.Collection(colEntries).InsertOne(ctx, doc); err != nil {
+				return nil, nil, false, fmt.Errorf("insert entry: %w", err)
+			}
+			// Sheet + client linkage (Mongo reads these explicit arrays); match a sheet on the
+			// normalized date, else create one.
+			if err := j.linkEntryToSheet(ctx, companyOID, job.UID, entryDate, entryOID); err != nil {
+				return nil, nil, false, err
+			}
+			if job.ClientID != nil {
+				if _, err := j.db.Collection(colClients).UpdateByID(ctx, *job.ClientID, bson.M{"$push": bson.M{"entries": entryOID}}); err != nil {
+					return nil, nil, false, err
+				}
+			}
+			newRows[i].EntryID = &entryOID
+			created = append(created, store.Entry{
+				ID: idOf(entryOID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Rate: ce.Rate, Qty: ce.Qty,
+				Length: ce.Length, Width: ce.Width, Date: entryDate, Amount: ce.Amount, Cgst: ce.Cgst, Sgst: ce.Sgst, Igst: ce.Igst,
+				Discount: ce.Discount, Charges: ce.Charges, Advance: ce.Advance, Total: ce.Total,
+			})
+			converted++
+		}
+		if _, err := j.db.Collection(colJobs).UpdateByID(ctx, job.ID, bson.M{"$set": bson.M{"rows": newRows, "updatedAt": time.Now().UTC()}}); err != nil {
+			return nil, nil, false, err
+		}
+		suffix := "s"
+		if converted == 1 {
+			suffix = ""
+		}
+		if _, err := j.db.Collection(colJobHistories).InsertOne(ctx, bson.M{
+			"job_id": job.ID, "uid": uidOID, "company_id": companyOID, "actorType": actor.Role,
+			"actorId": actorID, "actorName": name, "action": "Converted to Entry",
+			"detail": fmt.Sprintf("%d row%s converted to entries", converted, suffix), "createdAt": time.Now().UTC(), "__v": 0,
+		}); err != nil {
+			return nil, nil, false, err
+		}
+	}
+
+	list, err := j.List(ctx, uid, companyID, "")
+	if err != nil {
+		return nil, nil, false, err
+	}
+	want := map[primitive.ObjectID]bool{}
+	for _, jb := range jobs {
+		want[jb.ID] = true
+	}
+	var populated []store.Job
+	for _, job := range list {
+		if oid, err := objectID(job.ID); err == nil && want[oid] {
+			populated = append(populated, job)
+		}
+	}
+	return created, populated, true, nil
+}
+
+// linkEntryToSheet pushes an entry onto the sheet for its date (matched on the normalized date),
+// creating the sheet when none exists - the Mongo equivalent of routes/Entry's sheet linkage.
+func (j *jobs) linkEntryToSheet(ctx context.Context, companyOID, uidOID primitive.ObjectID, date string, entryOID primitive.ObjectID) error {
+	target := store.NormalizeDate(date)
+	cur, err := j.db.Collection(colSheets).Find(ctx, bson.M{"company_id": companyOID})
+	if err != nil {
+		return err
+	}
+	var sheets []struct {
+		ID   primitive.ObjectID `bson:"_id"`
+		Date string             `bson:"date"`
+	}
+	if err := cur.All(ctx, &sheets); err != nil {
+		return err
+	}
+	for _, s := range sheets {
+		if store.NormalizeDate(s.Date) == target {
+			_, err := j.db.Collection(colSheets).UpdateByID(ctx, s.ID, bson.M{"$push": bson.M{"entries": entryOID}})
+			return err
+		}
+	}
+	_, err = j.db.Collection(colSheets).InsertOne(ctx, bson.M{
+		"date": date, "uid": uidOID, "company_id": companyOID, "entries": bson.A{entryOID}, "createdAt": time.Now().UTC(), "__v": 0,
+	})
+	return err
+}

@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (103 of 209)
+## Routes ready (104 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -90,6 +90,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/rows/queue` | row stage jump (clears employee, progress→Assign) | Live · Unit |
 | `POST /lifecycle/jobs/rows/queue-order` | persist a row drag-reordered stage list | Live · Unit |
 | `POST /lifecycle/jobs/rows/progress` | row progress; Complete advances row stage; assignee gate 422; ROW_PROGRESS_STATES check | Live · Unit |
+| `POST /lifecycle/jobs/convert-to-entries` | admin-only; converts Done, unconverted rows to entries (base amount, gross w/ tax, advance clamped to job paid-ratio); sets row.entry_id; "Converted to Entry" history; 404 when none convertible | Live · Unit |
 | `POST /lifecycle/notes/list` | job notes newest-first, each flagged canEdit (author + 24h) | Live · Unit |
 | `POST /lifecycle/notes/create` | add a note (actor name resolved), logs "Note added" history | Live · Unit |
 | `POST /lifecycle/notes/update` | edit within author's 24h window; 403 otherwise; logs "Note edited" | Live · Unit |

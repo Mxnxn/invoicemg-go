@@ -35,6 +35,10 @@ type stubJobs struct {
 	gotArg       string
 	gotPerson    store.ID
 	gotOrder     []string
+	convEntries  []store.Entry
+	convJobs     []store.Job
+	convFound    bool
+	gotConvert   []store.ID
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
@@ -92,6 +96,10 @@ func (s *stubJobs) RowQueueOrder(_ context.Context, _, _, _, _ store.ID, _ store
 func (s *stubJobs) RowProgress(_ context.Context, _, _, _, _ store.ID, _ store.NoteActor, progress string) (store.Job, store.JobTxStatus, error) {
 	s.gotArg = progress
 	return s.tx("row-progress")
+}
+func (s *stubJobs) ConvertToEntries(_ context.Context, _, _ store.ID, jobIDs []store.ID, _ store.NoteActor) ([]store.Entry, []store.Job, bool, error) {
+	s.gotConvert = jobIDs
+	return s.convEntries, s.convJobs, s.convFound, nil
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -504,5 +512,52 @@ func TestTransitions(t *testing.T) {
 		map[string]string{"job_id": "j1", "row_id": "r1", "progress": "Complete"})
 	if body["message"] != "Assign an employee before changing progress." {
 		t.Errorf("row progress needs assignee: %v", body)
+	}
+}
+
+func TestConvertToEntries(t *testing.T) {
+	s := &stubJobs{convFound: true,
+		convEntries: []store.Entry{{ID: "e1", Material: "Vinyl", Amount: 100, Advance: 50, Total: 68}},
+		convJobs:    []store.Job{{ID: "j1", ChallanNumber: "MG/26-27/00001"}}}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.ConvertToEntries },
+		map[string]string{"job_ids": `["j1"]`})
+	if body["code"] != float64(200) || body["message"] != "Converted to entries." {
+		t.Fatalf("convert: %v", body)
+	}
+	data := body["data"].(map[string]any)
+	if len(data["entries"].([]any)) != 1 || len(data["jobs"].([]any)) != 1 {
+		t.Errorf("data shape: %v", data)
+	}
+	if len(s.gotConvert) != 1 || s.gotConvert[0] != "j1" {
+		t.Errorf("job ids passed: %v", s.gotConvert)
+	}
+	// no convertible → 404
+	body = postNotesJob(t, &stubJobs{convFound: false}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.ConvertToEntries },
+		map[string]string{"job_ids": `["j9"]`})
+	if body["code"] != float64(404) {
+		t.Errorf("none convertible: %v", body)
+	}
+	// validation
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.ConvertToEntries }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing job_ids: %v", body)
+	}
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.ConvertToEntries }, map[string]string{"job_ids": "[]"})
+	if body["message"] != "job_ids must be a non-empty array." {
+		t.Errorf("empty job_ids: %v", body)
+	}
+}
+
+// ConvertRow parity (values from routes/Lifecycle convert-to-entries math).
+func TestConvertRowMath(t *testing.T) {
+	// qty 1, L 2, W 3, rate 100 -> base 600; net 600; gross (18% tax) 708; job fully paid -> advance 708, total 0
+	ce := store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 1000, "HSN1", "JOB/1")
+	if ce.Amount != 600 || ce.Advance < 707.9 || ce.Advance > 708.1 || ce.Total != 0 {
+		t.Errorf("fully paid: %+v", ce)
+	}
+	// unpaid job (advance 0) -> advance 0, total = gross 708
+	ce = store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 0, "", "JOB/1")
+	if ce.Advance != 0 || ce.Total < 707.9 || ce.Total > 708.1 {
+		t.Errorf("unpaid: %+v", ce)
 	}
 }

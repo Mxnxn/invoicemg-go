@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -305,4 +306,164 @@ func nextQueueStage(cur string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jobIDs []store.ID, actor store.NoteActor) ([]store.Entry, []store.Job, bool, error) {
+	ids := make([]string, len(jobIDs))
+	for i, id := range jobIDs {
+		ids[i] = string(id)
+	}
+	// Jobs (owner+company scoped) that have at least one Done, unconverted row.
+	rows, err := j.pool.Query(ctx, `
+		SELECT DISTINCT jb.id FROM jobs jb JOIN job_rows r ON r.job_id = jb.id
+		 WHERE jb.id = ANY($1) AND jb.uid = $2 AND jb.company_id = $3 AND r.queue = 'Done' AND r.entry_id IS NULL`,
+		ids, string(uid), string(companyID))
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("convertible jobs: %w", err)
+	}
+	var jobList []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, nil, false, err
+		}
+		jobList = append(jobList, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, nil, false, err
+	}
+	if len(jobList) == 0 {
+		return nil, nil, false, nil
+	}
+
+	tx, err := j.pool.Begin(ctx)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	name := resolveActorName(ctx, j.pool, actor)
+	hsnCache := map[string]string{}
+	hsnFor := func(material string) (string, error) {
+		if material == "" {
+			return "", nil
+		}
+		if h, ok := hsnCache[material]; ok {
+			return h, nil
+		}
+		var h string
+		err := tx.QueryRow(ctx, `SELECT hsn FROM materials WHERE material_name=$1 AND company_id=$2 LIMIT 1`, material, string(companyID)).Scan(&h)
+		if noRows(err) {
+			h = ""
+		} else if err != nil {
+			return "", err
+		}
+		hsnCache[material] = h
+		return h, nil
+	}
+
+	var created []store.Entry
+	for _, jobID := range jobList {
+		var jobUID, challan, receivedDate string
+		var clientID *string
+		var jobTotal, jobAdvance float64
+		if err := tx.QueryRow(ctx, `SELECT uid, client_id, COALESCE(to_char(received_date,'YYYY-MM-DD'),''), challan_number, total, advance FROM jobs WHERE id=$1`, jobID).
+			Scan(&jobUID, &clientID, &receivedDate, &challan, &jobTotal, &jobAdvance); err != nil {
+			return nil, nil, false, err
+		}
+		rr, err := tx.Query(ctx, `
+			SELECT id, material, description, rate, qty, length, width, cgst, sgst, igst, discount, charges
+			  FROM job_rows WHERE job_id=$1 AND queue='Done' AND entry_id IS NULL ORDER BY position ASC, id ASC`, jobID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		type pend struct {
+			rowID string
+			in    store.ConvertJobRow
+		}
+		var pending []pend
+		for rr.Next() {
+			var p pend
+			if err := rr.Scan(&p.rowID, &p.in.Material, &p.in.Description, &p.in.Rate, &p.in.Qty, &p.in.Length, &p.in.Width,
+				&p.in.Cgst, &p.in.Sgst, &p.in.Igst, &p.in.Discount, &p.in.Charges); err != nil {
+				rr.Close()
+				return nil, nil, false, err
+			}
+			pending = append(pending, p)
+		}
+		rr.Close()
+		if err := rr.Err(); err != nil {
+			return nil, nil, false, err
+		}
+
+		entryDate := receivedDate
+		if entryDate == "" {
+			entryDate = time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
+		}
+		converted := 0
+		for _, p := range pending {
+			hsn, err := hsnFor(p.in.Material)
+			if err != nil {
+				return nil, nil, false, err
+			}
+			ce := store.ConvertRow(p.in, jobTotal, jobAdvance, hsn, challan)
+			var clientArg any
+			if clientID != nil {
+				clientArg = *clientID
+			}
+			var entryID string
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO entries (uid, company_id, client_id, description, material, hsn, rate, qty, length, width, date, amount, cgst, sgst, igst, discount, charges, advance, total, has_issued)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,false) RETURNING id`,
+				jobUID, string(companyID), clientArg, ce.Description, ce.Material, ce.Hsn, ce.Rate, ce.Qty, ce.Length, ce.Width,
+				entryDate, ce.Amount, ce.Cgst, ce.Sgst, ce.Igst, ce.Discount, ce.Charges, ce.Advance, ce.Total).Scan(&entryID); err != nil {
+				return nil, nil, false, fmt.Errorf("insert entry: %w", err)
+			}
+			if _, err := tx.Exec(ctx, `UPDATE job_rows SET entry_id=$2 WHERE id=$1`, p.rowID, entryID); err != nil {
+				return nil, nil, false, err
+			}
+			created = append(created, store.Entry{
+				ID: store.ID(entryID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Rate: ce.Rate, Qty: ce.Qty,
+				Length: ce.Length, Width: ce.Width, Date: entryDate, Amount: ce.Amount, Cgst: ce.Cgst, Sgst: ce.Sgst, Igst: ce.Igst,
+				Discount: ce.Discount, Charges: ce.Charges, Advance: ce.Advance, Total: ce.Total,
+			})
+			converted++
+		}
+		suffix := "s"
+		if converted == 1 {
+			suffix = ""
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO job_history (job_id, uid, company_id, actor_type, actor_id, actor_name, action, detail)
+			VALUES ($1,$2,$3,$4,$5,$6,'Converted to Entry',$7)`,
+			jobID, string(uid), string(companyID), actor.Role, string(actor.ActorID()), name,
+			fmt.Sprintf("%d row%s converted to entries", converted, suffix)); err != nil {
+			return nil, nil, false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET updated_at=now() WHERE id=$1`, jobID); err != nil {
+			return nil, nil, false, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, false, err
+	}
+
+	// Re-read the updated jobs, populated.
+	list, err := j.List(ctx, uid, companyID, "")
+	if err != nil {
+		return nil, nil, false, err
+	}
+	want := map[string]bool{}
+	for _, id := range jobList {
+		want[id] = true
+	}
+	var jobs []store.Job
+	for _, job := range list {
+		if want[string(job.ID)] {
+			jobs = append(jobs, job)
+		}
+	}
+	return created, jobs, true, nil
 }
