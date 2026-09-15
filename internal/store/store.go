@@ -1671,6 +1671,12 @@ type BatchReceives interface {
 	// entry side effects (Node's auto-apply is disabled). found is false when the client is not
 	// the caller's. date defaults to today when blank.
 	CreateSimple(ctx context.Context, uid, companyID, clientID ID, amount float64, date, note string) (b BatchReceive, found bool, err error)
+	// UpdateSimple is /client/batchReceiveUpdate: patch amount/note/date on a receipt (nil = leave
+	// as is), company-scoped (Node was unscoped). found is false on a miss.
+	UpdateSimple(ctx context.Context, companyID, batchID ID, amount *float64, note, date *string) (b BatchReceive, found bool, err error)
+	// DeleteSimple is /client/batchReceiveDelete: a plain delete with no allocation reversal
+	// (Node's fill logic is disabled), company-scoped. found is false on a miss.
+	DeleteSimple(ctx context.Context, companyID, batchID ID) (found bool, err error)
 }
 
 // SupplierPayment is one payment to a supplier, mirror of BatchReceive (supplier/bank

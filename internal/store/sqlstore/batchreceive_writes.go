@@ -388,3 +388,58 @@ func (b *batchReceives) CreateSimple(ctx context.Context, uid, companyID, client
 	}
 	return out, true, nil
 }
+
+func (b *batchReceives) UpdateSimple(ctx context.Context, companyID, batchID store.ID, amount *float64, note, date *string) (store.BatchReceive, bool, error) {
+	out, err := b.simpleRow(ctx, companyID, batchID)
+	if err == pgx.ErrNoRows {
+		return store.BatchReceive{}, false, nil
+	}
+	if err != nil {
+		return store.BatchReceive{}, false, err
+	}
+	if amount != nil {
+		out.Amount = *amount
+	}
+	if note != nil {
+		out.Note = *note
+	}
+	if date != nil {
+		out.Date = *date
+	}
+	if _, err := b.pool.Exec(ctx, `
+		UPDATE batch_receives SET amount=$1, note=$2, date=$3, updated_at=now()
+		 WHERE id=$4 AND company_id=$5`,
+		out.Amount, out.Note, out.Date, string(batchID), string(companyID)); err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("update batch receive: %w", err)
+	}
+	return out, true, nil
+}
+
+func (b *batchReceives) DeleteSimple(ctx context.Context, companyID, batchID store.ID) (bool, error) {
+	ct, err := b.pool.Exec(ctx, `DELETE FROM batch_receives WHERE id=$1 AND company_id=$2`,
+		string(batchID), string(companyID))
+	if err != nil {
+		return false, fmt.Errorf("delete batch receive: %w", err)
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+func (b *batchReceives) simpleRow(ctx context.Context, companyID, batchID store.ID) (store.BatchReceive, error) {
+	var out store.BatchReceive
+	var companyCol, clientCol *string
+	err := b.pool.QueryRow(ctx, `
+		SELECT id, uid, company_id, client_id, date, amount, note, mode, created_at, updated_at
+		  FROM batch_receives WHERE id=$1 AND company_id=$2`, string(batchID), string(companyID)).
+		Scan(&out.ID, &out.UID, &companyCol, &clientCol, &out.Date, &out.Amount, &out.Note, &out.Mode,
+			&out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return store.BatchReceive{}, err
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	if clientCol != nil {
+		out.ClientID = store.ID(*clientCol)
+	}
+	return out, nil
+}

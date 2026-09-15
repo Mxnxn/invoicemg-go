@@ -56,6 +56,12 @@ func (b *stubBatches) OpenJobs(context.Context, store.ID, store.ID, store.ID) ([
 func (b *stubBatches) Create(context.Context, store.ID, store.ID, store.BatchReceiveWrite) (store.BatchReceive, error) {
 	return store.BatchReceive{}, nil
 }
+func (b *stubBatches) UpdateSimple(_ context.Context, _, _ store.ID, _ *float64, _, _ *string) (store.BatchReceive, bool, error) {
+	return b.created, b.createdFound, nil
+}
+func (b *stubBatches) DeleteSimple(_ context.Context, _, _ store.ID) (bool, error) {
+	return b.createdFound, nil
+}
 func (b *stubBatches) CreateSimple(_ context.Context, _, _, _ store.ID, amount float64, date, note string) (store.BatchReceive, bool, error) {
 	return b.created, b.createdFound, nil
 }
@@ -462,4 +468,30 @@ func serveGet2(t *testing.T, c *stubClients, b *stubBatches, fn func(*Handler) f
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
 	}
 	return body
+}
+
+func TestBatchReceiveUpdateAndDelete(t *testing.T) {
+	b := &stubBatches{createdFound: true, created: store.BatchReceive{ID: "br1", ClientID: "c1", Amount: 900, Note: "x"}}
+	body := serveGet2(t, &stubClients{}, b, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchReceiveUpdate },
+		map[string]string{"batch_id": "br1", "amount": "900", "note": "x"})
+	if body["code"] != float64(200) || body["message"] != "Batch receive updated." {
+		t.Fatalf("update: %v", body)
+	}
+	// missing batch_id -> 422
+	body = serveGet2(t, &stubClients{}, b, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchReceiveUpdate }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("update missing id: %v", body)
+	}
+	// delete ok
+	body = serveGet2(t, &stubClients{}, b, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchReceiveDelete },
+		map[string]string{"batch_id": "br1"})
+	if body["code"] != float64(200) || body["message"] != "Batch receive deleted." || body["status"] != true {
+		t.Errorf("delete: %v", body)
+	}
+	// delete not found -> 404
+	body = serveGet2(t, &stubClients{}, &stubBatches{createdFound: false}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.BatchReceiveDelete },
+		map[string]string{"batch_id": "x"})
+	if body["code"] != float64(404) {
+		t.Errorf("delete not found: %v", body)
+	}
 }

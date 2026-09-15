@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (117 of 209)
+## Routes ready (119 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -40,6 +40,8 @@ the 209 routes the Node API declares.
 | `POST /client/remove` | hard delete (not via Trash), company-scoped; 404 on miss | Live · Unit |
 | `POST /client/get` | one client + entries populated (issued invoice number; quotation link null on Postgres - no column yet) + batchUpdates; 404/422 | Live · Unit |
 | `POST /client/batchUpdate` | plain logged client receipt, no entry allocation (Node's auto-apply is disabled); verifies client ownership; 422/404 | Live · Unit |
+| `POST /client/batchReceiveUpdate` | patch a receipt's amount/note/date (only sent fields), company-scoped (Node was unscoped); 422/404 | Live · Unit |
+| `POST /client/batchReceiveDelete` | plain delete of a receipt, no allocation reversal (Node's fill disabled), company-scoped; 422/404 | Live · Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /company/create` | admin; first company becomes default; firm falls back to name | Live · Unit |

@@ -363,3 +363,73 @@ func (b *batchReceives) CreateSimple(ctx context.Context, uid, companyID, client
 		Date: date, Amount: amount, Note: note, CreatedAt: now, UpdatedAt: now,
 	}, true, nil
 }
+
+func (b *batchReceives) UpdateSimple(ctx context.Context, companyID, batchID store.ID, amount *float64, note, date *string) (store.BatchReceive, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.BatchReceive{}, false, nil
+	}
+	batchOID, err := objectID(batchID)
+	if err != nil {
+		return store.BatchReceive{}, false, nil
+	}
+	set := bson.M{"updatedAt": time.Now().UTC()}
+	if amount != nil {
+		set["amount"] = *amount
+	}
+	if note != nil {
+		set["note"] = *note
+	}
+	if date != nil {
+		set["date"] = *date
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var doc struct {
+		ID        primitive.ObjectID  `bson:"_id"`
+		UID       *primitive.ObjectID `bson:"uid"`
+		CompanyID *primitive.ObjectID `bson:"company_id"`
+		ClientID  *primitive.ObjectID `bson:"client"`
+		Date      string              `bson:"date"`
+		Amount    float64             `bson:"amount"`
+		Note      string              `bson:"note"`
+		Mode      string              `bson:"mode"`
+		CreatedAt time.Time           `bson:"createdAt"`
+		UpdatedAt time.Time           `bson:"updatedAt"`
+		Version   int                 `bson:"__v"`
+	}
+	err = b.db.Collection(colBatchReceives).FindOneAndUpdate(ctx,
+		bson.M{"_id": batchOID, "company_id": companyOID}, bson.M{"$set": set}, opts).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.BatchReceive{}, false, nil
+	}
+	if err != nil {
+		return store.BatchReceive{}, false, fmt.Errorf("update batch receive: %w", err)
+	}
+	out := store.BatchReceive{ID: idOf(doc.ID), Date: doc.Date, Amount: doc.Amount, Note: doc.Note, Mode: doc.Mode, CreatedAt: doc.CreatedAt, UpdatedAt: doc.UpdatedAt, Version: doc.Version}
+	if doc.UID != nil {
+		out.UID = idOf(*doc.UID)
+	}
+	if doc.CompanyID != nil {
+		out.CompanyID = idOf(*doc.CompanyID)
+	}
+	if doc.ClientID != nil {
+		out.ClientID = idOf(*doc.ClientID)
+	}
+	return out, true, nil
+}
+
+func (b *batchReceives) DeleteSimple(ctx context.Context, companyID, batchID store.ID) (bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return false, nil
+	}
+	batchOID, err := objectID(batchID)
+	if err != nil {
+		return false, nil
+	}
+	res, err := b.db.Collection(colBatchReceives).DeleteOne(ctx, bson.M{"_id": batchOID, "company_id": companyOID})
+	if err != nil {
+		return false, fmt.Errorf("delete batch receive: %w", err)
+	}
+	return res.DeletedCount > 0, nil
+}
