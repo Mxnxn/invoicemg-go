@@ -876,9 +876,65 @@ type Invoice struct {
 	CreatedAt   time.Time
 }
 
+// InvoiceReceivedRow is one payment recorded against an invoice (getReceived), bank populated.
+type InvoiceReceivedRow struct {
+	ID        ID
+	Date      string
+	Amount    float64
+	Note      string
+	InvoiceID ID
+	BankID    ID
+	BankName  string
+	CreatedAt time.Time
+	Version   int
+}
+
+// InvoiceSaveInput is /invoice/save (issuance): bundle these entries onto an invoice numbered
+// InvNo for a client. If an invoice with that number exists it is rewritten in place.
+type InvoiceSaveInput struct {
+	Date     string
+	ClientID ID
+	InvNo    string
+	EntryIDs []ID
+}
+
+// InvoicePaidAlloc is one manual entry allocation on /invoice/paid.
+type InvoicePaidAlloc struct {
+	EntryID ID
+	Amount  float64
+}
+
+// InvoicePaidInput is /invoice/paid: record a payment against an invoice, spread over its entries.
+type InvoicePaidInput struct {
+	InvoiceID      ID
+	ReceivedAmount float64
+	Mode           string // "manual" | "auto"
+	Date           string
+	BankID         ID
+	Note           string
+	Allocations    []InvoicePaidAlloc
+}
+
 type Invoices interface {
 	// List returns a company's invoices with client populated and entries loaded (#6 batched).
 	List(ctx context.Context, companyID ID) ([]Invoice, error)
+	// Numbers returns every invoice number for the company, for the next-number helper.
+	Numbers(ctx context.Context, companyID ID) ([]string, error)
+	// EntryJobLabels maps each of these entry ids to the challan number of the job it came from
+	// (Job.rows[].entry_id is the only link), for the close-invoice modal.
+	EntryJobLabels(ctx context.Context, companyID ID, entryIDs []ID) (map[string]string, error)
+	// Received returns the payments recorded against an invoice, bank populated.
+	Received(ctx context.Context, companyID, invoiceID ID) ([]InvoiceReceivedRow, error)
+	// Save issues (or re-issues) an invoice from the given entries and returns its id; found is
+	// false only for the not-applicable cases (always true here). It marks entries issued and
+	// computes amount (Σ advance) and totalAmount (Σ RoundOffWithAmount(amount·1.18)).
+	Save(ctx context.Context, uid, companyID ID, in InvoiceSaveInput) (invoiceID ID, err error)
+	// Paid records a payment against an invoice, spreading it over the invoice's entries (and the
+	// jobs they came from) and logging an InvoiceReceived. found is false when the invoice is
+	// missing; manualErr names a manual-allocation problem (empty JSON handled by the handler).
+	Paid(ctx context.Context, companyID ID, in InvoicePaidInput) (found bool, err error)
+	// Remove deletes an invoice and un-issues its entries. found is false on a miss.
+	Remove(ctx context.Context, companyID, invoiceID ID) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------

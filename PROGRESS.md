@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (81 of 209)
+## Routes ready (87 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -68,6 +68,12 @@ the 209 routes the Node API declares.
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
+| `POST /invoice/next-invoice-number` | next MG/FY/INV- number (docnumber) | Live · Unit |
+| `POST /invoice/entries-jobs` | map entry ids → job challan numbers (reverse lookup) | Live · Unit |
+| `POST /invoice/getReceived` | payments recorded against an invoice, bank populated | Live · Unit |
+| `POST /invoice/save` | issue/re-issue: mark entries issued, amount=Σadvance, total=Σ RoundOffWithAmount(amount·1.18) | Live · Unit |
+| `POST /invoice/paid` | record payment; manual / auto-full-close / auto-partial; bumps entries + owning jobs (capped) + invoice.amount; logs InvoiceReceived | Live · Unit |
+| `POST /invoice/remove` | delete invoice, un-issue its entries; 404 on miss | Live · Unit |
 | `POST /lifecycle/lookups/clients` | name picker; uid+company scoped (not sharing-widened) | Live · Unit |
 | `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |
 | `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |

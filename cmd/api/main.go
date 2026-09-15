@@ -281,6 +281,12 @@ func routes(db store.Store) http.Handler {
 	// the populated entries and computed totals. Only /getAll is ported.
 	mux.Handle("POST /invoice/getAll", feature("invoices", invoiceHandler.List))
 	mux.Handle("GET /invoices", feature("invoices", invoiceHandler.List))
+	mux.Handle("POST /invoice/next-invoice-number", feature("invoices", invoiceHandler.NextNumber))
+	mux.Handle("POST /invoice/entries-jobs", feature("invoices", invoiceHandler.EntriesJobs))
+	mux.Handle("POST /invoice/getReceived", feature("invoices", invoiceHandler.GetReceived))
+	mux.Handle("POST /invoice/save", feature("invoices", invoiceHandler.Save, auth.RequireCreate("invoices")))
+	mux.Handle("POST /invoice/paid", feature("invoices", invoiceHandler.Paid))
+	mux.Handle("POST /invoice/remove", feature("invoices", invoiceHandler.Remove, auth.RequireDelete("invoices")))
 
 	// Lifecycle name/rate lookups for the Job and Quotation forms. Authenticated only (no
 	// feature gate), as routes/Lifecycle.js registers them before its feature guard.

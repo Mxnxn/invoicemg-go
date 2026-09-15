@@ -3,7 +3,10 @@ package invoice
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,10 +14,40 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type stubInvoices struct{ list []store.Invoice }
+type stubInvoices struct {
+	list        []store.Invoice
+	numbers     []string
+	labels      map[string]string
+	received    []store.InvoiceReceivedRow
+	savedID     store.ID
+	paidFound   bool
+	removeFound bool
+	gotSave     store.InvoiceSaveInput
+	gotPaid     store.InvoicePaidInput
+}
 
 func (s *stubInvoices) List(_ context.Context, _ store.ID) ([]store.Invoice, error) {
 	return s.list, nil
+}
+func (s *stubInvoices) Numbers(_ context.Context, _ store.ID) ([]string, error) {
+	return s.numbers, nil
+}
+func (s *stubInvoices) EntryJobLabels(_ context.Context, _ store.ID, _ []store.ID) (map[string]string, error) {
+	return s.labels, nil
+}
+func (s *stubInvoices) Received(_ context.Context, _, _ store.ID) ([]store.InvoiceReceivedRow, error) {
+	return s.received, nil
+}
+func (s *stubInvoices) Save(_ context.Context, _, _ store.ID, in store.InvoiceSaveInput) (store.ID, error) {
+	s.gotSave = in
+	return s.savedID, nil
+}
+func (s *stubInvoices) Paid(_ context.Context, _ store.ID, in store.InvoicePaidInput) (bool, error) {
+	s.gotPaid = in
+	return s.paidFound, nil
+}
+func (s *stubInvoices) Remove(_ context.Context, _, _ store.ID) (bool, error) {
+	return s.removeFound, nil
 }
 
 type stubCompanies struct{ c store.Company }
@@ -120,5 +153,122 @@ func TestGetAll_TotalFallback(t *testing.T) {
 	// no client -> client_id and uid null
 	if v, ok := row["client_id"]; !ok || v != nil {
 		t.Errorf("client_id should be null, got %v", v)
+	}
+}
+
+func postInv(t *testing.T, s *stubInvoices, fn func(*Handler) http.HandlerFunc, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(vals.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	fn(New(s, &stubCompanies{}, &stubUsers{}))(rec, r)
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return out
+}
+
+func TestNextNumber(t *testing.T) {
+	s := &stubInvoices{numbers: []string{"MG/26-27/INV-00002"}}
+	h := New(s, &stubCompanies{}, &stubUsers{})
+	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
+	defer func() { now = func() time.Time { return time.Now().UTC() } }()
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	h.NextNumber(rec, r)
+	var body map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &body)
+	if body["data"].(map[string]any)["invoiceNumber"] != "MG/26-27/INV-00003" {
+		t.Errorf("next: %v", body["data"])
+	}
+}
+
+func TestEntriesJobs(t *testing.T) {
+	s := &stubInvoices{labels: map[string]string{"e1": "JOB/1"}}
+	body := postInv(t, s, func(h *Handler) http.HandlerFunc { return h.EntriesJobs }, map[string]string{"entry_ids": `["e1"]`})
+	if body["data"].(map[string]any)["e1"] != "JOB/1" {
+		t.Errorf("labels: %v", body["data"])
+	}
+	// empty ids -> empty object, still 200
+	body = postInv(t, &stubInvoices{}, func(h *Handler) http.HandlerFunc { return h.EntriesJobs }, map[string]string{"entry_ids": "[]"})
+	if body["code"] != float64(200) {
+		t.Errorf("empty: %v", body)
+	}
+}
+
+func TestGetReceived(t *testing.T) {
+	s := &stubInvoices{received: []store.InvoiceReceivedRow{{ID: "rc1", Amount: 500, BankID: "b1", BankName: "HDFC", InvoiceID: "inv1"}}}
+	body := postInv(t, s, func(h *Handler) http.HandlerFunc { return h.GetReceived }, map[string]string{"invoice_id": "inv1"})
+	row := body["data"].([]any)[0].(map[string]any)
+	if row["amount"] != float64(500) || row["bank_id"].(map[string]any)["name"] != "HDFC" {
+		t.Errorf("received row: %v", row)
+	}
+	body = postInv(t, &stubInvoices{}, func(h *Handler) http.HandlerFunc { return h.GetReceived }, map[string]string{})
+	if body["code"] != float64(422) {
+		t.Errorf("missing id: %v", body)
+	}
+}
+
+func TestSave(t *testing.T) {
+	s := &stubInvoices{savedID: "inv9"}
+	body := postInv(t, s, func(h *Handler) http.HandlerFunc { return h.Save }, map[string]string{
+		"entry_ids": `["e1","e2"]`, "date": "2026-09-15", "client_id": "c1", "invNo": "MG/26-27/INV-00001",
+	})
+	if body["code"] != float64(200) || body["message"] != "Saved Successful!" || body["data"] != "inv9" {
+		t.Fatalf("save: %v", body)
+	}
+	if len(s.gotSave.EntryIDs) != 2 || s.gotSave.InvNo != "MG/26-27/INV-00001" {
+		t.Errorf("save input: %+v", s.gotSave)
+	}
+	// missing fields
+	body = postInv(t, &stubInvoices{}, func(h *Handler) http.HandlerFunc { return h.Save }, map[string]string{"date": "x"})
+	if body["code"] != float64(422) {
+		t.Errorf("validation: %v", body)
+	}
+}
+
+func TestPaid(t *testing.T) {
+	s := &stubInvoices{paidFound: true}
+	body := postInv(t, s, func(h *Handler) http.HandlerFunc { return h.Paid }, map[string]string{"invoice_id": "inv1", "receivedAmount": "500", "mode": "auto"})
+	if body["code"] != float64(200) || body["message"] != "Paid Successful." {
+		t.Fatalf("paid: %v", body)
+	}
+	if s.gotPaid.Mode != "auto" || s.gotPaid.ReceivedAmount != 500 {
+		t.Errorf("paid input: %+v", s.gotPaid)
+	}
+	// amount not > 0
+	body = postInv(t, &stubInvoices{}, func(h *Handler) http.HandlerFunc { return h.Paid }, map[string]string{"invoice_id": "inv1", "receivedAmount": "0"})
+	if body["message"] != "Amount must be greater than 0." {
+		t.Errorf("amount: %v", body)
+	}
+	// manual under-allocated
+	body = postInv(t, &stubInvoices{}, func(h *Handler) http.HandlerFunc { return h.Paid }, map[string]string{
+		"invoice_id": "inv1", "receivedAmount": "500", "mode": "manual", "allocations": `[{"entry_id":"e1","amount":300}]`,
+	})
+	if body["message"] != "Allocate the full amount before saving." {
+		t.Errorf("manual under: %v", body)
+	}
+	// not found
+	body = postInv(t, &stubInvoices{paidFound: false}, func(h *Handler) http.HandlerFunc { return h.Paid }, map[string]string{"invoice_id": "inv9", "receivedAmount": "500", "mode": "auto"})
+	if body["code"] != float64(404) {
+		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	body := postInv(t, &stubInvoices{removeFound: true}, func(h *Handler) http.HandlerFunc { return h.Remove }, map[string]string{"invoice_id": "inv1"})
+	if body["code"] != float64(200) || body["message"] != "Delete Successful." {
+		t.Errorf("remove: %v", body)
+	}
+	body = postInv(t, &stubInvoices{removeFound: false}, func(h *Handler) http.HandlerFunc { return h.Remove }, map[string]string{"invoice_id": "inv1"})
+	if body["code"] != float64(404) {
+		t.Errorf("404: %v", body)
 	}
 }
