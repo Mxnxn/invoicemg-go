@@ -827,6 +827,25 @@ type Expenses interface {
 	List(ctx context.Context, companyID ID, f ExpenseFilter) ([]Expense, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------------------
+
+// DatedAmount is one amount with its effective date (createdAt||date already resolved), the
+// input SumIntoBuckets needs.
+type DatedAmount struct {
+	Date   time.Time
+	Amount float64
+}
+
+// Analytics serves the reporting reads.
+type Analytics interface {
+	// RevenueSeries returns the billed and collected dated amounts for the revenue chart.
+	// source "all" reads entries (total, amount); "invoiced" reads invoices (totalAmount) and
+	// invoice_received (amount). Each amount carries createdAt when set, else the typed date.
+	RevenueSeries(ctx context.Context, companyID ID, source string) (billed, collected []DatedAmount, err error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -846,6 +865,7 @@ type Store interface {
 	Jobs() Jobs
 	Challans() Challans
 	Expenses() Expenses
+	Analytics() Analytics
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.

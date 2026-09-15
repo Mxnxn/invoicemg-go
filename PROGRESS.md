@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (28 of 209)
+## Routes ready (29 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -48,6 +48,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
+| `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -79,6 +80,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | jobs/job_rows extended | employee/vendor/queue_order/alert channels + row employee/quotation/queue_order, for `/lifecycle/jobs/list` |
 | `challans` | added for `/challan/getAll` |
 | `expenses` | added for `/expense/list` (bank populate; string date range) |
+| `invoice_received` | added for `/analytics/revenue` (invoiced collected series) |
 
 Nested Company config (`exportTemplate`, `sharing`, `numbering`, `whatsapp`, template/font) is **not
 yet stored** — returned at defaults, pending the config write-paths.
@@ -103,6 +105,7 @@ yet stored** — returned at defaults, pending the config write-paths.
 | `Helpers/JobTotals` + `Helpers/RowPricing` | `internal/jobmath` (`RowGrossTotal`, `JobRowsTotal`, `dimensionFactor`, `Round2` = JS `Math.round`) | Unit (bit-parity vs Node) · Live |
 | `Helpers/EntryTotals` + `Helpers/RoundOff` | `internal/entrymath` (`Total`, `RoundOffWithAmount`) | Unit (Node-captured) · Live |
 | `JobInvoiceState`+`JobLock`+`JobDoneAlert`+`JobAlertState` | `internal/joblifecycle` (invoice state, lock, alert sha1 signature) | Unit (Node-captured sha1) · Live |
+| `Helpers/DateBuckets` | `internal/datebuckets` (weekly/monthly/yearly bucketing) | Unit (Node-captured) |
 | `Helpers/TokenHelper` (session + per-tab company) | `internal/auth` `Require` + `ResolveCompany` | Unit · Live |
 | `Helpers/RoleHelper` + `Helpers/Permissions` (flat-key rule) | `internal/auth` `RequireRole/Admin/Feature/Create/Delete`, `HasPermission` | Unit |
 | `Helpers/ReviewScores` `parseScores` | `internal/alerts/scores.go` | Unit (Node-captured) |

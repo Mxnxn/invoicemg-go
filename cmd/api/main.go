@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/alerts"
+	"github.com/mxnxn/invoicemg-go/internal/analytics"
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/bank"
 	"github.com/mxnxn/invoicemg-go/internal/challan"
@@ -147,6 +148,7 @@ func routes(db store.Store) http.Handler {
 	bankHandler := bank.New(db.Banks())
 	challanHandler := challan.New(db.Challans())
 	expenseHandler := expense.New(db.Expenses())
+	analyticsHandler := analytics.New(db.Analytics())
 	clientHandler := client.New(db.Clients())
 	materialHandler := material.New(db.Materials())
 	personHandler := person.New(db.People())
@@ -257,6 +259,10 @@ func routes(db store.Store) http.Handler {
 	// Expenses, behind the batch_receive feature. Only /list is ported.
 	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
 	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
+
+	// Analytics (the reporting dashboards). Only /revenue is ported so far; the other tabs
+	// still 404 until their aggregations are ported.
+	mux.Handle("POST /analytics/revenue", feature("analytics", analyticsHandler.Revenue))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since

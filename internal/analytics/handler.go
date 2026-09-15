@@ -1,0 +1,123 @@
+// Package analytics serves the reporting reads from routes/Analytics.js. Only /analytics/revenue
+// is ported so far - the Revenue tab's billed/collected trend, honouring the Invoiced/All switch.
+// Behind the analytics feature.
+package analytics
+
+import (
+	"encoding/json"
+	"math"
+	"net/http"
+	"time"
+
+	"github.com/mxnxn/invoicemg-go/internal/auth"
+	"github.com/mxnxn/invoicemg-go/internal/datebuckets"
+	"github.com/mxnxn/invoicemg-go/internal/httpx"
+	"github.com/mxnxn/invoicemg-go/internal/store"
+)
+
+type Handler struct {
+	store store.Analytics
+	now   func() time.Time
+}
+
+func New(s store.Analytics) *Handler {
+	return &Handler{store: s, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func round2(n float64) float64 { return math.Floor(n*100+0.5) / 100 }
+
+// Revenue is POST /analytics/revenue. Requires `period` (weekly|monthly|yearly); optional
+// focusYear/focusMonth drill-in; `source` all|invoiced (default invoiced).
+func (h *Handler) Revenue(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+
+	period := form.String("period")
+	if period == "" {
+		httpx.Invalid(w, "")
+		return
+	}
+	now := h.now()
+	hasYear := form.Has("focusYear")
+	hasMonth := form.Has("focusMonth")
+	focusYear := form.Int("focusYear", 0)
+	focusMonth := form.Int("focusMonth", 0)
+
+	var buckets []datebuckets.Bucket
+	var yearAgo *datebuckets.Bucket
+	switch period {
+	case "weekly":
+		if hasYear && hasMonth {
+			buckets = datebuckets.WeeksForMonth(focusYear, focusMonth)
+		} else {
+			buckets = datebuckets.WeeklyBuckets(now, 8)
+			b := datebuckets.WeeklyBuckets(now, 53)[0] // 52 weeks back
+			yearAgo = &b
+		}
+	case "yearly":
+		buckets = datebuckets.YearlyBuckets(now, 15, 0)
+	default: // monthly
+		if hasYear {
+			buckets = datebuckets.MonthsForYear(focusYear)
+		} else {
+			buckets = datebuckets.MonthlyBuckets(now, 36)
+			b := datebuckets.MonthlyBuckets(now, 13)[0]
+			yearAgo = &b
+		}
+	}
+
+	allBuckets := buckets
+	if yearAgo != nil {
+		allBuckets = append(append([]datebuckets.Bucket{}, buckets...), *yearAgo)
+	}
+
+	source := "invoiced"
+	if form.String("source") == "all" {
+		source = "all"
+	}
+	billed, collected, err := h.store.RevenueSeries(r.Context(), sess.CompanyID, source)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	billedSums := datebuckets.SumIntoBuckets(toDated(billed), allBuckets)
+	collectedSums := datebuckets.SumIntoBuckets(toDated(collected), allBuckets)
+
+	data := make([]point, 0, len(buckets))
+	for i, b := range buckets {
+		data = append(data, point{Label: b.Label, Billed: round2(billedSums[i]), Collected: round2(collectedSums[i])})
+	}
+	var yearAgoOut *point
+	if yearAgo != nil {
+		last := len(allBuckets) - 1
+		yearAgoOut = &point{Label: yearAgo.Label, Billed: round2(billedSums[last]), Collected: round2(collectedSums[last])}
+	}
+
+	// Custom envelope: data plus a TOP-LEVEL yearAgo (not nested under data), so it is encoded
+	// directly rather than through httpx.Write. Always HTTP 200 like the Node route.
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(revenueEnvelope{Code: 200, Message: "Operation successful.", Data: data, YearAgo: yearAgoOut})
+}
+
+func toDated(in []store.DatedAmount) []datebuckets.Dated {
+	out := make([]datebuckets.Dated, 0, len(in))
+	for _, d := range in {
+		out = append(out, datebuckets.Dated{Date: d.Date, Amount: d.Amount})
+	}
+	return out
+}
+
+// revenue sends data AND a top-level yearAgo (not nested under the envelope's data), so it needs
+// its own envelope shape rather than httpx.Envelope.
+type revenueEnvelope struct {
+	Code    int     `json:"code"`
+	Message string  `json:"message"`
+	Data    []point `json:"data"`
+	YearAgo *point  `json:"yearAgo"`
+}
+
+type point struct {
+	Label     string  `json:"label"`
+	Billed    float64 `json:"billed"`
+	Collected float64 `json:"collected"`
+}

@@ -443,6 +443,22 @@ CREATE TABLE entries (
 CREATE INDEX entries_invoice_idx ON entries (invoice_id);
 CREATE INDEX entries_company_idx ON entries (company_id);
 
+-- Payments received against invoices (Invoice's collected side).
+CREATE TABLE invoice_received (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    uid         text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id  text REFERENCES companies(id) ON DELETE CASCADE,
+    client_id   text REFERENCES clients(id) ON DELETE SET NULL,
+    invoice_id  text REFERENCES invoices(id) ON DELETE SET NULL,
+    bank_id     text,
+    date        text NOT NULL DEFAULT '',
+    amount      numeric(14,2) NOT NULL DEFAULT 0,
+    note        text NOT NULL DEFAULT '',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX invoice_received_company_idx ON invoice_received (company_id);
+
 CREATE TABLE material_price_history (
     id            text PRIMARY KEY DEFAULT gen_ulid(),
     material_id   text NOT NULL REFERENCES materials(id) ON DELETE CASCADE,

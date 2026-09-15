@@ -130,3 +130,7 @@ INSERT INTO challans (uid, company_id, company_name, description, date, type, qu
 INSERT INTO expenses (uid, company_id, bank_id, date, amount, notes) VALUES
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','b0000000000000000000000b','2026-09-10',1200,'Ink cartridges'),
     ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','b0000000000000000000000a','2026-09-12',500,'Courier');
+
+-- A payment received against the seeded invoice, so revenue's collected series is non-zero.
+INSERT INTO invoice_received (uid, company_id, client_id, invoice_id, date, amount) VALUES
+    ('6a8b8c48ae946c0049e824a8','6a8b8c48ae946c0049e824a9','c00000000000000000000001','20000000000000000000000a','2026-09-13',5000);
