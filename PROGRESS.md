@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (48 of 209)
+## Routes ready (49 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -49,6 +49,7 @@ the 209 routes the Node API declares.
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
+| `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing

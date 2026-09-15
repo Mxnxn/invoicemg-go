@@ -1122,6 +1122,36 @@ type Statistics interface {
 	Client(ctx context.Context, companyID, clientID ID) (LookupClient, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Ledger
+// ---------------------------------------------------------------------------------------
+
+// LedgerTxn is one ledger line before balancing (a bill or a receipt).
+type LedgerTxn struct {
+	Date      string
+	Type      string // "Sales Invoice" | "Receipts"
+	InvoiceNo string
+	Bill      float64
+	Receipt   float64
+	Seq       int // 0 bills, 1 receipts, so a same-day receipt sorts after the bill
+}
+
+// LedgerClientData is a client's statement inputs. Node's /ledger/client computes the opening
+// balance from the transactions that fall before `from` (starting at zero) and never consults
+// the client's stored openingBalance, so that field is deliberately absent here.
+type LedgerClientData struct {
+	Found         bool
+	ClientName    string
+	ClientFirm    string
+	ClientGST     string
+	ClientAddress string
+	Txns          []LedgerTxn
+}
+
+type Ledger interface {
+	ClientStatement(ctx context.Context, companyID, clientID ID) (LedgerClientData, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -1148,6 +1178,7 @@ type Store interface {
 	Trash() Trash
 	Inventory() Inventory
 	Statistics() Statistics
+	Ledger() Ledger
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
