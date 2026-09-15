@@ -1,8 +1,9 @@
-// Package client serves the customer routes from routes/Client.js. Only the two list reads are
-// ported so far - /client/getall and /client/only - both of which WIDEN by sharing (#1): they
-// return the acting company's clients, legacy null-company rows, and clients shared with it. The
-// writes (add/update/remove) are not ported, and when they are they must use company-only scope
-// and never this widened read.
+// Package client serves the customer routes from routes/Client.js. The list reads /client/getall
+// and /client/only WIDEN by sharing (#1): they return the acting company's clients, legacy
+// null-company rows, and clients shared with it. The writes (add/update/remove), the populate-
+// heavy /client/get, and the batch-receipt routes (batchUpdate/batchReceiveUpdate/
+// batchReceiveDelete) are all ported too, and each uses company-only scope - never this widened
+// read - so a write can never touch a merely-shared record.
 package client
 
 import (

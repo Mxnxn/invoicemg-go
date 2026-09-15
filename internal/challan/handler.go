@@ -1,6 +1,6 @@
 // Package challan serves POST /challan/getAll from routes/Challan.js - a company's delivery
 // challans. Behind the challan feature. The response is {code, data, status} with NO message,
-// matching the Node route exactly. Only the list read is ported.
+// matching the Node route exactly. The create route /challan/new is ported in new.go.
 package challan
 
 import (

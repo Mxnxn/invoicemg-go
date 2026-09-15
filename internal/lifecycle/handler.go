@@ -2,7 +2,9 @@
 // Each job carries its six populations (client, employee, vendor, and per-row quotation,
 // employee, entry) and the state withInvoiceState derives: invoiceState, invoiceNumbers,
 // readyForInvoice, lock, alert and per-channel alerts, plus a per-row `invoiced` flag. Behind
-// the lifecycle feature. Only the list read is ported.
+// the lifecycle feature. The create/update, the eight state-machine transitions, notes,
+// history and convert-to-entries are ported across the sibling files; only jobs/delete (Trash)
+// is left out.
 package lifecycle
 
 import (

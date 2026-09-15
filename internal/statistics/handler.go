@@ -1,6 +1,7 @@
 // Package statistics serves the dashboard reads from routes/Statistics.js - /stats/get (square
 // feet produced per material for a month, by paid/unpaid, optionally one client) and
-// /stats/clients. Behind the dashboard feature. XLSX download/exports are not ported.
+// /stats/clients. Behind the dashboard feature. The XLSX /stats/exports and /stats/download
+// routes are ported in export.go.
 package statistics
 
 import (

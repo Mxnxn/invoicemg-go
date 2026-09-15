@@ -1,6 +1,8 @@
 // Package invoice serves POST /invoice/getAll from routes/Invoice.js - the invoices list, each
 // row carrying the issuer's letterhead, the client's details, the populated entries, and the
-// computed totals. Behind the invoices feature. Only the list read is ported.
+// computed totals. Behind the invoices feature. The other invoice routes (get,
+// getClientInvoices, save, paid, remove, next-number, entries-jobs, getReceived, and the XLSX
+// export/download) are ported across the sibling files in this package.
 package invoice
 
 import (

@@ -1,7 +1,7 @@
-// Package material serves the product routes from routes/Material.js. Only /material/getall (a
-// read) is ported so far - the whole product record plus a `borrowed` flag, widened by sharing
-// (#1). The writes (add/update/remove/set-unit) and /material/get are not ported; when they are,
-// they must use company-only scope and never this widened read.
+// Package material serves the product routes from routes/Material.js. /material/getall is the
+// sharing-widened read (#1) - the whole product record plus a `borrowed` flag. The writes
+// (add/update/remove) and the single-record /material/get are ported too, and each uses
+// company-only scope, never this widened read.
 package material
 
 import (
