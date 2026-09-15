@@ -1098,6 +1098,30 @@ type Inventory interface {
 	Data(ctx context.Context, companyID ID, from, to string) (InventoryData, error)
 }
 
+// ---------------------------------------------------------------------------------------
+// Statistics (dashboard)
+// ---------------------------------------------------------------------------------------
+
+// StatEntry is the square-footage-relevant subset of an entry.
+type StatEntry struct {
+	Material      string
+	Length        string
+	Width         string
+	Qty           float64
+	Date          string
+	HasDimensions *bool
+}
+
+type Statistics interface {
+	// Clients returns the company's clients for the dashboard dropdown.
+	Clients(ctx context.Context, companyID ID) ([]LookupClient, error)
+	// StatEntries returns entries matching the total flag (paid: total==0, else total>0) and
+	// whose date string contains monthName (the Node month-regex, #31), optionally one client.
+	StatEntries(ctx context.Context, companyID ID, monthName string, paid bool, clientID ID) ([]StatEntry, error)
+	// Client returns one client's names, or ErrNotFound.
+	Client(ctx context.Context, companyID, clientID ID) (LookupClient, error)
+}
+
 // Store is everything together, so main wires one value rather than six.
 type Store interface {
 	Sessions() Sessions
@@ -1123,6 +1147,7 @@ type Store interface {
 	SupplierPayments() SupplierPayments
 	Trash() Trash
 	Inventory() Inventory
+	Statistics() Statistics
 
 	// Ping is what the health check uses: a service that is up but cannot reach its database
 	// is not healthy, and a TCP check would call it healthy.
