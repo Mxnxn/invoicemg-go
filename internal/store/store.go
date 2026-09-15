@@ -508,10 +508,49 @@ type Person struct {
 	CreatedAt         time.Time
 }
 
+// PersonWrite is the field set of /person/create. Email is a pointer so an empty submission
+// stores NULL (Node's `email || null`); PasswordHash is set only for an Employee being granted a
+// login, and Permissions is already normalised by the handler.
+type PersonWrite struct {
+	Name         string
+	Type         string
+	Email        *string
+	Phone        string
+	Firm         string
+	Address      string
+	Gst          string
+	PasswordHash *string
+	Permissions  []string
+}
+
+// PersonPatch is /person/update's partial edit: a nil field is "not submitted" and left as-is.
+// EmailSet distinguishes "email omitted" from "email set to empty" (which stores NULL).
+type PersonPatch struct {
+	Name         *string
+	Type         *string
+	EmailSet     bool
+	Email        *string
+	Phone        *string
+	Firm         *string
+	Address      *string
+	Gst          *string
+	IsActive     *bool
+	Permissions  *[]string
+	PasswordHash *string
+}
+
 type People interface {
 	// List returns the owner's people (uid), optionally filtered by type ("Employee"/"Supplier").
 	// An empty personType means no filter.
 	List(ctx context.Context, uid ID, personType string) ([]Person, error)
+	// Create inserts an owner-scoped person. dupEmail is true (and nothing is inserted) when the
+	// email is already registered to another of this owner's people.
+	Create(ctx context.Context, uid ID, in PersonWrite) (p Person, dupEmail bool, err error)
+	// Update applies a partial patch to an owner-scoped person. found is false on a miss;
+	// dupEmail is true when the new email collides with another of the owner's people.
+	Update(ctx context.Context, uid, personID ID, patch PersonPatch) (p Person, dupEmail bool, found bool, err error)
+	// Delete hard-deletes an owner-scoped person. found is false on a miss.
+	Delete(ctx context.Context, uid, personID ID) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------

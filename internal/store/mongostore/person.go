@@ -83,3 +83,134 @@ func (p *people) List(ctx context.Context, uid store.ID, personType string) ([]s
 	}
 	return out, nil
 }
+
+func (p *people) Create(ctx context.Context, uid store.ID, in store.PersonWrite) (store.Person, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Person{}, false, err
+	}
+	perms := in.Permissions
+	if perms == nil {
+		perms = []string{}
+	}
+	now := time.Now().UTC()
+	doc := bson.M{
+		"uid": uidOID, "name": in.Name, "type": in.Type, "email": nullable(in.Email),
+		"phone": in.Phone, "firm": in.Firm, "address": in.Address, "gst": in.Gst,
+		"is_active": true, "permissions": perms, "createdAt": now, "updatedAt": now, "__v": 0,
+	}
+	if in.PasswordHash != nil {
+		doc["password"] = *in.PasswordHash
+	}
+	res, err := p.db.Collection(colPersons).InsertOne(ctx, doc)
+	if isDuplicate(err) {
+		return store.Person{}, true, nil
+	}
+	if err != nil {
+		return store.Person{}, false, fmt.Errorf("insert person: %w", err)
+	}
+	out := personDoc{Name: in.Name, Type: in.Type, Email: strOrEmpty(in.Email), Phone: in.Phone,
+		Firm: in.Firm, Address: in.Address, Gst: in.Gst, IsActive: true, Permissions: perms, CreatedAt: now}.toStore()
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		out.ID = idOf(oid)
+	}
+	return out, false, nil
+}
+
+func (p *people) Update(ctx context.Context, uid, personID store.ID, patch store.PersonPatch) (store.Person, bool, bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Person{}, false, false, err
+	}
+	personOID, err := objectID(personID)
+	if err != nil {
+		return store.Person{}, false, false, nil // malformed id is just "not found"
+	}
+	set := bson.M{}
+	if patch.Name != nil {
+		set["name"] = *patch.Name
+	}
+	if patch.Type != nil {
+		set["type"] = *patch.Type
+	}
+	if patch.EmailSet {
+		set["email"] = nullable(patch.Email)
+	}
+	if patch.Phone != nil {
+		set["phone"] = *patch.Phone
+	}
+	if patch.Firm != nil {
+		set["firm"] = *patch.Firm
+	}
+	if patch.Address != nil {
+		set["address"] = *patch.Address
+	}
+	if patch.Gst != nil {
+		set["gst"] = *patch.Gst
+	}
+	if patch.IsActive != nil {
+		set["is_active"] = *patch.IsActive
+	}
+	if patch.Permissions != nil {
+		perms := *patch.Permissions
+		if perms == nil {
+			perms = []string{}
+		}
+		set["permissions"] = perms
+	}
+	if patch.PasswordHash != nil {
+		set["password"] = *patch.PasswordHash
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	update := bson.M{}
+	if len(set) > 0 {
+		update["$set"] = set
+	} else {
+		// Nothing to change: Node still returns the (unchanged) doc. A no-op $set keeps that.
+		update["$set"] = bson.M{"updatedAt": time.Now().UTC()}
+	}
+	var doc personDoc
+	err = p.db.Collection(colPersons).FindOneAndUpdate(ctx, bson.M{"_id": personOID, "uid": uidOID}, update, opts).Decode(&doc)
+	if err == mongo.ErrNoDocuments {
+		return store.Person{}, false, false, nil
+	}
+	if isDuplicate(err) {
+		return store.Person{}, true, false, nil
+	}
+	if err != nil {
+		return store.Person{}, false, false, fmt.Errorf("update person: %w", err)
+	}
+	return doc.toStore(), false, true, nil
+}
+
+func (p *people) Delete(ctx context.Context, uid, personID store.ID) (bool, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return false, err
+	}
+	personOID, err := objectID(personID)
+	if err != nil {
+		return false, nil
+	}
+	res, err := p.db.Collection(colPersons).DeleteOne(ctx, bson.M{"_id": personOID, "uid": uidOID})
+	if err != nil {
+		return false, fmt.Errorf("delete person: %w", err)
+	}
+	return res.DeletedCount > 0, nil
+}
+
+// nullable maps a nil/empty email pointer to a BSON null, matching Node's `email || null`.
+func nullable(s *string) any {
+	if s == nil || *s == "" {
+		return nil
+	}
+	return *s
+}
+
+func strOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

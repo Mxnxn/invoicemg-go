@@ -251,6 +251,9 @@ func routes(db store.Store) http.Handler {
 	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
 	mux.Handle("POST /person/list", admin(personHandler.List))
 	mux.Handle("GET /people", admin(personHandler.List))
+	mux.Handle("POST /person/create", admin(personHandler.Create))
+	mux.Handle("POST /person/update", admin(personHandler.Update))
+	mux.Handle("POST /person/delete", admin(personHandler.Delete))
 
 	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
 	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))

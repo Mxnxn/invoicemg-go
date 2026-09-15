@@ -298,6 +298,9 @@ CREATE TABLE persons (
     firm          text NOT NULL DEFAULT '',
     address       text NOT NULL DEFAULT '',
     gst           text NOT NULL DEFAULT '',
+    -- Portal password (bcrypt), only ever set for an Employee the admin granted a login. NULL
+    -- otherwise, and never returned on the wire.
+    password      text,
     opening_balance numeric(14,2) NOT NULL DEFAULT 0,
     is_active     boolean NOT NULL DEFAULT true,
     permissions   text[] NOT NULL DEFAULT '{}',
@@ -308,6 +311,9 @@ CREATE TABLE persons (
     updated_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX persons_uid_idx ON persons (uid);
+-- Email is unique per owner where present (Model/Person.js's sparse unique index); a create or
+-- update that collides answers 422 "That email is already registered to a person."
+CREATE UNIQUE INDEX persons_email_per_uid ON persons (uid, email) WHERE email IS NOT NULL;
 
 -- Quotations. company+uid scoped; the list populates client_id into a nested client object.
 CREATE TABLE quotations (

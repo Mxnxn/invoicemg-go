@@ -107,6 +107,28 @@ func (f *Form) field(name string) string {
 // Has reports whether a field arrived with a non-empty value.
 func (f *Form) Has(name string) bool { return f.String(name) != "" }
 
+// Present reports whether a field's KEY arrived at all, an empty value included - the distinction
+// Node draws with `req.body.x !== undefined` (as opposed to Has's truthy `if (req.body.x)`). A
+// JSON null counts as present, matching how an explicit null reaches an Express body.
+func (f *Form) Present(name string) bool {
+	if f.jsonBody != nil {
+		_, ok := f.jsonBody[name]
+		return ok
+	}
+	// ReadForm has already parsed the body, so r.Form / r.MultipartForm are populated.
+	if f.r.Form != nil {
+		if _, ok := f.r.Form[name]; ok {
+			return true
+		}
+	}
+	if f.r.MultipartForm != nil && f.r.MultipartForm.Value != nil {
+		if _, ok := f.r.MultipartForm.Value[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // Int returns a field as a whole number, with a fallback for missing or unparseable input.
 //
 // Unparseable and missing deliberately give the same answer. `Number(undefined) || 0` and

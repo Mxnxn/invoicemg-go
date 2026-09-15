@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (58 of 209)
+## Routes ready (61 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -46,6 +46,9 @@ the 209 routes the Node API declares.
 | `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |
 | `POST /material/remove` | hard delete, company-scoped; a miss still answers 200 (matches Node) | Live · Unit |
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
+| `POST /person/create` | employee/supplier; only Employee+email+password gets a bcrypt login; perms normalised; dup email 422 | Live · Unit |
+| `POST /person/update` | partial edit (present-key semantics); password kept unless resupplied; email cleared to NULL when blank; 404 on miss | Live · Unit |
+| `POST /person/delete` | hard delete, owner-scoped; 404 on miss | Live · Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
 | `POST /purchase-invoice/list` (+ `GET /purchase-invoices`) | supplier_id populated (#6); rows batched; purchase rows default by-quantity | Live · Unit |
 | `POST /invoice/getAll` (+ `GET /invoices`) | issuer letterhead + client + entries populated (#6); totals via entrymath; message "Successful!" | Live · Unit |
@@ -83,7 +86,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `banks` | added for `/bank/list` |
 | `job_reviews` | added for Alert reviews (unique `job_id`, 1–5 CHECKs) |
 | `materials`, `material_price_history` | added for `/material/getall` (sharing array; history child table) |
-| `persons` | added for `/person/list` (nullable notify_po_* = absent-on-wire) |
+| `persons` | + `password` (bcrypt, never returned), unique email per uid; write paths added | Live · Unit |
 | `quotations`, `quotation_rows` | added for `/quotation/list` (populate via LEFT JOIN + batched rows) |
 | `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
 | `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
