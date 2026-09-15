@@ -14,9 +14,12 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type Handler struct{ store store.Jobs }
+type Handler struct {
+	store store.Jobs
+	notes store.JobNotes
+}
 
-func New(s store.Jobs) *Handler { return &Handler{store: s} }
+func New(s store.Jobs, n store.JobNotes) *Handler { return &Handler{store: s, notes: n} }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	sess := auth.MustFrom(r.Context())

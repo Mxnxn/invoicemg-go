@@ -172,7 +172,7 @@ func routes(db store.Store) http.Handler {
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
-	lifecycleHandler := lifecycle.New(db.Jobs())
+	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies())
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"))
@@ -298,6 +298,10 @@ func routes(db store.Store) http.Handler {
 	mux.Handle("POST /lifecycle/jobs/list", feature("lifecycle", lifecycleHandler.List))
 	mux.Handle("POST /lifecycle/jobs/next-challan-number", feature("lifecycle", lifecycleHandler.NextChallan))
 	mux.Handle("POST /lifecycle/jobs/by-entry", feature("lifecycle", lifecycleHandler.ByEntry))
+	mux.Handle("POST /lifecycle/notes/list", feature("lifecycle", lifecycleHandler.NotesList))
+	mux.Handle("POST /lifecycle/notes/create", feature("lifecycle", lifecycleHandler.NoteCreate))
+	mux.Handle("POST /lifecycle/notes/update", feature("lifecycle", lifecycleHandler.NoteUpdate))
+	mux.Handle("POST /lifecycle/history/list", feature("lifecycle", lifecycleHandler.HistoryList))
 	mux.Handle("GET /jobs", feature("lifecycle", lifecycleHandler.List))
 
 	// Delivery challans, behind the challan feature. Only /getAll is ported.

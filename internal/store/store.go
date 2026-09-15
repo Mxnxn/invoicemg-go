@@ -1081,6 +1081,60 @@ type Jobs interface {
 	ByEntry(ctx context.Context, uid, companyID, entryID ID) (Job, bool, error)
 }
 
+// NoteActor identifies who is acting on a note/history entry: an admin acts as their user, an
+// employee as their person (Helpers/Lifecycle actorFromAuth).
+type NoteActor struct {
+	Role     string // "admin" | "employee"
+	UID      ID
+	PersonID ID
+}
+
+// ActorID is the id this actor is recorded under (uid for admin, personId otherwise).
+func (a NoteActor) ActorID() ID {
+	if a.Role == "admin" {
+		return a.UID
+	}
+	return a.PersonID
+}
+
+// JobNote is one note on a job (Model/JobNote.js).
+type JobNote struct {
+	ID         ID
+	JobID      ID
+	AuthorType string
+	AuthorID   ID
+	AuthorName string
+	Text       string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Version    int
+}
+
+// JobHistoryRow is one audit-trail entry (Model/JobHistory.js).
+type JobHistoryRow struct {
+	ID        ID
+	JobID     ID
+	ActorType string
+	ActorID   ID
+	ActorName string
+	Action    string
+	Detail    string
+	CreatedAt time.Time
+	Version   int
+}
+
+type JobNotes interface {
+	// NotesList returns a job's notes, newest first.
+	NotesList(ctx context.Context, uid, companyID, jobID ID) ([]JobNote, error)
+	// NoteCreate adds a note (resolving the actor's name) and logs a "Note added" history entry.
+	NoteCreate(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, text string) (JobNote, error)
+	// NoteUpdate edits a note within the author's 24h window. found is false on a miss; forbidden
+	// is true when the actor is not the author or the window has closed.
+	NoteUpdate(ctx context.Context, uid, companyID, noteID ID, actor NoteActor, text string) (n JobNote, found, forbidden bool, err error)
+	// HistoryList returns a job's audit trail, newest first.
+	HistoryList(ctx context.Context, uid, companyID, jobID ID) ([]JobHistoryRow, error)
+}
+
 // ---------------------------------------------------------------------------------------
 // Challans
 // ---------------------------------------------------------------------------------------
@@ -1640,6 +1694,7 @@ type Store interface {
 	Invoices() Invoices
 	Lookups() Lookups
 	Jobs() Jobs
+	JobNotes() JobNotes
 	Challans() Challans
 	Expenses() Expenses
 	Analytics() Analytics

@@ -203,6 +203,37 @@ CREATE INDEX job_rows_job_idx ON job_rows (job_id);
 -- $elemMatch over a subdocument array. Here the stage is a column and can be indexed.
 CREATE INDEX job_rows_open_idx ON job_rows (job_id) WHERE queue <> 'Done';
 
+-- The job's audit trail (Model/JobHistory.js). job_id is a plain column, NOT a foreign key:
+-- history outlives the job (a trashed/deleted job keeps its trail), so a cascade must not take it.
+CREATE TABLE job_history (
+    id         text PRIMARY KEY DEFAULT gen_ulid(),
+    job_id     text NOT NULL,
+    uid        text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id text REFERENCES companies(id) ON DELETE CASCADE,
+    actor_type text NOT NULL DEFAULT '',
+    actor_id   text NOT NULL DEFAULT '',
+    actor_name text NOT NULL DEFAULT '',
+    action     text NOT NULL DEFAULT '',
+    detail     text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX job_history_job_idx ON job_history (job_id, created_at DESC);
+
+-- Job notes (Model/JobNote.js). Editable only by their author within 24h (Helpers/NoteEditWindow).
+CREATE TABLE job_notes (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    job_id      text NOT NULL,
+    uid         text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id  text REFERENCES companies(id) ON DELETE CASCADE,
+    author_type text NOT NULL DEFAULT '',
+    author_id   text NOT NULL DEFAULT '',
+    author_name text NOT NULL DEFAULT '',
+    text        text NOT NULL DEFAULT '',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX job_notes_job_idx ON job_notes (job_id, created_at DESC);
+
 -- ---------------------------------------------------------------------------------------
 -- Customer reviews (routes/Alert.js)
 -- ---------------------------------------------------------------------------------------

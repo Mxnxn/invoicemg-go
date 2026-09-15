@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (89 of 209)
+## Routes ready (93 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -80,6 +80,10 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
 | `POST /lifecycle/jobs/next-challan-number` | next MG/FY/ challan (docnumber, empty code) | Live · Unit |
 | `POST /lifecycle/jobs/by-entry` | populated job owning an entry, or data:null | Live · Unit |
+| `POST /lifecycle/notes/list` | job notes newest-first, each flagged canEdit (author + 24h) | Live · Unit |
+| `POST /lifecycle/notes/create` | add a note (actor name resolved), logs "Note added" history | Live · Unit |
+| `POST /lifecycle/notes/update` | edit within author's 24h window; 403 otherwise; logs "Note edited" | Live · Unit |
+| `POST /lifecycle/history/list` | a job's audit trail, newest-first | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
 | `POST /batch-receive/lookups/open-jobs` | client's unpaid jobs (advance<total), oldest first, entryCount | Live · Unit |
@@ -120,6 +124,7 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
 | `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
 | jobs/job_rows extended | employee/vendor/queue_order/alert channels + row employee/quotation/queue_order, for `/lifecycle/jobs/list` |
+| `job_history`, `job_notes` | added for lifecycle notes + audit trail; job_id is a plain column (history outlives a trashed job) |
 | `challans` | added for `/challan/getAll` |
 | `expenses` | added for `/expense/list` (bank populate; string date range) |
 | `invoice_received` | added for `/analytics/revenue` (invoiced collected series) |
