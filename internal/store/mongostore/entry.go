@@ -20,7 +20,7 @@ func (s *Store) Entries() store.Entries { return &entries{db: s.db} }
 // fullEntryDoc reads the entry columns entryDoc omits (client_id/uid/has_issued), needed by
 // the /entry domain where those are part of the wire shape.
 type fullEntryDoc struct {
-	entryDoc  `bson:",inline"`
+	Base      entryDoc            `bson:",inline"`
 	ClientID  *primitive.ObjectID `bson:"client_id"`
 	CompanyID *primitive.ObjectID `bson:"company_id"`
 	UID       *primitive.ObjectID `bson:"uid"`
@@ -28,7 +28,7 @@ type fullEntryDoc struct {
 }
 
 func (e fullEntryDoc) toStore() store.Entry {
-	out := e.entryDoc.toStore()
+	out := e.Base.toStore()
 	out.HasIssued = e.HasIssued
 	if e.ClientID != nil {
 		out.ClientID = idOf(*e.ClientID)
@@ -297,15 +297,15 @@ func (en *entries) SinceForClient(ctx context.Context, uid, companyID, clientID 
 		return nil, err
 	}
 	var docs []struct {
-		fullEntryDoc `bson:",inline"`
-		Issued       *primitive.ObjectID `bson:"issued"`
+		Full   fullEntryDoc        `bson:",inline"`
+		Issued *primitive.ObjectID `bson:"issued"`
 	}
 	if err := cur.All(ctx, &docs); err != nil {
 		return nil, err
 	}
 	out := make([]store.ClientEntryView, 0, len(docs))
 	for _, d := range docs {
-		v := store.ClientEntryView{Entry: d.fullEntryDoc.toStore()}
+		v := store.ClientEntryView{Entry: d.Full.toStore()}
 		if d.Issued != nil {
 			v.IssuedID = idOf(*d.Issued)
 			v.IssuedInvoiceID = en.invoiceNumber(ctx, *d.Issued)

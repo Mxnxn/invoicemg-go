@@ -147,8 +147,8 @@ func (c *clients) Update(ctx context.Context, companyID, clientID store.ID, in s
 	}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var doc struct {
-		clientDoc `bson:",inline"`
-		LegacyID  any `bson:"client_id"`
+		Base     clientDoc `bson:",inline"`
+		LegacyID any       `bson:"client_id"`
 	}
 	err = c.db.Collection(colClients).FindOneAndUpdate(ctx,
 		bson.M{"_id": clientOID, "company_id": companyOID}, bson.M{"$set": set}, opts).Decode(&doc)
@@ -158,7 +158,7 @@ func (c *clients) Update(ctx context.Context, companyID, clientID store.ID, in s
 	if err != nil {
 		return store.Client{}, store.DupNone, false, fmt.Errorf("update client: %w", err)
 	}
-	out := doc.clientDoc.toStore()
+	out := doc.Base.toStore()
 	out.LegacyID = doc.LegacyID
 	return out, store.DupNone, true, nil
 }

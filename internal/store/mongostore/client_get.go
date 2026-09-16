@@ -57,9 +57,9 @@ func (c *clients) Get(ctx context.Context, companyID, clientID store.ID) (store.
 	d.Entries = make([]store.ClientEntryView, 0, len(doc.Entries))
 	for _, id := range doc.Entries {
 		var ed struct {
-			fullEntryDoc `bson:",inline"`
-			Issued       *primitive.ObjectID `bson:"issued"`
-			QuotationID  *primitive.ObjectID `bson:"quotation_id"`
+			Full        fullEntryDoc        `bson:",inline"`
+			Issued      *primitive.ObjectID `bson:"issued"`
+			QuotationID *primitive.ObjectID `bson:"quotation_id"`
 		}
 		if err := c.db.Collection(colEntries).FindOne(ctx, bson.M{"_id": id}).Decode(&ed); err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -67,7 +67,7 @@ func (c *clients) Get(ctx context.Context, companyID, clientID store.ID) (store.
 			}
 			return store.ClientDetail{}, false, err
 		}
-		v := store.ClientEntryView{Entry: ed.fullEntryDoc.toStore()}
+		v := store.ClientEntryView{Entry: ed.Full.toStore()}
 		if ed.Issued != nil {
 			v.IssuedID = idOf(*ed.Issued)
 			v.IssuedInvoiceID = c.invoiceNumber(ctx, *ed.Issued)
