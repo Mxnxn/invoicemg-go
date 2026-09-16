@@ -148,7 +148,7 @@ func (c *clients) Update(ctx context.Context, companyID, clientID store.ID, in s
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var doc struct {
 		clientDoc `bson:",inline"`
-		LegacyID  *int64 `bson:"client_id"`
+		LegacyID  any `bson:"client_id"`
 	}
 	err = c.db.Collection(colClients).FindOneAndUpdate(ctx,
 		bson.M{"_id": clientOID, "company_id": companyOID}, bson.M{"$set": set}, opts).Decode(&doc)

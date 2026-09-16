@@ -144,7 +144,7 @@ func (en *entries) loadClient(ctx context.Context, id primitive.ObjectID) *store
 		ID            primitive.ObjectID  `bson:"_id"`
 		CompanyID     *primitive.ObjectID `bson:"company_id"`
 		UID           *primitive.ObjectID `bson:"uid"`
-		LegacyID      *int64              `bson:"client_id"`
+		LegacyID      any                 `bson:"client_id"`
 		ClientName    string              `bson:"clientName"`
 		ClientFirm    string              `bson:"clientFirm"`
 		ClientPhone   string              `bson:"clientPhone"`

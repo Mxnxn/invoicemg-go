@@ -358,7 +358,7 @@ type Client struct {
 	ID             ID
 	UID            ID
 	CompanyID      ID
-	LegacyID       *int64 // Client.client_id, the Date.now() millis Node stamps; nil when unset
+	LegacyID       any // Client.client_id: Node stores it as a String, Postgres as bigint; echoed as stored
 	ClientName     string
 	ClientFirm     string
 	ClientPhone    string
@@ -385,7 +385,7 @@ type ClientDetail struct {
 	ID            ID
 	UID           ID
 	CompanyID     ID
-	LegacyID      *int64
+	LegacyID      any
 	ClientName    string
 	ClientFirm    string
 	ClientPhone   string
@@ -963,7 +963,7 @@ type EntryClient struct {
 	ID            ID
 	CompanyID     ID
 	UID           ID
-	LegacyID      *int64
+	LegacyID      any
 	ClientName    string
 	ClientFirm    string
 	ClientPhone   string

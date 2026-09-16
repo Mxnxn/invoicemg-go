@@ -27,7 +27,7 @@ func (c *clients) Get(ctx context.Context, companyID, clientID store.ID) (store.
 		ID            primitive.ObjectID   `bson:"_id"`
 		UID           *primitive.ObjectID  `bson:"uid"`
 		CompanyID     *primitive.ObjectID  `bson:"company_id"`
-		LegacyID      *int64               `bson:"client_id"`
+		LegacyID      any                  `bson:"client_id"`
 		ClientName    string               `bson:"clientName"`
 		ClientFirm    string               `bson:"clientFirm"`
 		ClientPhone   string               `bson:"clientPhone"`
