@@ -239,3 +239,39 @@ func (p *people) FindEmployeeByEmail(ctx context.Context, email string) (store.E
 		PasswordHash: doc.Password, IsActive: doc.IsActive, Permissions: doc.Permissions,
 	}, true, nil
 }
+
+func (p *people) SetNotifyField(ctx context.Context, uid, personID store.ID, field string, value *bool) (store.Person, bool, error) {
+	if _, ok := store.NotifyFields[field]; !ok {
+		return store.Person{}, false, fmt.Errorf("unknown notify field %q", field)
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Person{}, false, err
+	}
+	personOID, err := objectID(personID)
+	if err != nil {
+		return store.Person{}, false, err // Node's CastError -> 500
+	}
+	// nil stores BSON null ("clear" -> follow the default); a non-nil pointer stores the bool.
+	var v any
+	if value != nil {
+		v = *value
+	}
+	proj := bson.M{
+		"name": 1, "type": 1, "email": 1, "phone": 1, "firm": 1, "address": 1, "gst": 1,
+		"openingBalance": 1, "is_active": 1, "permissions": 1,
+		"notifyPoCreated": 1, "notifyPoUpdated": 1, "notifyPoConfirmed": 1, "createdAt": 1,
+	}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(proj)
+	var doc personDoc
+	err = p.db.Collection(colPersons).
+		FindOneAndUpdate(ctx, bson.M{"_id": personOID, "uid": uidOID}, bson.M{"$set": bson.M{field: v}}, opts).
+		Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.Person{}, false, nil
+	}
+	if err != nil {
+		return store.Person{}, false, fmt.Errorf("set notify field: %w", err)
+	}
+	return doc.toStore(), true, nil
+}

@@ -2,6 +2,7 @@ package mongostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,6 +12,12 @@ import (
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
+
+// validClientNotifyField guards the ONE field name a notify-preference write may target. In
+// Mongo the field name is the bson key itself, so this is the whole safety check.
+func validClientNotifyField(field string) bool {
+	return field == "notifyOnCreate" || field == "notifyOnUpdate"
+}
 
 type clients struct{ db *mongo.Database }
 
@@ -229,4 +236,114 @@ func (c *clients) EnsureSupplier(ctx context.Context, uid store.ID, in store.Cli
 		return false, fmt.Errorf("insert supplier: %w", err)
 	}
 	return true, nil
+}
+
+func (c *clients) SetNotifyPreference(ctx context.Context, companyID, clientID store.ID, field string, value *bool) (*bool, *bool, bool, error) {
+	if !validClientNotifyField(field) {
+		return nil, nil, false, fmt.Errorf("unknown notify field %q", field)
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return nil, nil, false, err // Node's CastError -> 500
+	}
+	var v any
+	if value != nil {
+		v = *value
+	}
+	proj := bson.M{"notifyOnCreate": 1, "notifyOnUpdate": 1}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(proj)
+	var doc struct {
+		OnCreate *bool `bson:"notifyOnCreate"`
+		OnUpdate *bool `bson:"notifyOnUpdate"`
+	}
+	err = c.db.Collection(colClients).
+		FindOneAndUpdate(ctx, bson.M{"_id": clientOID, "company_id": companyOID}, bson.M{"$set": bson.M{field: v}}, opts).
+		Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil, false, nil
+	}
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("set client notify: %w", err)
+	}
+	return doc.OnCreate, doc.OnUpdate, true, nil
+}
+
+func (c *clients) NotifyPreferences(ctx context.Context, companyID store.ID, answeredOnly bool) ([]store.ClientNotify, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"company_id": companyOID}
+	if answeredOnly {
+		// $in:[true,false] matches an ANSWERED flag - not null, not absent - exactly as Node's.
+		filter["$or"] = bson.A{
+			bson.M{"notifyOnCreate": bson.M{"$in": bson.A{true, false}}},
+			bson.M{"notifyOnUpdate": bson.M{"$in": bson.A{true, false}}},
+		}
+	}
+	proj := bson.M{"clientName": 1, "clientFirm": 1, "clientPhone": 1, "notifyOnCreate": 1, "notifyOnUpdate": 1}
+	// Sort by clientFirm only, matching routes/Client.js; the sqlstore adds the _id tiebreak (#19).
+	cur, err := c.db.Collection(colClients).Find(ctx, filter,
+		options.Find().SetProjection(proj).SetSort(bson.D{{Key: "clientFirm", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("listing notify preferences: %w", err)
+	}
+	defer cur.Close(ctx)
+	var docs []struct {
+		ID          primitive.ObjectID `bson:"_id"`
+		ClientName  string             `bson:"clientName"`
+		ClientFirm  string             `bson:"clientFirm"`
+		ClientPhone string             `bson:"clientPhone"`
+		OnCreate    *bool              `bson:"notifyOnCreate"`
+		OnUpdate    *bool              `bson:"notifyOnUpdate"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, fmt.Errorf("reading notify preferences: %w", err)
+	}
+	out := make([]store.ClientNotify, 0, len(docs))
+	for _, d := range docs {
+		out = append(out, store.ClientNotify{
+			ID: idOf(d.ID), ClientName: d.ClientName, ClientFirm: d.ClientFirm, ClientPhone: d.ClientPhone,
+			NotifyOnCreate: d.OnCreate, NotifyOnUpdate: d.OnUpdate,
+		})
+	}
+	return out, nil
+}
+
+func (c *clients) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedClient, error) {
+	oids, err := objectIDs(companyIDs)
+	if err != nil {
+		return nil, err
+	}
+	proj := bson.M{"clientName": 1, "clientFirm": 1, "clientPhone": 1, "clientGST": 1, "company_id": 1}
+	cur, err := c.db.Collection(colClients).Find(ctx, bson.M{"company_id": bson.M{"$in": oids}},
+		options.Find().SetProjection(proj).SetSort(bson.D{{Key: "clientFirm", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("shared customers: %w", err)
+	}
+	defer cur.Close(ctx)
+	var docs []struct {
+		ID          primitive.ObjectID  `bson:"_id"`
+		ClientName  string              `bson:"clientName"`
+		ClientFirm  string              `bson:"clientFirm"`
+		ClientPhone string              `bson:"clientPhone"`
+		ClientGST   string              `bson:"clientGST"`
+		CompanyID   *primitive.ObjectID `bson:"company_id"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.SharedClient, 0, len(docs))
+	for _, d := range docs {
+		sc := store.SharedClient{ID: idOf(d.ID), ClientName: d.ClientName, ClientFirm: d.ClientFirm, ClientPhone: d.ClientPhone, ClientGST: d.ClientGST}
+		if d.CompanyID != nil {
+			sc.CompanyID = idOf(*d.CompanyID)
+		}
+		out = append(out, sc)
+	}
+	return out, nil
 }

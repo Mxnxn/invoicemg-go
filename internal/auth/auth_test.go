@@ -211,3 +211,5 @@ func TestRequireAdminAllowsAdminAndSuperadmin(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeSessions) DeactivateOthers(context.Context, store.ID, string) error { return nil }

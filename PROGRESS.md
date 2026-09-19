@@ -16,12 +16,13 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (134 of 209)
+## Routes ready (153 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
 | `POST /user/login` (+ `POST /sessions`) | bcrypt (`$2a`), TOTP accounts refused, session issued | Live · Unit |
 | `POST /user/logout` | retire the caller's session (is_active=false) so its token can't be replayed | Live · Unit |
+| `POST /user/password/change` | verify current bcrypt (not just a live session), set new (cost 10, ≥8 chars, must differ); retires every OTHER session, keeps the caller's; 422 wrong-current/validation, 404 gone | Unit |
 | `POST /person/login` | employee portal login: bcrypt verify, opens an "employee" session (person_id + permissions); 422 unknown/bad, 401 disabled | Live · Unit |
 | `POST /sheet/only` (+ `GET /days`) | day list from job `receivedDate`; no `status` field | Live |
 | `POST /sheet/open-jobs` (+ `GET /jobs/open`) | open job-ids, oldest first, client nested | Live |
@@ -34,10 +35,13 @@ the 209 routes the Node API declares.
 | `POST /alert/{job_id}/job/{jobcard_id}/review` | public write; parseScores; E11000 → 409; company fallback | Live · Unit |
 | `POST /bank/list` (+ `GET /banks`) | whole record incl `__v`, `createdAt` millis; no `status` | Live · Unit |
 | `POST /bank/create` | add a bank account (name trimmed/required); whole record echoed; no status field | Live · Unit |
+| `POST /bank/update` | rename + (only when submitted) re-set openingBalance so a name-only edit can't wipe a balance; 422 "A bank needs a name."; 404 on miss | Unit |
+| `POST /bank/remove` | requireDelete; refuses with the exact txn count when receipts/supplier-payments/expenses reference it (correct singular/plural); 404 on miss | Unit |
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
 | `POST /whatsapp/config` | company WhatsApp settings (phone/business ids, hasApiToken, configured); token never echoed; 404 | Live · Unit |
 | `POST /whatsapp/config/update` | admin; save phone/business ids and (only when non-blank) the api token; 404 | Live · Unit |
 | `POST /whatsapp/send` | forward a text to a client over the company's Cloud API; validation live-verified, Meta success/error mapping (incl. 190 expired-token) unit-tested against a mock | Unit (send path mocked) |
+| `POST /whatsapp/templates` | live-read the account's approved templates from Meta Graph; maps id/name/lang/status/category + headerText/bodyText/bodyVariables/hasUrlButton/urlButtonHasVariable; 422 unconfigured, 502 Meta/transport error | Unit (Graph mocked) |
 | `POST /client/getall` (+ `GET /clients`) | sharing-widened read; `borrowed` flag; `"Operation successful"` (no period) | Live · Unit |
 | `POST /client/only` (+ `GET /clients/only`) | lighter list + `openingBalance` | Live · Unit |
 | `POST /client/add` | create; per-company GST/phone uniqueness; phone=10/gst=15 checks; also_supplier convenience; legacy client_id millis | Live · Unit |
@@ -47,11 +51,15 @@ the 209 routes the Node API declares.
 | `POST /client/batchUpdate` | plain logged client receipt, no entry allocation (Node's auto-apply is disabled); verifies client ownership; 422/404 | Live · Unit |
 | `POST /client/batchReceiveUpdate` | patch a receipt's amount/note/date (only sent fields), company-scoped (Node was unscoped); 422/404 | Live · Unit |
 | `POST /client/batchReceiveDelete` | plain delete of a receipt, no allocation reversal (Node's fill disabled), company-scoped; 422/404 | Live · Unit |
+| `POST /client/notify-preference` | tri-state "notify on job-id raised/updated": kind picks the field, value from notifyOnCreate\|\|value (`clear`→null,`true`→true,else false), company-scoped; returns both flags; 422/404 | Unit |
+| `GET /client/notify-preferences` | customers + both flags, firm-sorted; `?all=true` returns everyone, else only those who answered either flag | Unit |
 | `POST /company/list` (+ `GET /companies`) | switcher; `company_limit`/`can_add_company` | Live · Unit |
 | `POST /company/active` | acting company letterhead | Live · Unit |
 | `POST /company/create` | admin; first company becomes default; firm falls back to name | Live · Unit |
 | `POST /company/update` | admin; partial edit (present-key); 404 on miss | Live · Unit |
 | `POST /company/switch` | any user; binds this TAB-ID to an owned active company; 422 without TAB-ID | Live · Unit |
+| `POST /company/numbering` | per-type numbering formats (invoice/job/quotation/purchase), each filled from DEFAULT_FORMATS where unset, + a next-number preview; never 404s | Unit |
+| `POST /company/numbering/update` | admin; set one type's format (incl. purchaseOrder); normalises (prefix trim, year whitelist, pad clamp 1-8) then requires a prefix (422); stores in `companies.numbering` jsonb; 422 unknown-kind, 404 miss | Unit |
 | `POST /company/deactivate` | admin; keep-one + not-the-default guards; clears tab bindings; never deletes | Live · Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
@@ -63,10 +71,12 @@ the 209 routes the Node API declares.
 | `POST /material/update` | edit; a rate change pushes a price-history row of the OLD rates; 404 on miss | Live · Unit |
 | `POST /material/remove` | hard delete, company-scoped; a miss still answers 200 (matches Node) | Live · Unit |
 | `POST /material/get` | admin/products; one product by id, company-scoped; miss -> 200 data:null | Live · Unit |
+| `POST /material/set-unit` | requireCreate; set an OWNED product's unit (24-hex id guard -> 404, not 500); a borrowed/shared-in product -> 404 with the "owned by another company" message; returns {_id,material_name,unit} | Unit |
 | `POST /person/list` (+ `GET /people`) | employees + suppliers; `type` filter; unset notifyPo* omitted (#22) | Live · Unit |
 | `POST /person/create` | employee/supplier; only Employee+email+password gets a bcrypt login; perms normalised; dup email 422 | Live · Unit |
 | `POST /person/update` | partial edit (present-key semantics); password kept unless resupplied; email cleared to NULL when blank; 404 on miss | Live · Unit |
 | `POST /person/delete` | hard delete, owner-scoped; 404 on miss | Live · Unit |
+| `POST /person/notify-preference` | admin; set one tri-state supplier-notify flag (true/false/clear->null), whitelisted field, owner-scoped; returns the {name,type,firm,phone,notifyPo*} projection; 422 unknown-field/bad-value, 404 miss | Unit |
 | `POST /quotation/list` (+ `GET /quotations`) | client_id populated (#6 batched); rows batched; optional client filter | Live · Unit |
 | `POST /quotation/row/add-to-job` | convert a quotation row into a job row: new job or append to the quotation's existing job; stamps row.job_id; System note + "Created"/"Updated" history; 404/422 | Live · Unit |
 | `POST /quotation/next-quotation-number` | next MG/FY/QT- number (docnumber) | Live · Unit |
@@ -107,6 +117,10 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/jobs/progress` | Unassigned clears assignee; Complete advances queue stage; else set; assignee gate 422; logs history | Live · Unit |
 | `POST /lifecycle/jobs/queue` | persist drag-reordered stage list; logs "Queue reordered" | Live · Unit |
 | `POST /lifecycle/jobs/set-queue` | jump to a stage (clears assignee); no-op when already there | Live · Unit |
+| `POST /lifecycle/jobs/unlock` | toggle the edit lock (`unlocked` defaults true); "No change." vs "Job unlocked."/"Job locked."; logs "Updated" history only on a real change; returns the populated job with status:true (unlike the other transitions); 422/404 | Unit |
+| `POST /lifecycle/jobs/rows/complete-all` | mark every not-Done row Done in bulk; reproduces refusedByLock("queue") → **403** when invoiced+locked (new `JobTxLocked` + per-backend isJobInvoiced); writes STRUCTURED "Queue advanced" history per row (fromStage/toStage/rowKey via new job_history columns); "N row(s) marked done." / "Every row was already done."; 422/404 | Unit |
+| `POST /lifecycle/jobs/delete` | move a job to **Trash**: full snapshot (source "Job", rows + job-level fields for restore) + TrashUser push (Mongo) + "Trashed" history, then remove the job; refusedByLock("delete") → **403** when invoiced+locked; SQL path is transactional; 422/404. First Trash producer in Go. | Unit |
+| `POST /lifecycle/jobs/queue/default` | admin; save the company's default job queue pipeline; `NormalizeQueueOrder` pins Created/Done + de-dupes; valid-JSON non-array falls back to defaults (not an error), only invalid JSON is a parse-422; 404 if the company is gone. Adds `companies.queue_order`. | Unit |
 | `POST /lifecycle/jobs/rows/assign` | row employee + progress recompute; logs Assigned/Unassigned | Live · Unit |
 | `POST /lifecycle/jobs/rows/queue` | row stage jump (clears employee, progress→Assign) | Live · Unit |
 | `POST /lifecycle/jobs/rows/queue-order` | persist a row drag-reordered stage list | Live · Unit |
@@ -130,12 +144,17 @@ the 209 routes the Node API declares.
 | `POST /entry/getall` | admin; every entry in the company | Live · Unit |
 | `POST /sheet/get` | admin; a day-sheet's entries grouped into one card per client, top-level `date`; 404/422; update/remove/getall are empty Node stubs, not ported | Live · Unit |
 | `POST /wastage/add` | log an offcut; numeric casts; purchase_rate/cost_total default 0; whole record echoed | Live · Unit |
+| `POST /wastage/remove` | requireDelete(challan); hard-delete a company-scoped wastage row; 422 missing id, 404 on miss | Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |
 | `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |
 | `POST /ledger/dues` | all-client receivables; shared dues math (ties to /client); numbers not strings; deleted clients dropped; server-side totals | Live · Unit |
 | `POST /purchase-report/dues` | payables twin of /ledger/dues: per-supplier billed/paid/due + totals, due-sorted, numbers not strings | Live · Unit |
 | `POST /purchase-report/supplier` | one supplier's ledger: invoices+payments merged chronologically, opening/closing/current, from/to, _seq tiebreak; 422/404 | Live · Unit |
+| `POST /settings/appearance` (+ `GET /settings/appearance`) | per-owner (personId\|\|uid) appearance blob; `null` on first login, `{}` once any setting exists; not admin-gated | Unit |
+| `POST /settings/appearance/update` (+ `PUT /settings/appearance`) | upsert appearance; JSON-in-form field, non-object → 422 "Invalid request."; other section seeded `{}` on insert (setDefaultsOnInsert parity) | Unit |
+| `POST /settings/tables` (+ `GET /settings/tables`) | per-owner per-table column blob; same null/`{}` semantics as appearance; separate blob so a column drag can't race a font change | Unit |
+| `POST /settings/tables/update` (+ `PUT /settings/tables`) | upsert per-table columns; same JSON-in-form + 422 rules | Unit |
 
 **The app boots standalone** on the Go backend as far as: login → shell (switcher, navbar,
 profile) → the Customers, Products (units), Banks and Daily screens. The default landing
@@ -151,9 +170,10 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | Table | Notes |
 |---|---|
 | `users` | + `company_limit`, `active_until`, `totp_*` |
-| `companies` | + letterhead (`firm/phone/gst/address/url`), banking (`upi_qr/account_no/ifsc/bank_name`), `is_active` |
+| `companies` | + letterhead (`firm/phone/gst/address/url`), banking (`upi_qr/account_no/ifsc/bank_name`), `is_active`, `queue_order text[]` (default pipeline), `numbering jsonb` (per-type formats) |
 | `user_sessions`, `company_sessions` | token + per-tab company binding |
-| `clients` | + `opening_balance`, `shared_company_ids text[]` (sharing), `client_id bigint` (legacy Date.now() millis, echoed by writes) |
+| `clients` | + `opening_balance`, `shared_company_ids text[]` (sharing), `client_id bigint` (legacy Date.now() millis, echoed by writes), nullable `notify_on_create`/`notify_on_update` (tri-state notify prefs) |
+| `user_settings` | per-owner (personId\|\|uid) `appearance`/`tables` jsonb blobs, both DEFAULT '{}' (setDefaultsOnInsert parity) |
 | `jobs`, `job_rows` | rows are their own table (money columns, tax CHECK) |
 | `sheets` | day/date rows |
 | `units` | unique `(company_id, key)` |
@@ -165,7 +185,8 @@ IDs are `text` (24-char ObjectID hex, ULIDs for new rows via `gen_ulid()` — ne
 | `purchase_invoices`, `purchase_invoice_rows` | added for `/purchase-invoice/list` (supplier populate + batched rows) |
 | `invoices`, `entries` | added for `/invoice/getAll` (entries linked by invoice_id; batched populate) |
 | jobs/job_rows extended | employee/vendor/queue_order/alert channels + row employee/quotation/queue_order, for `/lifecycle/jobs/list` |
-| `job_history`, `job_notes` | added for lifecycle notes + audit trail; job_id is a plain column (history outlives a trashed job) |
+| `job_history`, `job_notes` | added for lifecycle notes + audit trail; job_id is a plain column (history outlives a trashed job); job_history + `from_stage`/`to_stage`/`row_key` for structured "Queue advanced" events |
+| `trash` extended | + Job-snapshot columns (`source`, `total`, `advance`, `has_issued`/`issued`, `challan_number`, `employee_id`/`vendor_id`, `queue`/`progress`/`queue_order`, `received_date`, `rows jsonb`) so `/lifecycle/jobs/delete` stores a restorable snapshot |
 | `challans` | added for `/challan/getAll` |
 | `expenses` | added for `/expense/list` (bank populate; string date range) |
 | `invoice_received` | added for `/analytics/revenue` (invoiced collected series) |
@@ -211,8 +232,59 @@ yet stored** — returned at defaults, pending the config write-paths.
 
 Everything not listed above — Analytics (the landing), Invoice, Quotation, PurchaseInvoice/Order,
 Lifecycle, Challan, Ledger, GstReport, Statistics, Trash, Person, Expense, BatchReceive, Wastage,
-Material, Settings, Supplier/Payment, WhatsApp send, Enquiry, Dev/*, and all write-paths for the
+Material, Supplier/Payment, WhatsApp send, Enquiry, Dev/*, and all write-paths for the
 domains whose reads are done (Client, Company, Bank, Sheet).
+
+The bulk of that list is stale — Person, Material, Lifecycle, Ledger and most others above now
+have their reads and many writes ported (see the table). What genuinely remains for a
+**Node-independent** frontend is tracked here as the standalone-blocking gaps.
+
+Cleared since: Settings (`/settings/appearance|tables` + updates), `/bank/update` + `/bank/remove`,
+`/wastage/remove`, `/material/set-unit`, `/person/notify-preference`, `/user/password/change`,
+`/client/notify-preference` + GET `/client/notify-preferences`, `/whatsapp/templates`.
+
+Still blocking a Node-free frontend:
+- **Numbering config** (`/company/numbering` + `/numbering/update`): **DONE** — the config is
+  stored (`companies.numbering` jsonb) and read/normalised via `docnumber.Format`/`NormalizeFormat`/
+  `FormatDocumentNumber`. ⚠️ **Ripple still open:** the ported next-number routes
+  (`/invoice/next-invoice-number`, `/quotation/next-quotation-number`,
+  `/lifecycle/jobs/next-challan-number`) and every doc-creation site still use `docnumber.Next`'s
+  OLD hardcoded `MG/<FY>/…` scheme — they do NOT yet honour the stored per-company format. Wiring
+  `Next` to the config is the remaining step and wants a live diff (it changes issued numbers).
+- **Cross-account sharing** (`/sharing/preview`, `/sharing/set`, `/company/sharing`) and the
+  **Shared reads** (`/shared/customers|materials|duplicate-materials`). **Store foundation landed**
+  (not yet route-wired): `Companies.Scope` (= `Helpers/CompanyScope.scopeFor`, fail-closed to the
+  acting company), `Companies.SetReportsAcrossCompanies` (the `/company/sharing` toggle), and
+  `Clients.SharedList` / `Materials.SharedList` (the firm/name-sorted cross-company projections),
+  all implemented in BOTH backends + a mongostore `objectIDs` helper. Remaining before these
+  screens work:
+  - Wire the handlers/routes for `GET /shared/customers`, `GET /shared/materials`,
+    `POST /company/sharing`. The store methods above already back these — a handler package
+    (`internal/shared`) that combines `Scope` (labels + `shared` flag + `companyCount`) with
+    `SharedList` (rows) and the `countDuplicates` tally, mirroring `routes/Shared.js`.
+  - `GET /shared/duplicate-materials` and the write pair `POST /sharing/preview` + `/sharing/set`
+    still need NEW store surface: the owner's full company set with a per-record `sharing` count
+    (duplicate-materials, grouped on `InventoryMath.normaliseKey`), and read/write of a record's
+    `sharing.companies` under `ownedScope` plus `companiesLosingAccess` (the preview/set writes).
+    Node source: `InvoiceMG-Mxnxn/invoice-mg-api/routes/{Shared,Sharing}.js`,
+    `Helpers/{CompanyScope,SharedRecords}.js`.
+  - ⚠️ The store interface additions (`Scope`, `SetReportsAcrossCompanies`, `SharedList`) had
+    briefly BROKEN the build (unimplemented in sqlstore + an undefined `objectIDs` in mongostore +
+    lagging test stubs); that is fixed — `go build ./...` and `go test ./...` are both green again.
+- **Lifecycle writes** — `/jobs/unlock`, `/jobs/rows/complete-all` and `/jobs/delete` are ported.
+  Infra now in place: `JobTxLocked` (403 lock refusal) + per-backend isJobInvoiced, structured
+  `job_history` columns (from_stage/to_stage/row_key) + `history/list` returns them, and the first
+  Trash producer (job snapshot with rows, + TrashUser push on Mongo). Remaining:
+  - `/jobs/alert` → the WhatsApp done-alert: idempotent compare-and-set (#11) + "WhatsApp alert
+    sent/failed" history + a Meta send; a distinct beast from the queue transitions.
+  - **Pre-existing gap (not a regression):** the already-shipped transitions
+    `/jobs/progress`, `/jobs/set-queue`, `/jobs/queue`, `/jobs/rows/queue`, `/jobs/rows/progress`
+    still (a) skip refusedByLock and (b) write plain (not structured) "Queue advanced" history,
+    where Node does both. Retrofitting them is a behavior change to shipped routes — do it against a
+    live Node diff. The infra to fix them (JobTxLocked, isJobInvoiced, structured histEntry) now exists.
+- **User account** (`/user/password/request-reset`, `/user/totp/reveal`, `/user/register`) —
+  TOTP reveal depends on the unported TOTP (#10); request-reset likely involves email.
+- **Analytics production** (`/analytics/production/throughput`, `/analytics/production/wip`).
 
 Two audit-fidelity items still have no ported route to exercise them: **#25** (body-size limits)
 and **#27** (XLSX exports). Everything else in `docs/MIGRATION-AUDIT.md` (#1, #5, #6, #19–24, #26,

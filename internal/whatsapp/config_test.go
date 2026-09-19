@@ -25,6 +25,12 @@ func (s *stubCompanies) Active(context.Context, store.ID, store.ID) (store.Compa
 	return s.company, nil
 }
 func (s *stubCompanies) Count(context.Context, store.ID) (int, error) { return 0, nil }
+func (s *stubCompanies) Scope(context.Context, store.ID, store.ID) ([]store.ID, bool, map[store.ID]string, error) {
+	return nil, false, nil, nil
+}
+func (s *stubCompanies) SetReportsAcrossCompanies(context.Context, store.ID, store.ID, bool) (bool, error) {
+	return false, nil
+}
 func (s *stubCompanies) Create(context.Context, store.ID, store.CompanyWrite) (store.Company, error) {
 	return store.Company{}, nil
 }
@@ -86,4 +92,15 @@ func TestConfigUpdate(t *testing.T) {
 	if c2.gotPatch.WaAPIToken != nil {
 		t.Errorf("blank token should not be patched: %+v", c2.gotPatch)
 	}
+}
+
+func (s *stubCompanies) SetQueueOrder(context.Context, store.ID, []string) ([]string, bool, error) {
+	return nil, false, nil
+}
+
+func (s *stubCompanies) Numbering(context.Context, store.ID, store.ID) (map[string]json.RawMessage, error) {
+	return map[string]json.RawMessage{}, nil
+}
+func (s *stubCompanies) SetNumbering(context.Context, store.ID, store.ID, string, json.RawMessage) (bool, error) {
+	return false, nil
 }

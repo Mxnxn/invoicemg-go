@@ -32,6 +32,30 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
 }
 
+// Remove is POST /wastage/remove: hard-delete a company-scoped wastage record. Behind the
+// challan feature with requireDelete on top. Missing id -> 422; not the company's -> 404.
+func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	id := form.String("wastage_id")
+	if id == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	found, err := h.store.Delete(ctx, sess.CompanyID, store.ID(id))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Wastage record not found.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Wastage record deleted.", Status: httpx.True()})
+}
+
 func idPtr(id store.ID) *string {
 	if id == "" {
 		return nil

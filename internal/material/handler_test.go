@@ -37,6 +37,12 @@ func (s *stubMaterials) Delete(context.Context, store.ID, store.ID) error { retu
 func (s *stubMaterials) Get(context.Context, store.ID, store.ID) (store.Material, bool, error) {
 	return s.one, s.oneFound, nil
 }
+func (s *stubMaterials) SetUnit(context.Context, store.ID, store.ID, string) (string, string, bool, bool, error) {
+	return "", "", false, false, nil
+}
+func (s *stubMaterials) SharedList(context.Context, []store.ID) ([]store.SharedMaterial, error) {
+	return nil, nil
+}
 
 // writeStub drives the write-path tests.
 type writeStub struct {
@@ -47,6 +53,14 @@ type writeStub struct {
 	gotUpdate   store.MaterialWrite
 	gotDeleteID store.ID
 	deleted     bool
+
+	// set-unit
+	setName     string
+	setUnit     string
+	setFound    bool
+	setBorrowed bool
+	gotSetID    store.ID
+	gotSetUnit  string
 }
 
 func (s *writeStub) Visible(context.Context, store.ID) ([]store.Material, error) { return nil, nil }
@@ -64,6 +78,86 @@ func (s *writeStub) Update(_ context.Context, _, _ store.ID, in store.MaterialWr
 func (s *writeStub) Delete(_ context.Context, _, id store.ID) error {
 	s.gotDeleteID, s.deleted = id, true
 	return nil
+}
+func (s *writeStub) SetUnit(_ context.Context, _, id store.ID, unit string) (string, string, bool, bool, error) {
+	s.gotSetID, s.gotSetUnit = id, unit
+	return s.setName, s.setUnit, s.setFound, s.setBorrowed, nil
+}
+func (s *writeStub) SharedList(context.Context, []store.ID) ([]store.SharedMaterial, error) {
+	return nil, nil
+}
+
+func postSetUnit(t *testing.T, s *writeStub, id, unit string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	if id != "" {
+		vals.Set("material_id", id)
+	}
+	if unit != "" {
+		vals.Set("unit", unit)
+	}
+	req := httptest.NewRequest("POST", "/material/set-unit", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).SetUnit(rec, req)
+	var b map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return b
+}
+
+const validID = "0123456789abcdef01234567" // 24 hex
+
+func TestSetUnit_Success(t *testing.T) {
+	s := &writeStub{setFound: true, setName: "Vinyl", setUnit: "SQ. Ft"}
+	b := postSetUnit(t, s, validID, "SQ. Ft")
+	if b["code"] != float64(200) || b["message"] != "Unit set." || b["status"] != true {
+		t.Fatalf("envelope: %v", b)
+	}
+	if s.gotSetID != store.ID(validID) || s.gotSetUnit != "SQ. Ft" {
+		t.Errorf("store args: %v %q", s.gotSetID, s.gotSetUnit)
+	}
+	data := b["data"].(map[string]any)
+	if data["_id"] != validID || data["material_name"] != "Vinyl" || data["unit"] != "SQ. Ft" {
+		t.Errorf("data shape: %v", data)
+	}
+	if _, hasV := data["__v"]; hasV {
+		t.Error("projected doc must not carry __v")
+	}
+}
+
+func TestSetUnit_MissingFields(t *testing.T) {
+	if b := postSetUnit(t, &writeStub{}, "", "SQ. Ft"); b["code"] != float64(422) {
+		t.Errorf("missing id should be 422: %v", b)
+	}
+	if b := postSetUnit(t, &writeStub{}, validID, ""); b["code"] != float64(422) {
+		t.Errorf("missing unit should be 422: %v", b)
+	}
+}
+
+// A malformed id is a guarded 404, never a 500 (Node's Alert-style id guard).
+func TestSetUnit_MalformedIDIs404(t *testing.T) {
+	s := &writeStub{}
+	b := postSetUnit(t, s, "not-an-objectid", "SQ. Ft")
+	if b["code"] != float64(404) || b["message"] != "Product not found." {
+		t.Errorf("malformed id should be guarded 404: %v", b)
+	}
+	if s.gotSetID != "" {
+		t.Error("store must not be touched for a malformed id")
+	}
+}
+
+func TestSetUnit_NotFoundVsBorrowed(t *testing.T) {
+	miss := postSetUnit(t, &writeStub{setFound: false, setBorrowed: false}, validID, "SQ. Ft")
+	if miss["code"] != float64(404) || miss["message"] != "Product not found." {
+		t.Errorf("plain miss: %v", miss)
+	}
+	bor := postSetUnit(t, &writeStub{setFound: false, setBorrowed: true}, validID, "SQ. Ft")
+	if bor["code"] != float64(404) || !strings.Contains(bor["message"].(string), "belongs to another company") {
+		t.Errorf("borrowed message: %v", bor)
+	}
 }
 
 func serve(t *testing.T, s store.Materials, companyID store.ID) map[string]any {

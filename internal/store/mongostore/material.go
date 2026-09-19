@@ -2,6 +2,7 @@ package mongostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -206,4 +207,78 @@ func (m *materials) Get(ctx context.Context, companyID, materialID store.ID) (st
 		return store.Material{}, false, err
 	}
 	return doc.toStore(), true, nil
+}
+
+func (m *materials) SetUnit(ctx context.Context, companyID, materialID store.ID, unit string) (string, string, bool, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return "", "", false, false, err
+	}
+	matOID, err := objectID(materialID)
+	if err != nil {
+		return "", "", false, false, err
+	}
+	var updated struct {
+		Name string `bson:"material_name"`
+		Unit string `bson:"unit"`
+	}
+	opts := options.FindOneAndUpdate().
+		SetReturnDocument(options.After).
+		SetProjection(bson.M{"material_name": 1, "unit": 1})
+	// ownedScope is company_id only - a borrowed product cannot have its unit set from here.
+	err = m.db.Collection(colMaterials).
+		FindOneAndUpdate(ctx, bson.M{"_id": matOID, "company_id": companyOID}, bson.M{"$set": bson.M{"unit": unit}}, opts).
+		Decode(&updated)
+	if err == nil {
+		return updated.Name, updated.Unit, true, false, nil
+	}
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return "", "", false, false, fmt.Errorf("set unit: %w", err)
+	}
+	// Not owned. If the id exists at all it is shared in - the borrowed case worth naming.
+	err = m.db.Collection(colMaterials).
+		FindOne(ctx, bson.M{"_id": matOID}, options.FindOne().SetProjection(bson.M{"_id": 1})).
+		Err()
+	if err == nil {
+		return "", "", false, true, nil
+	}
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return "", "", false, false, nil
+	}
+	return "", "", false, false, fmt.Errorf("set unit borrow check: %w", err)
+}
+
+func (m *materials) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedMaterial, error) {
+	oids, err := objectIDs(companyIDs)
+	if err != nil {
+		return nil, err
+	}
+	proj := bson.M{"material_name": 1, "material_rate": 1, "purchase_rate": 1, "hsn": 1, "unit": 1, "company_id": 1}
+	cur, err := m.db.Collection(colMaterials).Find(ctx, bson.M{"company_id": bson.M{"$in": oids}},
+		options.Find().SetProjection(proj).SetSort(bson.D{{Key: "material_name", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("shared materials: %w", err)
+	}
+	defer cur.Close(ctx)
+	var docs []struct {
+		ID           primitive.ObjectID  `bson:"_id"`
+		MaterialName string              `bson:"material_name"`
+		MaterialRate float64             `bson:"material_rate"`
+		PurchaseRate float64             `bson:"purchase_rate"`
+		Hsn          string              `bson:"hsn"`
+		Unit         string              `bson:"unit"`
+		CompanyID    *primitive.ObjectID `bson:"company_id"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.SharedMaterial, 0, len(docs))
+	for _, d := range docs {
+		sm := store.SharedMaterial{ID: idOf(d.ID), MaterialName: d.MaterialName, MaterialRate: d.MaterialRate, PurchaseRate: d.PurchaseRate, Hsn: d.Hsn, Unit: d.Unit}
+		if d.CompanyID != nil {
+			sm.CompanyID = idOf(*d.CompanyID)
+		}
+		out = append(out, sm)
+	}
+	return out, nil
 }

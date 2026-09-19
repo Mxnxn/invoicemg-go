@@ -2,8 +2,10 @@ package sqlstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -60,4 +62,61 @@ func (b *banks) Create(ctx context.Context, companyID, uid store.ID, name string
 		out.CompanyID = store.ID(*companyCol)
 	}
 	return out, nil
+}
+
+func (b *banks) Update(ctx context.Context, companyID, bankID store.ID, name string, openingBalance *float64) (store.Bank, bool, error) {
+	// openingBalance is written only when it was submitted (non-nil), so a name-only edit keeps
+	// the stored balance. Two statements rather than a COALESCE trick: the column is NOT NULL, so
+	// there is no null sentinel to lean on, and "leave it alone" must mean not touching it.
+	q := `UPDATE banks SET name = $3, updated_at = now()
+	       WHERE id = $1 AND company_id = $2
+	   RETURNING id, uid, company_id, name, opening_balance, created_at, updated_at`
+	args := []any{string(bankID), string(companyID), name}
+	if openingBalance != nil {
+		q = `UPDATE banks SET name = $3, opening_balance = $4, updated_at = now()
+		      WHERE id = $1 AND company_id = $2
+		  RETURNING id, uid, company_id, name, opening_balance, created_at, updated_at`
+		args = append(args, *openingBalance)
+	}
+	var out store.Bank
+	var companyCol *string
+	err := b.pool.QueryRow(ctx, q, args...).
+		Scan(&out.ID, &out.UID, &companyCol, &out.Name, &out.OpeningBalance, &out.CreatedAt, &out.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.Bank{}, false, nil
+	}
+	if err != nil {
+		return store.Bank{}, false, fmt.Errorf("updating bank: %w", err)
+	}
+	if companyCol != nil {
+		out.CompanyID = store.ID(*companyCol)
+	}
+	return out, true, nil
+}
+
+func (b *banks) Remove(ctx context.Context, companyID, bankID store.ID) (int, bool, error) {
+	// One round trip for the three reference counts; a bank money has moved through cannot be
+	// removed without orphaning those rows. Company-scoped, so another company's bank_id counts
+	// zero and falls through to the delete, which then affects no rows (404) - matching Node.
+	var inUse int
+	err := b.pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM batch_receives   WHERE bank_id = $1 AND company_id = $2)
+		     + (SELECT count(*) FROM supplier_payments WHERE bank_id = $1 AND company_id = $2)
+		     + (SELECT count(*) FROM expenses          WHERE bank_id = $1 AND company_id = $2)`,
+		string(bankID), string(companyID)).Scan(&inUse)
+	if err != nil {
+		return 0, false, fmt.Errorf("counting bank references: %w", err)
+	}
+	if inUse > 0 {
+		return inUse, false, nil
+	}
+	tag, err := b.pool.Exec(ctx, `DELETE FROM banks WHERE id = $1 AND company_id = $2`,
+		string(bankID), string(companyID))
+	if err != nil {
+		return 0, false, fmt.Errorf("deleting bank: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return 0, false, nil
+	}
+	return 0, true, nil
 }

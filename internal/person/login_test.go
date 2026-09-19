@@ -31,6 +31,9 @@ func (l *loginPeople) Update(context.Context, store.ID, store.ID, store.PersonPa
 	return store.Person{}, false, false, nil
 }
 func (l *loginPeople) Delete(context.Context, store.ID, store.ID) (bool, error) { return false, nil }
+func (l *loginPeople) SetNotifyField(context.Context, store.ID, store.ID, string, *bool) (store.Person, bool, error) {
+	return store.Person{}, false, nil
+}
 
 type loginUsers struct{ got store.NewSession }
 
@@ -104,4 +107,8 @@ func TestPersonLogin(t *testing.T) {
 	if body["code"] != float64(422) || body["message"] != "Invalid request." {
 		t.Errorf("missing: %v", body)
 	}
+}
+
+func (u *loginUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
+	return false, nil
 }

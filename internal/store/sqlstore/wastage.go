@@ -76,3 +76,12 @@ func (w *wastages) MaterialsSummary(ctx context.Context, companyID store.ID) ([]
 	}
 	return out, rows.Err()
 }
+
+func (w *wastages) Delete(ctx context.Context, companyID, wastageID store.ID) (bool, error) {
+	tag, err := w.pool.Exec(ctx, `DELETE FROM wastages WHERE id = $1 AND company_id = $2`,
+		string(wastageID), string(companyID))
+	if err != nil {
+		return false, fmt.Errorf("delete wastage: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

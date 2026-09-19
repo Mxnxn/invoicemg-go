@@ -2,6 +2,7 @@ package mongostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -130,4 +131,25 @@ func (w *wastages) MaterialsSummary(ctx context.Context, companyID store.ID) ([]
 		out = append(out, store.MaterialAvg{MaterialName: d.MaterialName, MaterialRate: d.MaterialRate, PurchaseRate: d.PurchaseRate})
 	}
 	return out, nil
+}
+
+func (w *wastages) Delete(ctx context.Context, companyID, wastageID store.ID) (bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return false, err
+	}
+	wastageOID, err := objectID(wastageID)
+	if err != nil {
+		return false, err // malformed id: Node's CastError -> 500, unlike /material/remove
+	}
+	err = w.db.Collection(colWastages).
+		FindOneAndDelete(ctx, bson.M{"_id": wastageOID, "company_id": companyOID}).
+		Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("delete wastage: %w", err)
+	}
+	return true, nil
 }

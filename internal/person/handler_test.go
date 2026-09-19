@@ -35,6 +35,9 @@ func (s *stubPeople) Update(context.Context, store.ID, store.ID, store.PersonPat
 	return store.Person{}, false, false, nil
 }
 func (s *stubPeople) Delete(context.Context, store.ID, store.ID) (bool, error) { return false, nil }
+func (s *stubPeople) SetNotifyField(context.Context, store.ID, store.ID, string, *bool) (store.Person, bool, error) {
+	return store.Person{}, false, nil
+}
 
 // writeStub drives the write-path tests.
 type writeStub struct {
@@ -47,6 +50,14 @@ type writeStub struct {
 	gotCreate   store.PersonWrite
 	gotPatch    store.PersonPatch
 	gotDeleteID store.ID
+
+	// notify-preference
+	notifyPerson   store.Person
+	notifyFound    bool
+	notifyCalled   bool
+	gotNotifyID    store.ID
+	gotNotifyField string
+	gotNotifyValue *bool
 }
 
 func (s *writeStub) FindEmployeeByEmail(context.Context, string) (store.EmployeeAuth, bool, error) {
@@ -64,6 +75,10 @@ func (s *writeStub) Update(_ context.Context, _, _ store.ID, patch store.PersonP
 func (s *writeStub) Delete(_ context.Context, _, id store.ID) (bool, error) {
 	s.gotDeleteID = id
 	return s.deleteFound, nil
+}
+func (s *writeStub) SetNotifyField(_ context.Context, _, id store.ID, field string, value *bool) (store.Person, bool, error) {
+	s.gotNotifyID, s.gotNotifyField, s.gotNotifyValue, s.notifyCalled = id, field, value, true
+	return s.notifyPerson, s.notifyFound, nil
 }
 
 func serve(t *testing.T, s store.People, typeField string) map[string]any {
@@ -256,5 +271,75 @@ func TestDelete(t *testing.T) {
 	body = postW(t, &writeStub{}, func(h *Handler) http.HandlerFunc { return h.Delete }, map[string]string{})
 	if body["code"] != float64(422) {
 		t.Errorf("delete no id: %v", body)
+	}
+}
+
+func postNotify(t *testing.T, s *writeStub, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := url.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	req := httptest.NewRequest("POST", "/person/notify-preference", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{UID: "u1"}))
+	rec := httptest.NewRecorder()
+	New(s, nil).NotifyPreference(rec, req)
+	var b map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return b
+}
+
+func TestNotify_SetTrue(t *testing.T) {
+	yes := true
+	s := &writeStub{notifyFound: true, notifyPerson: store.Person{ID: "p1", Name: "ACME", Type: "Supplier", Firm: "ACME Co", Phone: "9", NotifyPoCreated: &yes}}
+	b := postNotify(t, s, map[string]string{"person_id": "p1", "field": "notifyPoCreated", "value": "true"})
+	if b["code"] != float64(200) || b["status"] != true {
+		t.Fatalf("envelope: %v", b)
+	}
+	if !s.notifyCalled || s.gotNotifyField != "notifyPoCreated" || s.gotNotifyValue == nil || *s.gotNotifyValue != true {
+		t.Errorf("store args wrong: called=%v field=%q value=%v", s.notifyCalled, s.gotNotifyField, s.gotNotifyValue)
+	}
+	data := b["data"].(map[string]any)
+	if data["_id"] != "p1" || data["notifyPoCreated"] != true {
+		t.Errorf("data: %v", data)
+	}
+	// projection: no email/gst/address/__v
+	for _, k := range []string{"email", "gst", "address", "__v", "permissions"} {
+		if _, ok := data[k]; ok {
+			t.Errorf("projection leaked %q: %v", k, data)
+		}
+	}
+}
+
+func TestNotify_ClearSendsNilToStore(t *testing.T) {
+	s := &writeStub{notifyFound: true, notifyPerson: store.Person{ID: "p1"}}
+	postNotify(t, s, map[string]string{"person_id": "p1", "field": "notifyPoUpdated", "value": "clear"})
+	if !s.notifyCalled || s.gotNotifyValue != nil {
+		t.Errorf("clear must pass nil, got %v (called=%v)", s.gotNotifyValue, s.notifyCalled)
+	}
+}
+
+func TestNotify_Validation(t *testing.T) {
+	// missing id/field -> "Invalid request."
+	if b := postNotify(t, &writeStub{}, map[string]string{"field": "notifyPoCreated", "value": "true"}); b["code"] != float64(422) || b["message"] != "Invalid request." {
+		t.Errorf("missing id: %v", b)
+	}
+	// unknown field -> "Not a notification setting."
+	if b := postNotify(t, &writeStub{}, map[string]string{"person_id": "p1", "field": "notifyBogus", "value": "true"}); b["code"] != float64(422) || b["message"] != "Not a notification setting." {
+		t.Errorf("bad field: %v", b)
+	}
+	// bad value -> "Invalid request."
+	if b := postNotify(t, &writeStub{}, map[string]string{"person_id": "p1", "field": "notifyPoCreated", "value": "maybe"}); b["code"] != float64(422) || b["message"] != "Invalid request." {
+		t.Errorf("bad value: %v", b)
+	}
+}
+
+func TestNotify_NotFound(t *testing.T) {
+	s := &writeStub{notifyFound: false}
+	if b := postNotify(t, s, map[string]string{"person_id": "p1", "field": "notifyPoCreated", "value": "false"}); b["code"] != float64(404) || b["message"] != "Person not found." {
+		t.Errorf("miss should be 404: %v", b)
 	}
 }

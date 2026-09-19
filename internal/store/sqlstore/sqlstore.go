@@ -161,3 +161,15 @@ func (s *sessions) BindCompany(ctx context.Context, token, tabID string, uid, co
 	}
 	return nil
 }
+
+// DeactivateOthers retires every other session of uid (all but keepToken), for
+// /user/password/change.
+func (s *sessions) DeactivateOthers(ctx context.Context, uid store.ID, keepToken string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE user_sessions SET is_active = false WHERE uid = $1 AND token <> $2`,
+		string(uid), keepToken)
+	if err != nil {
+		return fmt.Errorf("deactivate other sessions: %w", err)
+	}
+	return nil
+}

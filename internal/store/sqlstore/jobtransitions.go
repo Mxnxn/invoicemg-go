@@ -467,3 +467,179 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 	}
 	return created, jobs, true, nil
 }
+
+func (j *jobs) Unlock(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor, wanted bool) (store.Job, bool, store.JobTxStatus, error) {
+	changed := false
+	job, status, err := j.jobTx(ctx, uid, companyID, jobID, actor, func(tx pgx.Tx) (store.JobTxStatus, []histEntry, error) {
+		var cur bool
+		if err := tx.QueryRow(ctx, `SELECT unlocked FROM jobs WHERE id=$1`, string(jobID)).Scan(&cur); err != nil {
+			return 0, nil, err
+		}
+		if cur == wanted {
+			return store.JobTxOK, nil, nil // no change: no write, no history
+		}
+		changed = true
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET unlocked=$2 WHERE id=$1`, string(jobID), wanted); err != nil {
+			return 0, nil, err
+		}
+		detail := "Re-locked"
+		if wanted {
+			detail = "Unlocked for editing"
+		}
+		return store.JobTxOK, []histEntry{{"Updated", detail}}, nil
+	})
+	return job, changed, status, err
+}
+
+// RowsCompleteAll marks every not-Done row Done in bulk, refusing (JobTxLocked) when the invoice
+// lock forbids queue changes, and logging one STRUCTURED "Queue advanced" row per moved card.
+// "Invoiced" here is the entry-based signal (a row's entry is has_issued) - the relational model
+// has no invoices.job_ids array, so Node's isJobInvoiced part 1 does not apply.
+func (j *jobs) RowsCompleteAll(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor) (store.Job, int, store.JobTxStatus, error) {
+	moved := 0
+	job, status, err := j.jobTx(ctx, uid, companyID, jobID, actor, func(tx pgx.Tx) (store.JobTxStatus, []histEntry, error) {
+		var unlocked bool
+		if err := tx.QueryRow(ctx, `SELECT unlocked FROM jobs WHERE id=$1`, string(jobID)).Scan(&unlocked); err != nil {
+			return 0, nil, err
+		}
+		var invoiced bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM job_rows jr JOIN entries en ON en.id = jr.entry_id
+				 WHERE jr.job_id = $1 AND jr.entry_id IS NOT NULL AND en.has_issued
+			)`, string(jobID)).Scan(&invoiced); err != nil {
+			return 0, nil, err
+		}
+		if invoiced && !unlocked {
+			return store.JobTxLocked, nil, nil
+		}
+
+		type mr struct{ key, prev string }
+		var moving []mr
+		rows, err := tx.Query(ctx,
+			`SELECT COALESCE(NULLIF(row_id,''), id), queue FROM job_rows WHERE job_id = $1 AND queue <> 'Done'`,
+			string(jobID))
+		if err != nil {
+			return 0, nil, err
+		}
+		for rows.Next() {
+			var m mr
+			if err := rows.Scan(&m.key, &m.prev); err != nil {
+				rows.Close()
+				return 0, nil, err
+			}
+			moving = append(moving, m)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return 0, nil, err
+		}
+		moved = len(moving)
+		if moved == 0 {
+			return store.JobTxOK, nil, nil // every row already Done
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE job_rows SET queue='Done', employee_id=NULL, progress='Assign' WHERE job_id = $1 AND queue <> 'Done'`,
+			string(jobID)); err != nil {
+			return 0, nil, err
+		}
+		name := resolveActorName(ctx, j.pool, actor)
+		for _, m := range moving {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO job_history (job_id, uid, company_id, actor_type, actor_id, actor_name, action, detail, from_stage, to_stage, row_key)
+				VALUES ($1,$2,$3,$4,$5,$6,'Queue advanced',$7,$8,'Done',$9)`,
+				string(jobID), string(uid), string(companyID), actor.Role, string(actor.ActorID()), name,
+				fmt.Sprintf("Row %s: %s → Done", m.key, m.prev), m.prev, m.key); err != nil {
+				return 0, nil, fmt.Errorf("log row history: %w", err)
+			}
+		}
+		return store.JobTxOK, nil, nil
+	})
+	return job, moved, status, err
+}
+
+// Delete moves a job to Trash (source "Job") with a full snapshot, logs a "Trashed" history
+// entry, then removes the job - all in one transaction. Reproduces refusedByLock("delete").
+func (j *jobs) Delete(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor) (store.JobTxStatus, error) {
+	tx, err := j.pool.Begin(ctx)
+	if err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	defer tx.Rollback(ctx)
+
+	var clientID *string
+	var challan, received, queue, progress string
+	var total, advance float64
+	var employeeID, vendorID *string
+	var queueOrder []string
+	var unlocked bool
+	err = tx.QueryRow(ctx, `
+		SELECT client_id, challan_number, COALESCE(to_char(received_date,'YYYY-MM-DD'),''),
+		       total, advance, queue, progress, employee_id, vendor_id, queue_order, unlocked
+		  FROM jobs WHERE id=$1 AND uid=$2 AND company_id=$3`,
+		string(jobID), string(uid), string(companyID)).
+		Scan(&clientID, &challan, &received, &total, &advance, &queue, &progress, &employeeID, &vendorID, &queueOrder, &unlocked)
+	if noRows(err) {
+		return store.JobTxJobNotFound, nil
+	}
+	if err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("looking up job: %w", err)
+	}
+
+	var invoiced bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM job_rows jr JOIN entries en ON en.id = jr.entry_id
+			 WHERE jr.job_id=$1 AND jr.entry_id IS NOT NULL AND en.has_issued
+		)`, string(jobID)).Scan(&invoiced); err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	if invoiced && !unlocked {
+		return store.JobTxLocked, nil
+	}
+
+	var rowCount int
+	var description string
+	var rowsJSON []byte
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*),
+		       COALESCE(string_agg(NULLIF(COALESCE(NULLIF(description,''), material), ''), ', ' ORDER BY position), ''),
+		       COALESCE(json_agg(json_build_object(
+		           'material', material, 'description', description, 'hasDimensions', has_dimensions,
+		           'length', length, 'width', width, 'qty', qty, 'rate', rate,
+		           'cgst', cgst, 'sgst', sgst, 'igst', igst, 'discount', discount, 'charges', charges,
+		           'quotation_id', quotation_id, 'entry_id', entry_id) ORDER BY position), '[]'::json)::text
+		  FROM job_rows WHERE job_id=$1`, string(jobID)).
+		Scan(&rowCount, &description, &rowsJSON); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("summarising rows: %w", err)
+	}
+	plural := "s"
+	if rowCount == 1 {
+		plural = ""
+	}
+	material := fmt.Sprintf("%d item%s", rowCount, plural)
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO trash (uid, company_id, client_id, description, material, qty, date, amount, total, advance,
+		                   source, challan_number, employee_id, vendor_id, queue, progress, queue_order, received_date, rows)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Job',$11,$12,$13,$14,$15,$16,$17,$18::jsonb)`,
+		string(uid), string(companyID), clientID, description, material, rowCount, received, total, total, advance,
+		challan, employeeID, vendorID, queue, progress, queueOrder, received, string(rowsJSON)); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("insert trash: %w", err)
+	}
+	name := resolveActorName(ctx, j.pool, actor)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO job_history (job_id, uid, company_id, actor_type, actor_id, actor_name, action, detail)
+		VALUES ($1,$2,$3,$4,$5,$6,'Trashed',$7)`,
+		string(jobID), string(uid), string(companyID), actor.Role, string(actor.ActorID()), name,
+		fmt.Sprintf("Moved to trash (job %s)", challan)); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("log history: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM jobs WHERE id=$1`, string(jobID)); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("delete job: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	return store.JobTxOK, nil
+}

@@ -189,3 +189,55 @@ func (m *materials) Get(ctx context.Context, companyID, materialID store.ID) (st
 	}
 	return out, true, nil
 }
+
+func (m *materials) SetUnit(ctx context.Context, companyID, materialID store.ID, unit string) (string, string, bool, bool, error) {
+	var name, saved string
+	err := m.pool.QueryRow(ctx, `
+		UPDATE materials SET unit = $3, updated_at = now()
+		 WHERE id = $1 AND company_id = $2
+	 RETURNING material_name, unit`, string(materialID), string(companyID), unit).Scan(&name, &saved)
+	if err == nil {
+		return name, saved, true, false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, false, fmt.Errorf("set unit: %w", err)
+	}
+	// Not owned by this company. If the id exists at all it is a product shared IN - the case
+	// the handler names distinctly from a plain miss.
+	var exists bool
+	if err := m.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM materials WHERE id = $1)`,
+		string(materialID)).Scan(&exists); err != nil {
+		return "", "", false, false, fmt.Errorf("set unit borrow check: %w", err)
+	}
+	return "", "", false, exists, nil
+}
+
+func (m *materials) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedMaterial, error) {
+	ids := make([]string, 0, len(companyIDs))
+	for _, id := range companyIDs {
+		ids = append(ids, string(id))
+	}
+	rows, err := m.pool.Query(ctx, `
+		SELECT id, material_name, material_rate, purchase_rate, hsn, unit, company_id
+		  FROM materials
+		 WHERE company_id = ANY ($1)
+		 ORDER BY material_name ASC, id ASC`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("shared materials: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.SharedMaterial, 0)
+	for rows.Next() {
+		var sm store.SharedMaterial
+		var companyIDCol *string
+		if err := rows.Scan(&sm.ID, &sm.MaterialName, &sm.MaterialRate, &sm.PurchaseRate,
+			&sm.Hsn, &sm.Unit, &companyIDCol); err != nil {
+			return nil, fmt.Errorf("reading shared materials: %w", err)
+		}
+		if companyIDCol != nil {
+			sm.CompanyID = store.ID(*companyIDCol)
+		}
+		out = append(out, sm)
+	}
+	return out, rows.Err()
+}

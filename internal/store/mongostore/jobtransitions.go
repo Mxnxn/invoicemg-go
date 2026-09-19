@@ -2,12 +2,15 @@ package mongostore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
@@ -537,4 +540,219 @@ func (j *jobs) linkEntryToSheet(ctx context.Context, companyOID, uidOID primitiv
 		"date": date, "uid": uidOID, "company_id": companyOID, "entries": bson.A{entryOID}, "createdAt": time.Now().UTC(), "__v": 0,
 	})
 	return err
+}
+
+func (j *jobs) Unlock(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor, wanted bool) (store.Job, bool, store.JobTxStatus, error) {
+	changed := false
+	job, status, err := j.jobTx(ctx, uid, companyID, jobID, actor, func(jobOID primitive.ObjectID) (store.JobTxStatus, []histEntry, error) {
+		var cur struct {
+			Unlocked bool `bson:"unlocked"`
+		}
+		if err := j.db.Collection(colJobs).FindOne(ctx, bson.M{"_id": jobOID}).Decode(&cur); err != nil {
+			return 0, nil, err
+		}
+		if cur.Unlocked == wanted {
+			return store.JobTxOK, nil, nil // no change: no write, no history (the job still populates)
+		}
+		changed = true
+		if _, err := j.db.Collection(colJobs).UpdateByID(ctx, jobOID, bson.M{"$set": bson.M{"unlocked": wanted}}); err != nil {
+			return 0, nil, err
+		}
+		detail := "Re-locked"
+		if wanted {
+			detail = "Unlocked for editing"
+		}
+		return store.JobTxOK, []histEntry{{"Updated", detail}}, nil
+	})
+	return job, changed, status, err
+}
+
+// RowsCompleteAll marks every not-Done row Done in bulk. It reproduces refusedByLock("queue")
+// (JobTxLocked when the job is invoiced and not unlocked) and writes one STRUCTURED "Queue
+// advanced" history row per moved card - fromStage/toStage/rowKey, which the generic histEntry
+// path does not carry - so the analytics throughput report can read timings without parsing.
+func (j *jobs) RowsCompleteAll(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor) (store.Job, int, store.JobTxStatus, error) {
+	moved := 0
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Job{}, 0, store.JobTxJobNotFound, err
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Job{}, 0, store.JobTxJobNotFound, err
+	}
+	job, status, err := j.jobTx(ctx, uid, companyID, jobID, actor, func(jobOID primitive.ObjectID) (store.JobTxStatus, []histEntry, error) {
+		st, err := j.loadState(ctx, jobOID)
+		if err != nil {
+			return 0, nil, err
+		}
+		var meta struct {
+			Unlocked bool `bson:"unlocked"`
+		}
+		if err := j.db.Collection(colJobs).FindOne(ctx, bson.M{"_id": jobOID},
+			options.FindOne().SetProjection(bson.M{"unlocked": 1})).Decode(&meta); err != nil {
+			return 0, nil, err
+		}
+		invoiced, err := j.jobInvoiced(ctx, jobOID, companyOID, st.Rows)
+		if err != nil {
+			return 0, nil, err
+		}
+		// canEditQueue = !invoiced || unlocked (Helpers/JobLock.js).
+		if invoiced && !meta.Unlocked {
+			return store.JobTxLocked, nil, nil
+		}
+
+		type movedRow struct{ key, prev string }
+		var rows []movedRow
+		for i := range st.Rows {
+			if st.Rows[i].Queue == "Done" {
+				continue
+			}
+			key := st.Rows[i].RowID
+			if key == "" {
+				key = st.Rows[i].ID.Hex()
+			}
+			rows = append(rows, movedRow{key, st.Rows[i].Queue})
+			st.Rows[i].Queue = "Done"
+			st.Rows[i].EmployeeID = nil
+			st.Rows[i].Progress = "Assign"
+		}
+		moved = len(rows)
+		if moved == 0 {
+			return store.JobTxOK, nil, nil // every row already Done: populate, no write, no history
+		}
+		if _, err := j.db.Collection(colJobs).UpdateByID(ctx, jobOID, bson.M{"$set": bson.M{"rows": st.Rows}}); err != nil {
+			return 0, nil, err
+		}
+		// Structured history, one line per row, written here rather than through histEntry.
+		now := time.Now().UTC()
+		name := j.actorName(ctx, actor)
+		actorID, _ := objectID(actor.ActorID())
+		for _, m := range rows {
+			if _, err := j.db.Collection(colJobHistories).InsertOne(ctx, bson.M{
+				"job_id": jobOID, "uid": uidOID, "company_id": companyOID, "actorType": actor.Role,
+				"actorId": actorID, "actorName": name, "action": "Queue advanced",
+				"detail":    fmt.Sprintf("Row %s: %s → Done", m.key, m.prev),
+				"fromStage": m.prev, "toStage": "Done", "rowKey": m.key,
+				"createdAt": now, "__v": 0,
+			}); err != nil {
+				return 0, nil, fmt.Errorf("log row history: %w", err)
+			}
+		}
+		return store.JobTxOK, nil, nil
+	})
+	return job, moved, status, err
+}
+
+// jobInvoiced reproduces routes/Lifecycle.js isJobInvoiced: an invoice references the job by
+// job_ids, OR one of the job's rows' entries is has_issued.
+func (j *jobs) jobInvoiced(ctx context.Context, jobOID, companyOID primitive.ObjectID, rows []jobRowFull) (bool, error) {
+	byJob, err := j.db.Collection(colInvoices).CountDocuments(ctx, bson.M{"company_id": companyOID, "job_ids": jobOID})
+	if err != nil {
+		return false, fmt.Errorf("invoice-by-job check: %w", err)
+	}
+	if byJob > 0 {
+		return true, nil
+	}
+	entryIDs := make([]primitive.ObjectID, 0, len(rows))
+	for _, r := range rows {
+		if r.EntryID != nil {
+			entryIDs = append(entryIDs, *r.EntryID)
+		}
+	}
+	if len(entryIDs) == 0 {
+		return false, nil
+	}
+	n, err := j.db.Collection(colEntries).CountDocuments(ctx, bson.M{"_id": bson.M{"$in": entryIDs}, "has_issued": true})
+	if err != nil {
+		return false, fmt.Errorf("entry has_issued check: %w", err)
+	}
+	return n > 0, nil
+}
+
+// Delete moves a job to Trash (source "Job") with a full snapshot for a future restore, logs a
+// "Trashed" history entry, and removes the job. It reproduces refusedByLock("delete"). Not wrapped
+// in a transaction - like the other mongo writes, and matching the Node app's own non-atomic
+// delete (#3).
+func (j *jobs) Delete(ctx context.Context, uid, companyID, jobID store.ID, actor store.NoteActor) (store.JobTxStatus, error) {
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	jobOID, err := objectID(jobID)
+	if err != nil {
+		return store.JobTxJobNotFound, nil
+	}
+	var job jobFull
+	err = j.db.Collection(colJobs).FindOne(ctx, bson.M{"_id": jobOID, "uid": uidOID, "company_id": companyOID}).Decode(&job)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.JobTxJobNotFound, nil
+	}
+	if err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("looking up job: %w", err)
+	}
+	invoiced, err := j.jobInvoiced(ctx, jobOID, companyOID, job.Rows)
+	if err != nil {
+		return store.JobTxJobNotFound, err
+	}
+	// canDeleteJob = !invoiced || unlocked (Helpers/JobLock.js).
+	if invoiced && !job.Unlocked {
+		return store.JobTxLocked, nil
+	}
+
+	descParts := make([]string, 0, len(job.Rows))
+	rowSnaps := make(bson.A, 0, len(job.Rows))
+	for _, r := range job.Rows {
+		if d := r.Description; d != "" {
+			descParts = append(descParts, d)
+		} else if r.Material != "" {
+			descParts = append(descParts, r.Material)
+		}
+		rowSnaps = append(rowSnaps, bson.M{
+			"material": r.Material, "description": r.Description, "hasDimensions": r.HasDimensions,
+			"length": r.Length, "width": r.Width, "qty": r.Qty, "rate": r.Rate,
+			"cgst": r.Cgst, "sgst": r.Sgst, "igst": r.Igst, "discount": r.Discount, "charges": r.Charges,
+			"quotation_id": r.QuotationID, "entry_id": r.EntryID,
+		})
+	}
+	now := time.Now().UTC()
+	plural := "s"
+	if len(job.Rows) == 1 {
+		plural = ""
+	}
+	trashDoc := bson.M{
+		"client_id": job.ClientID, "uid": uidOID, "company_id": companyOID,
+		"material": fmt.Sprintf("%d item%s", len(job.Rows), plural), "description": strings.Join(descParts, ", "),
+		"qty": len(job.Rows), "date": job.ReceivedDate, "amount": job.Total, "total": job.Total, "advance": job.Advance,
+		"source": "Job", "challanNumber": job.ChallanNumber, "employee_id": job.EmployeeID, "vendor_id": job.VendorID,
+		"queue": job.Queue, "progress": job.Progress, "queueOrder": job.QueueOrder, "receivedDate": job.ReceivedDate,
+		"rows": rowSnaps, "createdAt": now, "updatedAt": now, "__v": 0,
+	}
+	res, err := j.db.Collection(colTrash).InsertOne(ctx, trashDoc)
+	if err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("insert trash: %w", err)
+	}
+	if trashOID, ok := res.InsertedID.(primitive.ObjectID); ok {
+		if _, err := j.db.Collection(colTrashUsers).UpdateOne(ctx, bson.M{"uid": uidOID},
+			bson.M{"$push": bson.M{"trash_entries": trashOID}, "$setOnInsert": bson.M{"uid": uidOID}},
+			options.Update().SetUpsert(true)); err != nil {
+			return store.JobTxJobNotFound, fmt.Errorf("push trash entry: %w", err)
+		}
+	}
+	actorID, _ := objectID(actor.ActorID())
+	if _, err := j.db.Collection(colJobHistories).InsertOne(ctx, bson.M{
+		"job_id": jobOID, "uid": uidOID, "company_id": companyOID, "actorType": actor.Role,
+		"actorId": actorID, "actorName": j.actorName(ctx, actor), "action": "Trashed",
+		"detail": fmt.Sprintf("Moved to trash (job %s)", job.ChallanNumber), "createdAt": now, "__v": 0,
+	}); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("log history: %w", err)
+	}
+	if _, err := j.db.Collection(colJobs).DeleteOne(ctx, bson.M{"_id": jobOID}); err != nil {
+		return store.JobTxJobNotFound, fmt.Errorf("delete job: %w", err)
+	}
+	return store.JobTxOK, nil
 }

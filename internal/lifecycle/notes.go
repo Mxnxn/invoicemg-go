@@ -112,7 +112,8 @@ func (h *Handler) HistoryList(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"_id": string(hrow.ID), "job_id": string(hrow.JobID), "actorType": hrow.ActorType,
 			"actorId": string(hrow.ActorID), "actorName": hrow.ActorName, "action": hrow.Action,
-			"detail": hrow.Detail, "createdAt": httpx.NewTime(hrow.CreatedAt), "__v": hrow.Version,
+			"detail": hrow.Detail, "fromStage": hrow.FromStage, "toStage": hrow.ToStage, "rowKey": hrow.RowKey,
+			"createdAt": httpx.NewTime(hrow.CreatedAt), "__v": hrow.Version,
 		})
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})

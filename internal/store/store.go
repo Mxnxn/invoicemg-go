@@ -14,6 +14,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -83,6 +84,11 @@ type Sessions interface {
 
 	// BindCompany points this (token, tabID) tab at companyID (upsert), for /company/switch.
 	BindCompany(ctx context.Context, token, tabID string, uid, companyID ID) error
+
+	// DeactivateOthers retires every ACTIVE session of uid except the one holding keepToken -
+	// what /user/password/change does so a password change signs out the other devices while
+	// leaving the caller signed in.
+	DeactivateOthers(ctx context.Context, uid ID, keepToken string) error
 }
 
 // ---------------------------------------------------------------------------------------
@@ -212,6 +218,9 @@ type Users interface {
 	// found is false when no such user.
 	UpdateProfile(ctx context.Context, uid ID, email, name string) (User, bool, error)
 	CreateSession(ctx context.Context, s NewSession) (Session, error)
+	// UpdatePassword replaces a user's bcrypt hash (for /user/password/change). found is false
+	// when no such user. The caller has already verified the current password.
+	UpdatePassword(ctx context.Context, uid ID, passwordHash string) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -344,6 +353,17 @@ type Banks interface {
 	// Create inserts a company-scoped bank account (name only; openingBalance defaults to 0),
 	// owned by uid, and returns the stored record.
 	Create(ctx context.Context, companyID, uid ID, name string) (Bank, error)
+	// Update patches a company-owned bank's name and, ONLY when openingBalance is non-nil, its
+	// opening balance - Node writes the balance only when the field was submitted, so a
+	// name-only edit cannot wipe a balance. found is false when no such bank exists for the
+	// company. A malformed id is ErrBadID on the document store (Node's CastError -> 500); the
+	// relational store has text ids and simply finds nothing (found=false -> 404).
+	Update(ctx context.Context, companyID, bankID ID, name string, openingBalance *float64) (bank Bank, found bool, err error)
+	// Remove deletes a company-owned bank only when nothing references it. inUse is the count of
+	// receipts + supplier payments + expenses pointing at the bank; when it is > 0 the bank is
+	// kept (found is not meaningful) so the handler can refuse with that exact count. When inUse
+	// is 0, found reports whether a bank was actually deleted (false -> 404).
+	Remove(ctx context.Context, companyID, bankID ID) (inUse int, found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -432,6 +452,50 @@ type Clients interface {
 	// Get is /client/get: one company-scoped client with its entries populated (issued invoice
 	// number and quotation number); found is false on a miss or another company's row.
 	Get(ctx context.Context, companyID, clientID ID) (ClientDetail, bool, error)
+	// SharedList returns the projected customers across a set of companies (firm-sorted), for the
+	// /shared/customers report. Read-only and caller-scoped to the owner's companies.
+	SharedList(ctx context.Context, companyIDs []ID) ([]SharedClient, error)
+	// SetNotifyPreference sets ONE tri-state notify flag (field is "notifyOnCreate" or
+	// "notifyOnUpdate"; value nil clears to null "ask each time") on a company-scoped client and
+	// returns BOTH flags as stored. found is false on a miss. field is whitelisted by the store.
+	SetNotifyPreference(ctx context.Context, companyID, clientID ID, field string, value *bool) (onCreate, onUpdate *bool, found bool, err error)
+	// NotifyPreferences lists a company's clients with their notify flags, firm-sorted. When
+	// answeredOnly is true (the route's default) only clients who have answered EITHER flag are
+	// returned; false returns every client (the "choose an answer" tab).
+	NotifyPreferences(ctx context.Context, companyID ID, answeredOnly bool) ([]ClientNotify, error)
+}
+
+// SharedClient is the /shared/customers projection: a customer plus its owning company id (the
+// handler adds the company's label).
+type SharedClient struct {
+	ID          ID
+	ClientName  string
+	ClientFirm  string
+	ClientPhone string
+	ClientGST   string
+	CompanyID   ID
+}
+
+// SharedMaterial is the /shared/materials projection: a product plus its owning company id.
+type SharedMaterial struct {
+	ID           ID
+	MaterialName string
+	MaterialRate float64
+	PurchaseRate float64
+	Hsn          string
+	Unit         string
+	CompanyID    ID
+}
+
+// ClientNotify is the /client/notify-preferences projection: a customer plus their two tri-state
+// notify flags. The flags are pointers so nil (unanswered) is distinct from &false on the wire.
+type ClientNotify struct {
+	ID             ID
+	ClientName     string
+	ClientFirm     string
+	ClientPhone    string
+	NotifyOnCreate *bool
+	NotifyOnUpdate *bool
 }
 
 // ---------------------------------------------------------------------------------------
@@ -523,6 +587,25 @@ type Companies interface {
 	// Deactivate flips is_active off on an owner-scoped company, enforcing the keep-one and
 	// not-the-default guards, and clears any tab bindings that pointed at it.
 	Deactivate(ctx context.Context, uid, companyID ID) (DeactivateResult, error)
+	// SetQueueOrder saves the company's default job queue pipeline (/jobs/queue/default). Scoped
+	// by company id alone (Node does not add uid here); found is false on a miss. Returns the
+	// stored order.
+	SetQueueOrder(ctx context.Context, companyID ID, order []string) (stored []string, found bool, err error)
+	// Numbering returns the owner-scoped company's stored per-kind numbering formats as raw JSON
+	// (empty map when none set). /company/numbering fills the gaps from DEFAULT_FORMATS itself, so
+	// this never 404s - a missing company just yields an empty map.
+	Numbering(ctx context.Context, companyID, uid ID) (map[string]json.RawMessage, error)
+	// SetNumbering upserts ONE kind's format on the owner-scoped company (/numbering/update).
+	// found is false on a miss (-> 404).
+	SetNumbering(ctx context.Context, companyID, uid ID, kind string, format json.RawMessage) (found bool, err error)
+	// SetReportsAcrossCompanies flips the cross-account reporting toggle on the owner-scoped
+	// company (/company/sharing). found is false on a miss.
+	SetReportsAcrossCompanies(ctx context.Context, companyID, uid ID, on bool) (found bool, err error)
+	// Scope resolves which companies a READ may span (Helpers/CompanyScope.scopeFor): the acting
+	// company alone, unless its reportsAcrossCompanies toggle is on, in which case every company
+	// the same owner has (uid-bounded, fail-closed). Returns the ids, whether it widened, and a
+	// companyID->label map for rendering each row's origin.
+	Scope(ctx context.Context, companyID, uid ID) (companyIDs []ID, shared bool, labels map[ID]string, err error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -578,6 +661,13 @@ type Materials interface {
 	Delete(ctx context.Context, companyID, materialID ID) error
 	// Get reads one company-scoped product by id (/material/get); found is false on a miss.
 	Get(ctx context.Context, companyID, materialID ID) (Material, bool, error)
+	// SharedList returns the projected products across a set of companies (name-sorted), for the
+	// /shared/materials report. Read-only and caller-scoped to the owner's companies.
+	SharedList(ctx context.Context, companyIDs []ID) ([]SharedMaterial, error)
+	// SetUnit sets a company-OWNED product's unit (ownedScope, not sharing-widened) and returns
+	// its name+unit. found is false when no owned product matches; borrowed is true when the id
+	// exists but belongs to another company (shared in), so the handler can name that case.
+	SetUnit(ctx context.Context, companyID, materialID ID, unit string) (name, savedUnit string, found, borrowed bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -662,6 +752,20 @@ type People interface {
 	Update(ctx context.Context, uid, personID ID, patch PersonPatch) (p Person, dupEmail bool, found bool, err error)
 	// Delete hard-deletes an owner-scoped person. found is false on a miss.
 	Delete(ctx context.Context, uid, personID ID) (found bool, err error)
+	// SetNotifyField sets ONE tri-state WhatsApp-notify flag on an owner-scoped person: value
+	// nil clears it to null ("follow the default"), &true/&false set it. field is a NotifyPo*
+	// wire name, whitelisted by both the handler and the store (an unknown field is an error,
+	// never a dynamic column). found is false on a miss.
+	SetNotifyField(ctx context.Context, uid, personID ID, field string, value *bool) (p Person, found bool, err error)
+}
+
+// NotifyFields is the whitelist of tri-state supplier-notify flags a person carries
+// (Helpers/NotifyPreference.NOTIFY_FIELDS). The map value is unused; membership is the point.
+// Handlers validate a requested field against this before it ever reaches a store.
+var NotifyFields = map[string]struct{}{
+	"notifyPoCreated":   {},
+	"notifyPoUpdated":   {},
+	"notifyPoConfirmed": {},
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1267,6 +1371,22 @@ type Jobs interface {
 	RowQueueOrder(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, order []string) (Job, JobTxStatus, error)
 	// RowProgress moves one row's progress; "Complete" advances its stage (clearing its employee).
 	RowProgress(ctx context.Context, uid, companyID, jobID, rowID ID, actor NoteActor, progress string) (Job, JobTxStatus, error)
+	// Unlock sets the job's `unlocked` flag to wanted, logging an "Updated" history entry ("Unlocked
+	// for editing" / "Re-locked") only when it actually changes. changed reports whether it did, so
+	// the handler can answer "No change." vs "Job unlocked."/"Job locked.". The populated job comes
+	// back in every OK case, including no-change.
+	Unlock(ctx context.Context, uid, companyID, jobID ID, actor NoteActor, wanted bool) (j Job, changed bool, status JobTxStatus, err error)
+	// RowsCompleteAll marks every not-yet-Done row of the job as Done (clearing the assignee,
+	// progress→Assign), logging one STRUCTURED "Queue advanced" history entry per moved row. It
+	// refuses (JobTxLocked) when the invoice lock forbids queue changes (invoiced and not
+	// unlocked), reproducing refusedByLock("queue"). moved is how many rows changed - 0 means
+	// "every row was already done" (still a 200 with the populated job).
+	RowsCompleteAll(ctx context.Context, uid, companyID, jobID ID, actor NoteActor) (j Job, moved int, status JobTxStatus, err error)
+	// Delete moves a job to Trash: it snapshots the whole job (source "Job", its rows and
+	// job-level fields, for a future restore), logs a "Trashed" history entry, then removes the
+	// job. It refuses (JobTxLocked) when the invoice lock forbids deletion (invoiced and not
+	// unlocked), reproducing refusedByLock("delete"). JobTxJobNotFound when no such job.
+	Delete(ctx context.Context, uid, companyID, jobID ID, actor NoteActor) (JobTxStatus, error)
 	// ConvertToEntries turns each Done, not-yet-converted row of the named jobs into a billable
 	// Entry (stamping the row with its entry_id), logs a "Converted to Entry" history entry per
 	// job, and returns the created entries and the re-populated jobs. found is false when none of
@@ -1378,6 +1498,9 @@ type JobHistoryRow struct {
 	ActorName string
 	Action    string
 	Detail    string
+	FromStage string
+	ToStage   string
+	RowKey    string
 	CreatedAt time.Time
 	Version   int
 }
@@ -1661,6 +1784,9 @@ type Wastages interface {
 	// MaterialsSummary is /wastage/materials: distinct products by lowercased name with averaged
 	// rates, name-sorted - the wastage form's material picker.
 	MaterialsSummary(ctx context.Context, companyID ID) ([]MaterialAvg, error)
+	// Delete hard-deletes a company-scoped wastage record (Node's findOneAndDelete). found is
+	// false on a miss (-> 404). A malformed id is ErrBadID on the document store (500).
+	Delete(ctx context.Context, companyID, wastageID ID) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2026,8 +2152,40 @@ type PurchaseReport interface {
 }
 
 // Store is everything together, so main wires one value rather than six.
+// ---------------------------------------------------------------------------------------
+// Settings (per-owner UI preferences, from routes/Settings.js + Model/UserSetting.js)
+// ---------------------------------------------------------------------------------------
+
+// SettingsSection names one of the two independent preference blobs a UserSetting holds.
+// They live side by side so dragging a column cannot race a font change and overwrite it,
+// exactly as Model/UserSetting.js keeps `appearance` and `tables` as separate Mixed fields.
+type SettingsSection string
+
+const (
+	SettingsAppearance SettingsSection = "appearance"
+	SettingsTables     SettingsSection = "tables"
+)
+
+// Settings is the per-person UI-preference store. The owner is the Person for an employee
+// session and the User for an admin one (personId || uid), never the company - a preference
+// follows whoever is logged in, as Model/UserSetting.js explains.
+type Settings interface {
+	// Get returns the owner's stored blob for one section as raw JSON. It returns (nil, nil)
+	// when the owner has no row at all - the first-login case, where Node's `row ? row.section
+	// : null` sends null. Once any update has created the row, the OTHER section reads back as
+	// `{}` (the schema default that setDefaultsOnInsert writes), never null.
+	Get(ctx context.Context, ownerID ID, section SettingsSection) (json.RawMessage, error)
+
+	// Set upserts one section for the owner and returns the stored value. On the insert that
+	// creates the row, the other section is initialised to `{}`, reproducing Mongoose's
+	// setDefaultsOnInsert so a later read of it is `{}` and not null. value is a validated JSON
+	// object (the handler has already rejected non-objects with the Node 422).
+	Set(ctx context.Context, ownerID ID, section SettingsSection, value json.RawMessage) (json.RawMessage, error)
+}
+
 type Store interface {
 	Sessions() Sessions
+	Settings() Settings
 	Days() Days
 	Units() Units
 	Users() Users

@@ -3,6 +3,7 @@
 package bank
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -74,9 +75,87 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, err)
 		return
 	}
-	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Bank created.", Data: bankDTO{
-		ID: string(saved.ID), UID: string(saved.UID), CompanyID: string(saved.CompanyID),
-		Name: saved.Name, OpeningBalance: saved.OpeningBalance,
-		CreatedAt: httpx.NewTime(saved.CreatedAt), UpdatedAt: httpx.NewTime(saved.UpdatedAt), Version: saved.Version,
-	}})
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Bank created.", Data: toDTO(saved)})
+}
+
+// Update is POST /bank/update: rename a bank and, when the openingBalance field was submitted,
+// re-set its balance. A missing id or blank name is 422 "A bank needs a name." (Node's exact
+// wording, distinct from create's "Invalid request."); a bank that isn't the company's is 404.
+// A malformed id reproduces Node's CastError -> 500 on the document store.
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	bankID := form.String("bank_id")
+	name := strings.TrimSpace(form.String("name"))
+	if bankID == "" || name == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "A bank needs a name.", Status: httpx.False()})
+		return
+	}
+	// Only when the field actually arrived (Node's `!== undefined`), so a name-only edit does
+	// not silently zero a balance somebody entered. Number("") is 0 and Number("abc") is 0,
+	// which Float(...,0) reproduces.
+	var opening *float64
+	if form.Present("openingBalance") {
+		v := form.Float("openingBalance", 0)
+		opening = &v
+	}
+	updated, found, err := h.store.Update(ctx, sess.CompanyID, store.ID(bankID), name, opening)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Bank not found.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Bank updated.", Status: httpx.True(), Data: toDTO(updated)})
+}
+
+// Remove is POST /bank/remove: delete a bank, but only when no receipt, supplier payment or
+// expense references it - money already moved through it means the account must stay, and the
+// refusal carries the exact transaction count so the UI can explain why. Behind requireDelete.
+// Missing id -> 422; in use -> 422 with the count; not the company's -> 404.
+func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	bankID := form.String("bank_id")
+	if bankID == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	inUse, found, err := h.store.Remove(ctx, sess.CompanyID, store.ID(bankID))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if inUse > 0 {
+		plural := "s"
+		if inUse == 1 {
+			plural = ""
+		}
+		httpx.Write(w, httpx.Envelope{
+			Code:    422,
+			Status:  httpx.False(),
+			Message: fmt.Sprintf("This bank has %d transaction%s against it. Money already moved through it, so it can't be removed.", inUse, plural),
+		})
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Bank not found.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Bank removed.", Status: httpx.True()})
+}
+
+// toDTO renders a stored bank as the whole record Node's routes echo.
+func toDTO(b store.Bank) bankDTO {
+	return bankDTO{
+		ID: string(b.ID), UID: string(b.UID), CompanyID: string(b.CompanyID),
+		Name: b.Name, OpeningBalance: b.OpeningBalance,
+		CreatedAt: httpx.NewTime(b.CreatedAt), UpdatedAt: httpx.NewTime(b.UpdatedAt), Version: b.Version,
+	}
 }

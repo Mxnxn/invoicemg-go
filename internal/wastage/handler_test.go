@@ -13,11 +13,14 @@ import (
 )
 
 type stub struct {
-	summary   []store.MaterialAvg
-	list      []store.Wastage
-	got       store.ID
-	created   store.Wastage
-	gotCreate store.WastageWrite
+	summary     []store.MaterialAvg
+	list        []store.Wastage
+	got         store.ID
+	created     store.Wastage
+	gotCreate   store.WastageWrite
+	deleteFound bool
+	deleteErr   error
+	gotDeleteID store.ID
 }
 
 func (s *stub) List(_ context.Context, c store.ID) ([]store.Wastage, error) {
@@ -31,6 +34,52 @@ func (s *stub) MaterialsSummary(_ context.Context, _ store.ID) ([]store.Material
 func (s *stub) Create(_ context.Context, companyID, uid store.ID, in store.WastageWrite) (store.Wastage, error) {
 	s.gotCreate = in
 	return s.created, nil
+}
+func (s *stub) Delete(_ context.Context, companyID, wastageID store.ID) (bool, error) {
+	s.got = companyID
+	s.gotDeleteID = wastageID
+	return s.deleteFound, s.deleteErr
+}
+
+func postRemove(t *testing.T, s *stub, id string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	if id != "\x00" {
+		vals.Set("wastage_id", id)
+	}
+	req := httptest.NewRequest("POST", "/wastage/remove", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Remove(rec, req)
+	var b map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return b
+}
+
+func TestRemove_Success(t *testing.T) {
+	s := &stub{deleteFound: true}
+	b := postRemove(t, s, "w1")
+	if b["code"] != float64(200) || b["message"] != "Wastage record deleted." || b["status"] != true {
+		t.Fatalf("envelope: %v", b)
+	}
+	if s.got != "co1" || s.gotDeleteID != "w1" {
+		t.Errorf("scope/id wrong: %v %v", s.got, s.gotDeleteID)
+	}
+}
+
+func TestRemove_MissingID(t *testing.T) {
+	if b := postRemove(t, &stub{}, "\x00"); b["code"] != float64(422) || b["message"] != "Invalid request." {
+		t.Errorf("missing id should be 422: %v", b)
+	}
+}
+
+func TestRemove_NotFound(t *testing.T) {
+	if b := postRemove(t, &stub{deleteFound: false}, "w1"); b["code"] != float64(404) || b["message"] != "Wastage record not found." {
+		t.Errorf("miss should be 404: %v", b)
+	}
 }
 
 func TestGetAll(t *testing.T) {

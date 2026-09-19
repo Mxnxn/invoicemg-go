@@ -118,7 +118,7 @@ func (n *jobNotes) NoteUpdate(ctx context.Context, uid, companyID, noteID store.
 
 func (n *jobNotes) HistoryList(ctx context.Context, uid, companyID, jobID store.ID) ([]store.JobHistoryRow, error) {
 	rows, err := n.pool.Query(ctx, `
-		SELECT id, job_id, actor_type, actor_id, actor_name, action, detail, created_at
+		SELECT id, job_id, actor_type, actor_id, actor_name, action, detail, from_stage, to_stage, row_key, created_at
 		  FROM job_history WHERE job_id=$1 AND uid=$2 AND company_id=$3
 		 ORDER BY created_at DESC, id DESC`, string(jobID), string(uid), string(companyID))
 	if err != nil {
@@ -128,7 +128,8 @@ func (n *jobNotes) HistoryList(ctx context.Context, uid, companyID, jobID store.
 	out := make([]store.JobHistoryRow, 0)
 	for rows.Next() {
 		var h store.JobHistoryRow
-		if err := rows.Scan(&h.ID, &h.JobID, &h.ActorType, &h.ActorID, &h.ActorName, &h.Action, &h.Detail, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.JobID, &h.ActorType, &h.ActorID, &h.ActorName, &h.Action, &h.Detail,
+			&h.FromStage, &h.ToStage, &h.RowKey, &h.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, h)

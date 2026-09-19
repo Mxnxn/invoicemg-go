@@ -46,6 +46,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
 	"github.com/mxnxn/invoicemg-go/internal/purchasereport"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
+	"github.com/mxnxn/invoicemg-go/internal/settings"
 	"github.com/mxnxn/invoicemg-go/internal/sheet"
 	"github.com/mxnxn/invoicemg-go/internal/statistics"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -183,6 +184,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
+	settingsHandler := settings.New(db.Settings())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies(), uploadsDir)
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"), db.Companies())
 
@@ -204,6 +206,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.HandleFunc("POST /user/login", userHandler.Login)
 	mux.HandleFunc("POST /person/login", personHandler.Login)
 	mux.Handle("POST /user/logout", authed(userHandler.Logout))
+	mux.Handle("POST /user/password/change", authed(userHandler.PasswordChange))
 	mux.HandleFunc("POST /sessions", userHandler.Login)
 
 	// Reads. GET under REST, so they are cacheable, safe to retry, and visible as reads in
@@ -238,6 +241,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /bank/list", feature("batch_receive", bankHandler.List))
 	mux.Handle("GET /banks", feature("batch_receive", bankHandler.List))
 	mux.Handle("POST /bank/create", feature("batch_receive", bankHandler.Create))
+	mux.Handle("POST /bank/update", feature("batch_receive", bankHandler.Update))
+	mux.Handle("POST /bank/remove", feature("batch_receive", bankHandler.Remove, auth.RequireDelete("batch_receive")))
 
 	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes use
 	// company-only scope. The populate-heavy /client/get is not ported.
@@ -252,6 +257,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /client/batchUpdate", feature("customers", clientHandler.BatchUpdate))
 	mux.Handle("POST /client/batchReceiveUpdate", feature("customers", clientHandler.BatchReceiveUpdate))
 	mux.Handle("POST /client/batchReceiveDelete", feature("customers", clientHandler.BatchReceiveDelete))
+	mux.Handle("POST /client/notify-preference", feature("customers", clientHandler.NotifyPreference))
+	mux.Handle("GET /client/notify-preferences", feature("customers", clientHandler.NotifyPreferences))
 
 	// The shell bootstrap: the company switcher, the active-company letterhead, and the admin
 	// profile. /company/* need only a session; /userinfo/get is admin-only.
@@ -261,12 +268,28 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /company/create", admin(companyHandler.Create))
 	mux.Handle("POST /company/update", admin(companyHandler.Update))
 	mux.Handle("POST /company/switch", authed(companyHandler.Switch))
+	mux.Handle("POST /company/numbering", authed(companyHandler.Numbering))
+	mux.Handle("POST /company/numbering/update", admin(companyHandler.NumberingUpdate))
 	mux.Handle("POST /company/deactivate", admin(companyHandler.Deactivate))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 	mux.Handle("POST /userinfo/update", admin(userinfoHandler.Update))
 	mux.Handle("POST /userinfo/set-template", admin(userinfoHandler.SetTemplate))
 	mux.Handle("POST /userinfo/upload", admin(userinfoHandler.Upload))
+
+	// Per-person UI preferences (font/size/accent and per-table columns). Behind a valid
+	// session only, NOT requireAdmin - an employee picks their own font, as routes/Settings.js
+	// deliberately does. The shell pulls these on login and pushes them on change, so leaving
+	// them unported makes every page-load fail a request against the Go-only stack. Reads get a
+	// GET alias, updates a PUT one, on the REST surface.
+	mux.Handle("POST /settings/appearance", authed(settingsHandler.Appearance))
+	mux.Handle("GET /settings/appearance", authed(settingsHandler.Appearance))
+	mux.Handle("POST /settings/appearance/update", authed(settingsHandler.AppearanceUpdate))
+	mux.Handle("PUT /settings/appearance", authed(settingsHandler.AppearanceUpdate))
+	mux.Handle("POST /settings/tables", authed(settingsHandler.Tables))
+	mux.Handle("GET /settings/tables", authed(settingsHandler.Tables))
+	mux.Handle("POST /settings/tables/update", authed(settingsHandler.TablesUpdate))
+	mux.Handle("PUT /settings/tables", authed(settingsHandler.TablesUpdate))
 
 	// Products, behind the products feature as routes/Material.js is. Read widens by sharing
 	// (#1); the writes and /material/get are not ported.
@@ -276,6 +299,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /material/update", feature("products", materialHandler.Update))
 	mux.Handle("POST /material/remove", feature("products", materialHandler.Remove, auth.RequireDelete("products")))
 	mux.Handle("POST /material/get", feature("products", materialHandler.Get))
+	mux.Handle("POST /material/set-unit", feature("products", materialHandler.SetUnit, auth.RequireCreate("products")))
 
 	// People (employees + suppliers), admin-only as routes/Person.js is. Only /list is ported.
 	mux.Handle("POST /person/list", admin(personHandler.List))
@@ -283,6 +307,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /person/create", admin(personHandler.Create))
 	mux.Handle("POST /person/update", admin(personHandler.Update))
 	mux.Handle("POST /person/delete", admin(personHandler.Delete))
+	mux.Handle("POST /person/notify-preference", admin(personHandler.NotifyPreference))
 
 	// Quotations, behind the quotations feature. client_id is populated. Only /list is ported.
 	mux.Handle("POST /quotation/list", feature("quotations", quotationHandler.List))
@@ -334,10 +359,14 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /lifecycle/jobs/progress", feature("lifecycle", lifecycleHandler.Progress))
 	mux.Handle("POST /lifecycle/jobs/queue", feature("lifecycle", lifecycleHandler.Queue))
 	mux.Handle("POST /lifecycle/jobs/set-queue", feature("lifecycle", lifecycleHandler.SetQueue))
+	mux.Handle("POST /lifecycle/jobs/queue/default", feature("lifecycle", companyHandler.QueueDefault, auth.RequireAdmin))
+	mux.Handle("POST /lifecycle/jobs/unlock", feature("lifecycle", lifecycleHandler.Unlock))
 	mux.Handle("POST /lifecycle/jobs/rows/assign", feature("lifecycle", lifecycleHandler.RowAssign))
 	mux.Handle("POST /lifecycle/jobs/rows/queue", feature("lifecycle", lifecycleHandler.RowQueue))
 	mux.Handle("POST /lifecycle/jobs/rows/queue-order", feature("lifecycle", lifecycleHandler.RowQueueOrder))
 	mux.Handle("POST /lifecycle/jobs/rows/progress", feature("lifecycle", lifecycleHandler.RowProgress))
+	mux.Handle("POST /lifecycle/jobs/rows/complete-all", feature("lifecycle", lifecycleHandler.RowsCompleteAll))
+	mux.Handle("POST /lifecycle/jobs/delete", feature("lifecycle", lifecycleHandler.Delete))
 	mux.Handle("POST /lifecycle/jobs/convert-to-entries", feature("lifecycle", lifecycleHandler.ConvertToEntries, auth.RequireAdmin))
 	mux.Handle("POST /lifecycle/notes/list", feature("lifecycle", lifecycleHandler.NotesList))
 	mux.Handle("POST /lifecycle/notes/create", feature("lifecycle", lifecycleHandler.NoteCreate))
@@ -396,6 +425,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /wastage/getall", feature("challan", wastageHandler.GetAll))
 	mux.Handle("POST /wastage/materials", authed(wastageHandler.Materials))
 	mux.Handle("POST /wastage/add", feature("challan", wastageHandler.Add, auth.RequireCreate("challan")))
+	mux.Handle("POST /wastage/remove", feature("challan", wastageHandler.Remove, auth.RequireDelete("challan")))
 
 	// The public customer link from a WhatsApp message (routes/Alert.js). Unauthenticated -
 	// the recipient is a customer with no login; the pair of ids is what authorises it, since
@@ -425,6 +455,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /whatsapp/config", feature("whatsapp", whatsappHandler.Config))
 	mux.Handle("POST /whatsapp/config/update", feature("whatsapp", whatsappHandler.ConfigUpdate, auth.RequireAdmin))
 	mux.Handle("POST /whatsapp/send", feature("whatsapp", whatsappHandler.Send))
+	mux.Handle("POST /whatsapp/templates", feature("whatsapp", whatsappHandler.Templates))
 
 	mux.HandleFunc("GET /healthz", health(db))
 

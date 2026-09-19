@@ -315,3 +315,29 @@ func (h *Handler) ConvertToEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Converted to entries.", Data: map[string]any{"entries": entryDTO, "jobs": jobsOut}})
 }
+
+// Delete is POST /lifecycle/jobs/delete: move a job to trash (snapshot + "Trashed" history +
+// removal). Refused with 403 when the invoice lock forbids deletion. Sends status:true, no data.
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	jobID := form.String("job_id")
+	if jobID == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	status, err := h.store.Delete(r.Context(), sess.UID, sess.CompanyID, store.ID(jobID), actorOf(sess))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	switch status {
+	case store.JobTxJobNotFound:
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Job not found.", Status: httpx.False()})
+		return
+	case store.JobTxLocked:
+		httpx.Write(w, httpx.Envelope{Code: 403, Message: "This job is invoiced and cannot be deleted. Delete the invoice first.", Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Job moved to trash.", Status: httpx.True()})
+}

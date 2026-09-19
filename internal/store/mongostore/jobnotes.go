@@ -207,6 +207,9 @@ func (n *jobNotes) HistoryList(ctx context.Context, uid, companyID, jobID store.
 		ActorName string             `bson:"actorName"`
 		Action    string             `bson:"action"`
 		Detail    string             `bson:"detail"`
+		FromStage string             `bson:"fromStage"`
+		ToStage   string             `bson:"toStage"`
+		RowKey    string             `bson:"rowKey"`
 		CreatedAt time.Time          `bson:"createdAt"`
 		Version   int                `bson:"__v"`
 	}
@@ -217,7 +220,9 @@ func (n *jobNotes) HistoryList(ctx context.Context, uid, companyID, jobID store.
 	for _, d := range docs {
 		out = append(out, store.JobHistoryRow{
 			ID: idOf(d.ID), JobID: idOf(d.JobID), ActorType: d.ActorType, ActorID: idOf(d.ActorID),
-			ActorName: d.ActorName, Action: d.Action, Detail: d.Detail, CreatedAt: d.CreatedAt, Version: d.Version,
+			ActorName: d.ActorName, Action: d.Action, Detail: d.Detail,
+			FromStage: d.FromStage, ToStage: d.ToStage, RowKey: d.RowKey,
+			CreatedAt: d.CreatedAt, Version: d.Version,
 		})
 	}
 	return out, nil

@@ -79,6 +79,17 @@ CREATE TABLE companies (
     wa_phone_number_id     text NOT NULL DEFAULT '',
     wa_business_account_id text NOT NULL DEFAULT '',
     wa_api_token           text NOT NULL DEFAULT '',
+    -- The company's default queue pipeline for new jobs (routes/Lifecycle.js /jobs/queue/default,
+    -- Model/Company.queueOrder). Defaults to the standard stages; always First..Last-pinned.
+    queue_order text[] NOT NULL DEFAULT '{Created,Printing,Ready-to-Pickup,Done}',
+    -- Per-document-type numbering formats (routes/Company.js /numbering, Model/Company.numbering):
+    -- a {prefix,year,pad,separator} object per kind. Empty means "use the defaults" - the read
+    -- route fills every kind from DEFAULT_FORMATS, so nothing needs seeding here.
+    numbering jsonb NOT NULL DEFAULT '{}',
+    -- Cross-account reporting toggle (routes/Company.js /sharing, Company.sharing.reportsAcrossCompanies).
+    -- When on, the /shared/* reports span every company this owner has; off (the default and the
+    -- fail-closed direction) keeps a report to the acting company alone.
+    reports_across_companies boolean NOT NULL DEFAULT false,
     is_active   boolean NOT NULL DEFAULT true,
     is_default  boolean NOT NULL DEFAULT false,
     created_at  timestamptz NOT NULL DEFAULT now(),
@@ -137,6 +148,13 @@ CREATE TABLE clients (
     -- Which companies this record is shared with (Phase 2). A Postgres array mirrors Mongo's
     -- sharing.companies; a read widens by membership, a write never does (#1).
     shared_company_ids text[] NOT NULL DEFAULT '{}',
+    -- Tri-state "notify this customer when a job-id is raised / updated?" (routes/Client.js
+    -- notify-preference). Nullable ON PURPOSE, like Model/Client.js which gives them no default:
+    -- true always sends, false never, NULL/absent means "ask me each time" (a prompt does the
+    -- asking). The distinction between NULL and absent that Mongo keeps collapses to NULL here,
+    -- which the client cannot observe (both read as falsy -> ask).
+    notify_on_create boolean,
+    notify_on_update boolean,
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now()
 );
@@ -225,6 +243,12 @@ CREATE TABLE job_history (
     actor_name text NOT NULL DEFAULT '',
     action     text NOT NULL DEFAULT '',
     detail     text NOT NULL DEFAULT '',
+    -- Structured mirror of a "Queue advanced" detail string (Model/JobHistory.js). Additive and
+    -- optional: older rows have them '' and readers fall back to parsing `detail`. The production
+    -- analytics tab reads these directly instead of parsing.
+    from_stage text NOT NULL DEFAULT '',
+    to_stage   text NOT NULL DEFAULT '',
+    row_key    text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX job_history_job_idx ON job_history (job_id, created_at DESC);
@@ -590,6 +614,21 @@ CREATE TABLE trash (
     cgst          numeric(6,2) NOT NULL DEFAULT 0,
     sgst          numeric(6,2) NOT NULL DEFAULT 0,
     igst          numeric(6,2) NOT NULL DEFAULT 0,
+    total         numeric(14,2) NOT NULL DEFAULT 0,
+    advance       numeric(14,2) NOT NULL DEFAULT 0,
+    has_issued    boolean NOT NULL DEFAULT false,
+    issued        text,
+    -- "Entry" or "Job". The Job-only fields below carry the snapshot a restore needs, mirroring
+    -- Model/Trash.js - populated only when source = 'Job'.
+    source          text NOT NULL DEFAULT 'Entry',
+    challan_number  text NOT NULL DEFAULT '',
+    employee_id     text,
+    vendor_id       text,
+    queue           text NOT NULL DEFAULT '',
+    progress        text NOT NULL DEFAULT '',
+    queue_order     text[] NOT NULL DEFAULT '{}',
+    received_date   text NOT NULL DEFAULT '',
+    rows            jsonb,
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now()
 );
@@ -631,3 +670,21 @@ CREATE TABLE expenses (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX expenses_company_date_idx ON expenses (company_id, date);
+
+-- Per-person UI preferences (font/size/accent, and per-table column visibility+order), from
+-- Model/UserSetting.js + routes/Settings.js. The owner is the Person for an employee session
+-- and the User for an admin one (personId || uid), never the company - a preference follows
+-- whoever is logged in - so there is no single table to FK to and owner_id is a plain column,
+-- UNIQUE for the upsert. Both blobs default to '{}': once either is saved the row exists, so a
+-- later read of the other returns {} rather than null, reproducing Mongoose's
+-- setDefaultsOnInsert. The shapes are unstructured on purpose - the client owns and sanitises
+-- them (Common/appearance.js), so a stricter server would only reject a new setting until both
+-- sides shipped.
+CREATE TABLE user_settings (
+    id         text PRIMARY KEY DEFAULT gen_ulid(),
+    owner_id   text NOT NULL UNIQUE,
+    appearance jsonb NOT NULL DEFAULT '{}',
+    tables     jsonb NOT NULL DEFAULT '{}',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);

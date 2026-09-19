@@ -2,6 +2,7 @@ package material
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
@@ -130,4 +131,53 @@ func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Material has removed.", Status: httpx.True()})
+}
+
+// objectIDRe is Node's own guard, `/^[0-9a-fA-F]{24}$/`. /material/set-unit checks the id shape
+// itself and answers 404 for a malformed one, rather than letting Mongoose's CastError surface
+// as a 500 - the same guard, for the same reason, as routes/Alert.js.
+var objectIDRe = regexp.MustCompile(`^[0-9a-fA-F]{24}$`)
+
+// SetUnit is POST /material/set-unit: set a company-OWNED product's stocked unit. Behind
+// requireCreate("products"). A missing id or unit is 422; a malformed id is 404 (guarded, not a
+// 500); a product owned by another company (shared in) is 404 with a message that says so.
+func (h *Handler) SetUnit(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	materialID := form.String("material_id")
+	unit := form.String("unit")
+	if materialID == "" || unit == "" {
+		invalid(w)
+		return
+	}
+	if !objectIDRe.MatchString(materialID) {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Product not found.", Status: httpx.False()})
+		return
+	}
+	name, savedUnit, found, borrowed, err := h.store.SetUnit(ctx, sess.CompanyID, store.ID(materialID), unit)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		msg := "Product not found."
+		if borrowed {
+			msg = "That product belongs to another company. Set its unit from the company that owns it."
+		}
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: msg, Status: httpx.False()})
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Unit set.", Status: httpx.True(), Data: setUnitDTO{
+		ID: materialID, MaterialName: name, Unit: savedUnit,
+	}})
+}
+
+// setUnitDTO is the projected doc Node returns from .select(["material_name","unit"]): _id plus
+// the two fields, no __v (an inclusive projection drops it).
+type setUnitDTO struct {
+	ID           string `json:"_id"`
+	MaterialName string `json:"material_name"`
+	Unit         string `json:"unit"`
 }

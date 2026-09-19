@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
@@ -63,6 +64,76 @@ func (h *Handler) Progress(w http.ResponseWriter, r *http.Request) {
 	}
 	job, status, err := h.store.Progress(r.Context(), sess.UID, sess.CompanyID, store.ID(jobID), actorOf(sess), progress)
 	txResult(w, job, status, err, "Assign an employee or vendor before changing progress.")
+}
+
+// Unlock is POST /lifecycle/jobs/unlock: toggle a job's edit lock. `unlocked` defaults to true
+// when absent. Returns the populated job - "No change." when already at the wanted state, else
+// "Job unlocked." / "Job locked.". Unlike the other transitions this route DOES send status:true,
+// matching routes/Lifecycle.js.
+func (h *Handler) Unlock(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	jobID := form.String("job_id")
+	if jobID == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	wanted := true
+	if form.Present("unlocked") {
+		wanted = form.String("unlocked") == "true"
+	}
+	job, changed, status, err := h.store.Unlock(r.Context(), sess.UID, sess.CompanyID, store.ID(jobID), actorOf(sess), wanted)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if status == store.JobTxJobNotFound {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Job not found.", Status: httpx.False()})
+		return
+	}
+	msg := "No change."
+	if changed {
+		msg = "Job locked."
+		if wanted {
+			msg = "Job unlocked."
+		}
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: msg, Status: httpx.True(), Data: build(job)})
+}
+
+// RowsCompleteAll is POST /lifecycle/jobs/rows/complete-all: mark every not-Done row Done in one
+// go. Refused with 403 when the invoice lock forbids queue changes; "Every row was already done."
+// when nothing moved; else "N row(s) marked done.". Sends status:true and the populated job.
+func (h *Handler) RowsCompleteAll(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	jobID := form.String("job_id")
+	if jobID == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Invalid request.", Status: httpx.False()})
+		return
+	}
+	job, moved, status, err := h.store.RowsCompleteAll(r.Context(), sess.UID, sess.CompanyID, store.ID(jobID), actorOf(sess))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	switch status {
+	case store.JobTxJobNotFound:
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Job not found.", Status: httpx.False()})
+		return
+	case store.JobTxLocked:
+		httpx.Write(w, httpx.Envelope{Code: 403, Message: "This job is invoiced and locked. Unlock it to change production stages.", Status: httpx.False()})
+		return
+	}
+	msg := "Every row was already done."
+	if moved > 0 {
+		unit := "rows"
+		if moved == 1 {
+			unit = "row"
+		}
+		msg = fmt.Sprintf("%d %s marked done.", moved, unit)
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: msg, Status: httpx.True(), Data: build(job)})
 }
 
 // SetQueue is POST /lifecycle/jobs/set-queue.

@@ -47,3 +47,57 @@ func TestNext_NoCode(t *testing.T) {
 		t.Errorf("no-code -> %q, want MG/26-27/00008", got)
 	}
 }
+
+func strptr(s string) *string { return &s }
+
+func TestFormatDocumentNumber(t *testing.T) {
+	now := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) // FY 26-27
+	cases := []struct {
+		f    Format
+		seq  int
+		want string
+	}{
+		{DefaultFormats["invoice"], 1, "INV/26-27/000001"},
+		{DefaultFormats["job"], 1, "JOB/26-27/000001"},
+		{DefaultFormats["quotation"], 1, "QT/26-27/000001"},
+		{DefaultFormats["purchase"], 1, "PURINV/26-27/000001"},
+		{Format{Prefix: "INV", Year: "none", Pad: 6, Separator: "/"}, 1, "INV/000001"},
+		{Format{Prefix: "INV", Year: "yy", Pad: 4, Separator: "-"}, 5, "INV-26-0005"},
+		{Format{Prefix: "INV", Year: "yyyy", Pad: 3, Separator: "/"}, 42, "INV/2026/042"},
+		{Format{Prefix: "", Year: "none", Pad: 4, Separator: "/"}, 7, "0007"}, // no prefix, no year
+	}
+	for _, c := range cases {
+		if got := FormatDocumentNumber(c.f, c.seq, now); got != c.want {
+			t.Errorf("FormatDocumentNumber(%+v, %d) = %q, want %q", c.f, c.seq, got, c.want)
+		}
+	}
+}
+
+func TestNormalizeFormat(t *testing.T) {
+	fb := DefaultFormats["invoice"] // {INV, fy, 6, /}
+
+	// all nil -> fallback unchanged
+	if got := NormalizeFormat(RawFormat{}, fb); got != fb {
+		t.Errorf("empty raw = %+v, want fallback %+v", got, fb)
+	}
+	// prefix trimmed; separator taken as-is; year kept when valid
+	got := NormalizeFormat(RawFormat{Prefix: strptr("  ABC  "), Year: strptr("yyyy"), Separator: strptr("-")}, fb)
+	if got.Prefix != "ABC" || got.Year != "yyyy" || got.Separator != "-" || got.Pad != 6 {
+		t.Errorf("normalise = %+v", got)
+	}
+	// empty prefix is kept as "", not replaced by fallback
+	if got := NormalizeFormat(RawFormat{Prefix: strptr("")}, fb); got.Prefix != "" {
+		t.Errorf("empty prefix should stay empty, got %q", got.Prefix)
+	}
+	// invalid year falls back
+	if got := NormalizeFormat(RawFormat{Year: strptr("banana")}, fb); got.Year != "fy" {
+		t.Errorf("invalid year should fall back, got %q", got.Year)
+	}
+	// pad: clamp low/high, round, and NaN -> fallback; ""(Number 0) -> clamped to 1
+	pads := map[string]int{"0": 1, "1": 1, "6": 6, "8": 8, "99": 8, "6.7": 7, "abc": 6, "": 1}
+	for in, want := range pads {
+		if got := NormalizeFormat(RawFormat{Pad: strptr(in)}, fb); got.Pad != want {
+			t.Errorf("pad %q -> %d, want %d", in, got.Pad, want)
+		}
+	}
+}

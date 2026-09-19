@@ -61,6 +61,12 @@ func (s *stubCompanies) Active(_ context.Context, _, _ store.ID) (store.Company,
 	return s.c, nil
 }
 func (s *stubCompanies) Count(_ context.Context, _ store.ID) (int, error) { return 0, nil }
+func (s *stubCompanies) Scope(context.Context, store.ID, store.ID) ([]store.ID, bool, map[store.ID]string, error) {
+	return nil, false, nil, nil
+}
+func (s *stubCompanies) SetReportsAcrossCompanies(context.Context, store.ID, store.ID, bool) (bool, error) {
+	return false, nil
+}
 func (s *stubCompanies) Create(_ context.Context, _ store.ID, _ store.CompanyWrite) (store.Company, error) {
 	return store.Company{}, nil
 }
@@ -365,6 +371,9 @@ type stubClientsX struct {
 func (s stubClientsX) Visible(context.Context, store.ID, store.ID) ([]store.Client, error) {
 	return nil, nil
 }
+func (s stubClientsX) SharedList(context.Context, []store.ID) ([]store.SharedClient, error) {
+	return nil, nil
+}
 func (s stubClientsX) Create(context.Context, store.ID, store.ID, int64, store.ClientWrite) (store.Client, store.Dup, error) {
 	return store.Client{}, "", nil
 }
@@ -377,4 +386,25 @@ func (s stubClientsX) EnsureSupplier(context.Context, store.ID, store.ClientWrit
 }
 func (s stubClientsX) Get(context.Context, store.ID, store.ID) (store.ClientDetail, bool, error) {
 	return s.detail, s.found, nil
+}
+func (s stubClientsX) SetNotifyPreference(context.Context, store.ID, store.ID, string, *bool) (*bool, *bool, bool, error) {
+	return nil, nil, false, nil
+}
+func (s stubClientsX) NotifyPreferences(context.Context, store.ID, bool) ([]store.ClientNotify, error) {
+	return nil, nil
+}
+
+func (s *stubUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
+	return false, nil
+}
+
+func (s *stubCompanies) SetQueueOrder(context.Context, store.ID, []string) ([]string, bool, error) {
+	return nil, false, nil
+}
+
+func (s *stubCompanies) Numbering(context.Context, store.ID, store.ID) (map[string]json.RawMessage, error) {
+	return map[string]json.RawMessage{}, nil
+}
+func (s *stubCompanies) SetNumbering(context.Context, store.ID, store.ID, string, json.RawMessage) (bool, error) {
+	return false, nil
 }

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -214,4 +215,65 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Logout successful.", Status: httpx.True()})
+}
+
+// PasswordChange is POST /user/password/change: re-set the admin's own password after proving
+// the current one. Behind a valid session only. The current password (not merely a live
+// session) is required, so an unattended signed-in browser is not enough to take the account
+// over; and on success every OTHER session is retired while this one survives, so the person is
+// not thrown out mid-task. Validation runs in Node's order.
+func (h *Handler) PasswordChange(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	sess := auth.MustFrom(ctx)
+	form, _ := httpx.ReadForm(r)
+
+	current := form.String("currentPassword")
+	next := form.String("newPassword")
+	if current == "" || next == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Both the current and the new password are required.", Status: httpx.False()})
+		return
+	}
+	if utf8.RuneCountInString(next) < 8 {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "Use at least 8 characters.", Status: httpx.False()})
+		return
+	}
+	if next == current {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "That is the password you already have.", Status: httpx.False()})
+		return
+	}
+
+	user, err := h.Users.FindByID(ctx, sess.UID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Write(w, httpx.Envelope{Code: 404, Message: "Account not found.", Status: httpx.False()})
+			return
+		}
+		httpx.Internal(w, err)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)) != nil {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "That is not your current password.", Status: httpx.False()})
+		return
+	}
+
+	// genSalt(10) in Node; bcrypt.DefaultCost is 10, so hashes stay cross-compatible.
+	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	found, err := h.Users.UpdatePassword(ctx, sess.UID, string(hash))
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	if !found {
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Account not found.", Status: httpx.False()})
+		return
+	}
+	if err := h.Sessions.DeactivateOthers(ctx, sess.UID, sess.Token); err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Password changed. Other devices have been signed out.", Status: httpx.True()})
 }

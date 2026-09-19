@@ -2,6 +2,7 @@ package sqlstore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -173,4 +174,109 @@ func (c *companies) Deactivate(ctx context.Context, uid, companyID store.ID) (st
 		return store.DeactivateNotFound, fmt.Errorf("clearing tab bindings: %w", err)
 	}
 	return store.DeactivateOK, nil
+}
+
+func (c *companies) SetQueueOrder(ctx context.Context, companyID store.ID, order []string) ([]string, bool, error) {
+	var stored []string
+	err := c.pool.QueryRow(ctx,
+		`UPDATE companies SET queue_order=$2, updated_at=now() WHERE id=$1 RETURNING queue_order`,
+		string(companyID), order).Scan(&stored)
+	if noRows(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("set queue order: %w", err)
+	}
+	return stored, true, nil
+}
+
+func (c *companies) Numbering(ctx context.Context, companyID, uid store.ID) (map[string]json.RawMessage, error) {
+	var raw []byte
+	err := c.pool.QueryRow(ctx, `SELECT numbering FROM companies WHERE id=$1 AND uid=$2`,
+		string(companyID), string(uid)).Scan(&raw)
+	if noRows(err) {
+		return map[string]json.RawMessage{}, nil // read never 404s
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read numbering: %w", err)
+	}
+	out := map[string]json.RawMessage{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, fmt.Errorf("decode numbering: %w", err)
+		}
+	}
+	return out, nil
+}
+
+func (c *companies) SetNumbering(ctx context.Context, companyID, uid store.ID, kind string, format json.RawMessage) (bool, error) {
+	// jsonb_set with a parameterised path key is injection-safe; kind is also handler-whitelisted.
+	tag, err := c.pool.Exec(ctx,
+		`UPDATE companies SET numbering = jsonb_set(numbering, ARRAY[$3], $4::jsonb, true), updated_at=now()
+		  WHERE id=$1 AND uid=$2`,
+		string(companyID), string(uid), kind, string(format))
+	if err != nil {
+		return false, fmt.Errorf("set numbering: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func (c *companies) SetReportsAcrossCompanies(ctx context.Context, companyID, uid store.ID, on bool) (bool, error) {
+	tag, err := c.pool.Exec(ctx,
+		`UPDATE companies SET reports_across_companies=$3, updated_at=now() WHERE id=$1 AND uid=$2`,
+		string(companyID), string(uid), on)
+	if err != nil {
+		return false, fmt.Errorf("set sharing toggle: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// Scope is Helpers/CompanyScope.scopeFor. Fail-closed to the acting company on any trouble.
+func (c *companies) Scope(ctx context.Context, companyID, uid store.ID) ([]store.ID, bool, map[store.ID]string, error) {
+	var name, firm, ownerUID string
+	var on bool
+	err := c.pool.QueryRow(ctx,
+		`SELECT name, firm, uid, reports_across_companies FROM companies WHERE id=$1`, string(companyID)).
+		Scan(&name, &firm, &ownerUID, &on)
+	if err != nil {
+		return []store.ID{companyID}, false, map[store.ID]string{}, nil
+	}
+	label := name
+	if label == "" {
+		label = firm
+	}
+	if !on || ownerUID == "" {
+		return []store.ID{companyID}, false, map[store.ID]string{companyID: label}, nil
+	}
+	rows, err := c.pool.Query(ctx, `SELECT id, name, firm FROM companies WHERE uid=$1`, ownerUID)
+	if err != nil {
+		return []store.ID{companyID}, false, map[store.ID]string{companyID: label}, nil
+	}
+	defer rows.Close()
+	ids := make([]store.ID, 0)
+	labels := map[store.ID]string{}
+	has := false
+	for rows.Next() {
+		var id, n, f string
+		if err := rows.Scan(&id, &n, &f); err != nil {
+			return []store.ID{companyID}, false, map[store.ID]string{companyID: label}, nil
+		}
+		l := n
+		if l == "" {
+			l = f
+		}
+		ids = append(ids, store.ID(id))
+		labels[store.ID(id)] = l
+		if store.ID(id) == companyID {
+			has = true
+		}
+	}
+	if len(ids) == 0 {
+		return []store.ID{companyID}, false, map[store.ID]string{companyID: label}, nil
+	}
+	if !has {
+		ids = append(ids, companyID)
+		labels[companyID] = label
+	}
+	return ids, len(ids) > 1, labels, nil
 }

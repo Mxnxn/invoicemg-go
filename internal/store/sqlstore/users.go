@@ -115,3 +115,11 @@ func (u *users) CreateSession(ctx context.Context, s store.NewSession) (store.Se
 	}
 	return created, nil
 }
+
+func (u *users) UpdatePassword(ctx context.Context, uid store.ID, passwordHash string) (bool, error) {
+	tag, err := u.pool.Exec(ctx, `UPDATE users SET password = $2 WHERE id = $1`, string(uid), passwordHash)
+	if err != nil {
+		return false, fmt.Errorf("update password: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

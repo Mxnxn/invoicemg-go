@@ -20,6 +20,17 @@ type stubClients struct {
 	err         error
 	gotUID      store.ID
 	gotCompany  store.ID
+
+	// notify-preference
+	notifyOnCreate  *bool
+	notifyOnUpdate  *bool
+	notifyFound     bool
+	gotNotifyID     store.ID
+	gotNotifyField  string
+	gotNotifyValue  *bool
+	notifySetCalled bool
+	notifyList      []store.ClientNotify
+	gotAnsweredOnly bool
 }
 
 func (s *stubClients) Visible(_ context.Context, uid, companyID store.ID) ([]store.Client, error) {
@@ -71,6 +82,147 @@ func (b *stubBatches) Delete(context.Context, store.ID, store.ID, store.ID) (boo
 
 func (s *stubClients) EnsureSupplier(context.Context, store.ID, store.ClientWrite) (bool, error) {
 	return false, nil
+}
+func (s *stubClients) SetNotifyPreference(_ context.Context, companyID, clientID store.ID, field string, value *bool) (*bool, *bool, bool, error) {
+	s.gotCompany, s.gotNotifyID, s.gotNotifyField, s.gotNotifyValue, s.notifySetCalled = companyID, clientID, field, value, true
+	return s.notifyOnCreate, s.notifyOnUpdate, s.notifyFound, nil
+}
+func (s *stubClients) NotifyPreferences(_ context.Context, companyID store.ID, answeredOnly bool) ([]store.ClientNotify, error) {
+	s.gotCompany, s.gotAnsweredOnly = companyID, answeredOnly
+	return s.notifyList, nil
+}
+func (s *stubClients) SharedList(context.Context, []store.ID) ([]store.SharedClient, error) {
+	return nil, nil
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func postSetNotify(t *testing.T, s *stubClients, fields map[string]string) map[string]any {
+	t.Helper()
+	vals := neturl.Values{}
+	for k, v := range fields {
+		vals.Set(k, v)
+	}
+	req := httptest.NewRequest("POST", "/client/notify-preference", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s, &stubBatches{}).NotifyPreference(rec, req)
+	var b map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return b
+}
+
+// "true" in the notifyOnCreate field, default kind -> writes notifyOnCreate=true.
+func TestSetNotify_TrueCreate(t *testing.T) {
+	s := &stubClients{notifyFound: true, notifyOnCreate: boolPtr(true)}
+	b := postSetNotify(t, s, map[string]string{"client_id": "c1", "notifyOnCreate": "true"})
+	if b["code"] != float64(200) || b["status"] != true {
+		t.Fatalf("envelope: %v", b)
+	}
+	if s.gotNotifyField != "notifyOnCreate" || s.gotNotifyValue == nil || *s.gotNotifyValue != true {
+		t.Errorf("store args: field=%q value=%v", s.gotNotifyField, s.gotNotifyValue)
+	}
+	if s.gotNotifyID != "c1" || s.gotCompany != "co1" {
+		t.Errorf("scope/id: %v %v", s.gotCompany, s.gotNotifyID)
+	}
+	data := b["data"].(map[string]any)
+	if data["notifyOnCreate"] != true {
+		t.Errorf("data: %v", data)
+	}
+}
+
+// kind=updated targets notifyOnUpdate; the value still comes from the notifyOnCreate field.
+func TestSetNotify_KindUpdated(t *testing.T) {
+	s := &stubClients{notifyFound: true}
+	postSetNotify(t, s, map[string]string{"client_id": "c1", "kind": "updated", "notifyOnCreate": "false"})
+	if s.gotNotifyField != "notifyOnUpdate" {
+		t.Errorf("kind=updated should target notifyOnUpdate, got %q", s.gotNotifyField)
+	}
+	if s.gotNotifyValue == nil || *s.gotNotifyValue != false {
+		t.Errorf("value should be false, got %v", s.gotNotifyValue)
+	}
+}
+
+// "clear" stores nil (null); anything not "true"/"clear" is false.
+func TestSetNotify_ClearAndFalse(t *testing.T) {
+	s := &stubClients{notifyFound: true}
+	postSetNotify(t, s, map[string]string{"client_id": "c1", "notifyOnCreate": "clear"})
+	if s.gotNotifyValue != nil {
+		t.Errorf("clear must send nil, got %v", s.gotNotifyValue)
+	}
+	s2 := &stubClients{notifyFound: true}
+	postSetNotify(t, s2, map[string]string{"client_id": "c1", "notifyOnCreate": "banana"})
+	if s2.gotNotifyValue == nil || *s2.gotNotifyValue != false {
+		t.Errorf("non-true/clear must be false, got %v", s2.gotNotifyValue)
+	}
+}
+
+// Value falls back to the `value` field when notifyOnCreate is absent.
+func TestSetNotify_ValueFallback(t *testing.T) {
+	s := &stubClients{notifyFound: true}
+	postSetNotify(t, s, map[string]string{"client_id": "c1", "value": "true"})
+	if s.gotNotifyValue == nil || *s.gotNotifyValue != true {
+		t.Errorf("value fallback should give true, got %v", s.gotNotifyValue)
+	}
+}
+
+func TestSetNotify_MissingIDAndNotFound(t *testing.T) {
+	if b := postSetNotify(t, &stubClients{}, map[string]string{"notifyOnCreate": "true"}); b["code"] != float64(422) || b["message"] != "Invalid request." {
+		t.Errorf("missing id: %v", b)
+	}
+	if b := postSetNotify(t, &stubClients{notifyFound: false}, map[string]string{"client_id": "c1", "notifyOnCreate": "true"}); b["code"] != float64(404) || b["message"] != "Customer not found." {
+		t.Errorf("miss: %v", b)
+	}
+}
+
+func getNotifyList(t *testing.T, s *stubClients, all string) map[string]any {
+	t.Helper()
+	url := "/client/notify-preferences"
+	if all != "" {
+		url += "?all=" + all
+	}
+	req := httptest.NewRequest("GET", url, nil)
+	req = req.WithContext(auth.WithSession(req.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s, &stubBatches{}).NotifyPreferences(rec, req)
+	var b map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
+	}
+	return b
+}
+
+func TestListNotify_AnsweredOnlyDefault(t *testing.T) {
+	s := &stubClients{notifyList: []store.ClientNotify{
+		{ID: "c1", ClientFirm: "Acme", ClientName: "Priya", ClientPhone: "9", NotifyOnCreate: boolPtr(true)},
+	}}
+	b := getNotifyList(t, s, "")
+	if !s.gotAnsweredOnly {
+		t.Error("default should be answered-only")
+	}
+	row := b["data"].([]any)[0].(map[string]any)
+	if row["_id"] != "c1" || row["clientFirm"] != "Acme" || row["notifyOnCreate"] != true {
+		t.Errorf("row: %v", row)
+	}
+	// notifyOnUpdate is nil -> omitted
+	if _, ok := row["notifyOnUpdate"]; ok {
+		t.Error("nil notifyOnUpdate must be omitted")
+	}
+}
+
+func TestListNotify_AllTrue(t *testing.T) {
+	s := &stubClients{notifyList: nil}
+	b := getNotifyList(t, s, "true")
+	if s.gotAnsweredOnly {
+		t.Error("all=true should return everyone (answeredOnly=false)")
+	}
+	// empty list is [] not null
+	if _, ok := b["data"].([]any); !ok {
+		t.Errorf("data should be []: %v", b["data"])
+	}
 }
 
 // Write-path stub state; each field lets a test steer one outcome.

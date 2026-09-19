@@ -138,3 +138,15 @@ func (u *usersStore) CreateSession(ctx context.Context, s store.NewSession) (sto
 		ExpiresAt:   s.ExpiresAt,
 	}, nil
 }
+
+func (u *usersStore) UpdatePassword(ctx context.Context, uid store.ID, passwordHash string) (bool, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return false, err
+	}
+	res, err := u.db.Collection(colUsers).UpdateByID(ctx, oid, bson.M{"$set": bson.M{"password": passwordHash}})
+	if err != nil {
+		return false, fmt.Errorf("update password: %w", err)
+	}
+	return res.MatchedCount > 0, nil
+}

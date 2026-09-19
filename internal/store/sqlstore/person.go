@@ -191,3 +191,40 @@ func (p *people) FindEmployeeByEmail(ctx context.Context, email string) (store.E
 	}
 	return a, true, nil
 }
+
+// notifyColumn maps a NotifyPo* wire name to its column. A whitelist, not interpolation of
+// caller input: the result is one of three literals, so the query text is never caller-shaped.
+func notifyColumn(field string) (string, bool) {
+	switch field {
+	case "notifyPoCreated":
+		return "notify_po_created", true
+	case "notifyPoUpdated":
+		return "notify_po_updated", true
+	case "notifyPoConfirmed":
+		return "notify_po_confirmed", true
+	default:
+		return "", false
+	}
+}
+
+func (p *people) SetNotifyField(ctx context.Context, uid, personID store.ID, field string, value *bool) (store.Person, bool, error) {
+	col, ok := notifyColumn(field)
+	if !ok {
+		return store.Person{}, false, fmt.Errorf("unknown notify field %q", field)
+	}
+	// value is *bool: nil encodes as NULL ("clear"), &true/&false as the boolean.
+	tag, err := p.pool.Exec(ctx,
+		`UPDATE persons SET `+col+` = $3, updated_at = now() WHERE id = $1 AND uid = $2`,
+		string(personID), string(uid), value)
+	if err != nil {
+		return store.Person{}, false, fmt.Errorf("set notify field: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return store.Person{}, false, nil
+	}
+	pr, err := p.one(ctx, uid, personID)
+	if err != nil {
+		return store.Person{}, false, fmt.Errorf("reloading person: %w", err)
+	}
+	return pr, true, nil
+}

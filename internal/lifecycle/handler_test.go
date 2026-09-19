@@ -39,6 +39,15 @@ type stubJobs struct {
 	convJobs     []store.Job
 	convFound    bool
 	gotConvert   []store.ID
+
+	unlockChanged   bool
+	gotUnlockWanted *bool
+
+	completeMoved  int
+	completeCalled bool
+
+	deleteCalled bool
+	gotDeleteID  store.ID
 }
 
 func (s *stubJobs) List(_ context.Context, _, _, clientID store.ID) ([]store.Job, error) {
@@ -100,6 +109,18 @@ func (s *stubJobs) RowProgress(_ context.Context, _, _, _, _ store.ID, _ store.N
 func (s *stubJobs) ConvertToEntries(_ context.Context, _, _ store.ID, jobIDs []store.ID, _ store.NoteActor) ([]store.Entry, []store.Job, bool, error) {
 	s.gotConvert = jobIDs
 	return s.convEntries, s.convJobs, s.convFound, nil
+}
+func (s *stubJobs) Unlock(_ context.Context, _, _, _ store.ID, _ store.NoteActor, wanted bool) (store.Job, bool, store.JobTxStatus, error) {
+	s.gotUnlockWanted = &wanted
+	return s.txJob, s.unlockChanged, s.txStatus, nil
+}
+func (s *stubJobs) RowsCompleteAll(_ context.Context, _, _, _ store.ID, _ store.NoteActor) (store.Job, int, store.JobTxStatus, error) {
+	s.completeCalled = true
+	return s.txJob, s.completeMoved, s.txStatus, nil
+}
+func (s *stubJobs) Delete(_ context.Context, _, _, id store.ID, _ store.NoteActor) (store.JobTxStatus, error) {
+	s.gotDeleteID, s.deleteCalled = id, true
+	return s.txStatus, nil
 }
 
 func serve(t *testing.T, s store.Jobs) map[string]any {
@@ -559,5 +580,155 @@ func TestConvertRowMath(t *testing.T) {
 	ce = store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 0, "", "JOB/1")
 	if ce.Advance != 0 || ce.Total < 707.9 || ce.Total > 708.1 {
 		t.Errorf("unpaid: %+v", ce)
+	}
+}
+
+func TestUnlock(t *testing.T) {
+	okJob := store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001"}
+
+	// changed -> "Job unlocked.", status:true, wanted=true, populated job
+	s := &stubJobs{txJob: okJob, txStatus: store.JobTxOK, unlockChanged: true}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"job_id": "j1", "unlocked": "true"})
+	if body["code"] != float64(200) || body["message"] != "Job unlocked." || body["status"] != true {
+		t.Fatalf("unlock: %v", body)
+	}
+	if s.gotUnlockWanted == nil || *s.gotUnlockWanted != true {
+		t.Errorf("wanted should be true, got %v", s.gotUnlockWanted)
+	}
+	if body["data"] == nil {
+		t.Error("unlock must return the populated job")
+	}
+
+	// unlocked=false and changed -> "Job locked."
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK, unlockChanged: true}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"job_id": "j1", "unlocked": "false"})
+	if body["message"] != "Job locked." || s.gotUnlockWanted == nil || *s.gotUnlockWanted != false {
+		t.Errorf("lock: %v (wanted=%v)", body, s.gotUnlockWanted)
+	}
+
+	// no change -> "No change." (still 200, still returns the job)
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK, unlockChanged: false}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"job_id": "j1", "unlocked": "true"})
+	if body["code"] != float64(200) || body["message"] != "No change." {
+		t.Errorf("no-change: %v", body)
+	}
+
+	// unlocked absent -> defaults to wanting true
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK, unlockChanged: true}
+	postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"job_id": "j1"})
+	if s.gotUnlockWanted == nil || *s.gotUnlockWanted != true {
+		t.Errorf("absent unlocked should default to true, got %v", s.gotUnlockWanted)
+	}
+
+	// missing job_id -> 422
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"unlocked": "true"})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing id: %v", body)
+	}
+
+	// not found -> 404
+	s = &stubJobs{txStatus: store.JobTxJobNotFound}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Unlock },
+		map[string]string{"job_id": "j9", "unlocked": "true"})
+	if body["code"] != float64(404) || body["message"] != "Job not found." {
+		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestRowsCompleteAll(t *testing.T) {
+	okJob := store.Job{ID: "j1", ChallanNumber: "MG/26-27/00001"}
+
+	// several moved -> "N rows marked done." + populated job + status:true
+	s := &stubJobs{txJob: okJob, txStatus: store.JobTxOK, completeMoved: 3}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{"job_id": "j1"})
+	if body["code"] != float64(200) || body["message"] != "3 rows marked done." || body["status"] != true {
+		t.Fatalf("many: %v", body)
+	}
+	if !s.completeCalled || body["data"] == nil {
+		t.Error("should call the store and return the populated job")
+	}
+
+	// exactly one -> singular
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK, completeMoved: 1}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{"job_id": "j1"})
+	if body["message"] != "1 row marked done." {
+		t.Errorf("singular: %v", body)
+	}
+
+	// none moved -> "Every row was already done."
+	s = &stubJobs{txJob: okJob, txStatus: store.JobTxOK, completeMoved: 0}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{"job_id": "j1"})
+	if body["code"] != float64(200) || body["message"] != "Every row was already done." {
+		t.Errorf("none: %v", body)
+	}
+
+	// invoice lock -> 403 with the queue refusal wording
+	s = &stubJobs{txStatus: store.JobTxLocked}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{"job_id": "j1"})
+	if body["code"] != float64(403) || body["message"] != "This job is invoiced and locked. Unlock it to change production stages." {
+		t.Errorf("locked: %v", body)
+	}
+
+	// missing id -> 422
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing id: %v", body)
+	}
+
+	// not found -> 404
+	s = &stubJobs{txStatus: store.JobTxJobNotFound}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.RowsCompleteAll },
+		map[string]string{"job_id": "j9"})
+	if body["code"] != float64(404) || body["message"] != "Job not found." {
+		t.Errorf("not found: %v", body)
+	}
+}
+
+func TestJobDelete(t *testing.T) {
+	// success -> "Job moved to trash.", status:true, no data
+	s := &stubJobs{txStatus: store.JobTxOK}
+	body := postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Delete },
+		map[string]string{"job_id": "j1"})
+	if body["code"] != float64(200) || body["message"] != "Job moved to trash." || body["status"] != true {
+		t.Fatalf("delete: %v", body)
+	}
+	if !s.deleteCalled || s.gotDeleteID != "j1" {
+		t.Errorf("store not called with the job id: %v %v", s.deleteCalled, s.gotDeleteID)
+	}
+	if _, hasData := body["data"]; hasData {
+		t.Error("delete sends no data")
+	}
+
+	// missing id -> 422
+	body = postNotesJob(t, &stubJobs{}, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Delete },
+		map[string]string{})
+	if body["code"] != float64(422) || body["message"] != "Invalid request." {
+		t.Errorf("missing id: %v", body)
+	}
+
+	// invoice lock -> 403 with the delete refusal wording
+	s = &stubJobs{txStatus: store.JobTxLocked}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Delete },
+		map[string]string{"job_id": "j1"})
+	if body["code"] != float64(403) || body["message"] != "This job is invoiced and cannot be deleted. Delete the invoice first." {
+		t.Errorf("locked: %v", body)
+	}
+
+	// not found -> 404
+	s = &stubJobs{txStatus: store.JobTxJobNotFound}
+	body = postNotesJob(t, s, func(h *Handler) func(http.ResponseWriter, *http.Request) { return h.Delete },
+		map[string]string{"job_id": "j9"})
+	if body["code"] != float64(404) || body["message"] != "Job not found." {
+		t.Errorf("not found: %v", body)
 	}
 }

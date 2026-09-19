@@ -8,6 +8,7 @@ import (
 	neturl "net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -27,6 +28,16 @@ type stubCompanies struct {
 	gotCreate     store.CompanyWrite
 	gotPatch      store.CompanyPatch
 	gotDeactivate store.ID
+
+	queueStored []string
+	queueFound  bool
+	gotQueue    []string
+
+	numbering       map[string]json.RawMessage
+	setNumberFound  bool
+	gotNumberKind   string
+	gotNumberFormat json.RawMessage
+	setNumberCalled bool
 }
 
 func (s *stubCompanies) List(_ context.Context, _ store.ID) ([]store.Company, error) {
@@ -36,6 +47,12 @@ func (s *stubCompanies) Active(_ context.Context, _, _ store.ID) (store.Company,
 	return s.active, s.actErr
 }
 func (s *stubCompanies) Count(_ context.Context, _ store.ID) (int, error) { return len(s.list), nil }
+func (s *stubCompanies) Scope(context.Context, store.ID, store.ID) ([]store.ID, bool, map[store.ID]string, error) {
+	return nil, false, nil, nil
+}
+func (s *stubCompanies) SetReportsAcrossCompanies(context.Context, store.ID, store.ID, bool) (bool, error) {
+	return false, nil
+}
 func (s *stubCompanies) Create(_ context.Context, _ store.ID, in store.CompanyWrite) (store.Company, error) {
 	s.gotCreate = in
 	return s.created, nil
@@ -50,6 +67,20 @@ func (s *stubCompanies) FindActive(_ context.Context, _, _ store.ID) (store.Comp
 func (s *stubCompanies) Deactivate(_ context.Context, _, companyID store.ID) (store.DeactivateResult, error) {
 	s.gotDeactivate = companyID
 	return s.deactivate, nil
+}
+func (s *stubCompanies) SetQueueOrder(_ context.Context, _ store.ID, order []string) ([]string, bool, error) {
+	s.gotQueue = order
+	return s.queueStored, s.queueFound, nil
+}
+func (s *stubCompanies) Numbering(context.Context, store.ID, store.ID) (map[string]json.RawMessage, error) {
+	if s.numbering == nil {
+		return map[string]json.RawMessage{}, nil
+	}
+	return s.numbering, nil
+}
+func (s *stubCompanies) SetNumbering(_ context.Context, _, _ store.ID, kind string, format json.RawMessage) (bool, error) {
+	s.setNumberCalled, s.gotNumberKind, s.gotNumberFormat = true, kind, format
+	return s.setNumberFound, nil
 }
 
 // stubSessions implements store.Sessions; only BindCompany matters here.
@@ -278,5 +309,158 @@ func TestDeactivate(t *testing.T) {
 	body := postForm(t, h, func(h *Handler) http.HandlerFunc { return h.Deactivate }, store.Session{UID: "u1", Role: "admin"}, "", map[string]string{})
 	if body["code"] != float64(422) {
 		t.Errorf("missing id: %v", body)
+	}
+}
+
+func (s *stubSessions) DeactivateOthers(context.Context, store.ID, string) error { return nil }
+func (s *stubUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
+	return false, nil
+}
+
+func TestQueueDefault(t *testing.T) {
+	sess := store.Session{UID: "u1", CompanyID: "co1", Role: "admin"}
+
+	// a good order is normalised (First/Last pinned) and stored; returns queueOrder
+	s := &stubCompanies{queueFound: true, queueStored: []string{"Created", "Printing", "Done"}}
+	body := postForm(t, New(s, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.QueueDefault },
+		sess, "", map[string]string{"queueOrder": `["Printing"]`})
+	if body["code"] != float64(200) || body["message"] != "Saved as the default for new jobs." || body["status"] != true {
+		t.Fatalf("envelope: %v", body)
+	}
+	// handler normalises before storing: ["Printing"] -> [Created, Printing, Done]
+	if len(s.gotQueue) != 3 || s.gotQueue[0] != "Created" || s.gotQueue[1] != "Printing" || s.gotQueue[2] != "Done" {
+		t.Errorf("stored order not normalised: %v", s.gotQueue)
+	}
+	if qo, _ := body["data"].(map[string]any)["queueOrder"].([]any); len(qo) != 3 {
+		t.Errorf("data.queueOrder: %v", body["data"])
+	}
+
+	// missing field -> 422 "Invalid request."
+	if b := postForm(t, New(&stubCompanies{}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.QueueDefault },
+		sess, "", map[string]string{}); b["code"] != float64(422) || b["message"] != "Invalid request." {
+		t.Errorf("missing: %v", b)
+	}
+
+	// malformed JSON -> 422 parse message
+	if b := postForm(t, New(&stubCompanies{}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.QueueDefault },
+		sess, "", map[string]string{"queueOrder": "{bad"}); b["code"] != float64(422) || b["message"] != "queueOrder must be a JSON array of strings." {
+		t.Errorf("malformed: %v", b)
+	}
+
+	// valid JSON non-array -> normalises to the fallback (not an error)
+	s2 := &stubCompanies{queueFound: true, queueStored: store.QueueStages}
+	postForm(t, New(s2, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.QueueDefault },
+		sess, "", map[string]string{"queueOrder": `{}`})
+	if len(s2.gotQueue) != 4 || s2.gotQueue[0] != "Created" || s2.gotQueue[3] != "Done" {
+		t.Errorf("non-array should fall back to default: %v", s2.gotQueue)
+	}
+
+	// company not found -> 404
+	if b := postForm(t, New(&stubCompanies{queueFound: false}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.QueueDefault },
+		sess, "", map[string]string{"queueOrder": `["Printing"]`}); b["code"] != float64(404) || b["message"] != "Company not found." {
+		t.Errorf("not found: %v", b)
+	}
+}
+
+func TestNumbering_ReadDefaults(t *testing.T) {
+	numberingClock = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) } // FY 26-27
+	defer func() { numberingClock = func() time.Time { return time.Now().UTC() } }()
+
+	sess := store.Session{UID: "u1", CompanyID: "co1"}
+	// nothing stored -> every kind filled from defaults
+	body := postForm(t, New(&stubCompanies{}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.Numbering },
+		sess, "", map[string]string{})
+	if body["code"] != float64(200) || body["status"] != true {
+		t.Fatalf("envelope: %v", body)
+	}
+	num := body["data"].(map[string]any)["numbering"].(map[string]any)
+	inv := num["invoice"].(map[string]any)
+	if inv["prefix"] != "INV" || inv["year"] != "fy" || inv["pad"] != float64(6) || inv["separator"] != "/" {
+		t.Errorf("invoice default: %v", inv)
+	}
+	// all four kinds present, no purchaseOrder
+	for _, k := range []string{"invoice", "job", "quotation", "purchase"} {
+		if _, ok := num[k]; !ok {
+			t.Errorf("missing kind %q", k)
+		}
+	}
+	if _, ok := num["purchaseOrder"]; ok {
+		t.Error("read must not include purchaseOrder")
+	}
+	prev := body["data"].(map[string]any)["preview"].(map[string]any)
+	if prev["invoice"] != "INV/26-27/000001" {
+		t.Errorf("invoice preview = %v", prev["invoice"])
+	}
+}
+
+func TestNumbering_ReadStoredOverride(t *testing.T) {
+	numberingClock = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
+	defer func() { numberingClock = func() time.Time { return time.Now().UTC() } }()
+
+	s := &stubCompanies{numbering: map[string]json.RawMessage{
+		"invoice": json.RawMessage(`{"prefix":"BILL","year":"yyyy","pad":4,"separator":"-"}`),
+	}}
+	body := postForm(t, New(s, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.Numbering },
+		store.Session{UID: "u1", CompanyID: "co1"}, "", map[string]string{})
+	prev := body["data"].(map[string]any)["preview"].(map[string]any)
+	if prev["invoice"] != "BILL-2026-0001" {
+		t.Errorf("stored override preview = %v", prev["invoice"])
+	}
+	// an unset kind still shows its default
+	if prev["job"] != "JOB/26-27/000001" {
+		t.Errorf("job default preview = %v", prev["job"])
+	}
+}
+
+func TestNumberingUpdate(t *testing.T) {
+	numberingClock = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
+	defer func() { numberingClock = func() time.Time { return time.Now().UTC() } }()
+	admin := store.Session{UID: "u1", CompanyID: "co1", Role: "admin"}
+
+	// success: normalised format stored + echoed with preview
+	s := &stubCompanies{setNumberFound: true}
+	body := postForm(t, New(s, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.NumberingUpdate },
+		admin, "", map[string]string{"kind": "invoice", "prefix": "  BILL  ", "year": "yyyy", "pad": "99", "separator": "-"})
+	if body["code"] != float64(200) || body["message"] != "Numbering updated. Documents already issued keep the numbers they have." {
+		t.Fatalf("envelope: %v", body)
+	}
+	if !s.setNumberCalled || s.gotNumberKind != "invoice" {
+		t.Errorf("store not called for invoice: %+v", s)
+	}
+	// stored format is normalised: prefix trimmed, pad clamped to 8
+	var stored map[string]any
+	json.Unmarshal(s.gotNumberFormat, &stored)
+	if stored["prefix"] != "BILL" || stored["pad"] != float64(8) {
+		t.Errorf("stored format not normalised: %v", stored)
+	}
+	data := body["data"].(map[string]any)
+	// pad clamped to 8 -> "BILL-2026-00000001"
+	if data["preview"] != "BILL-2026-00000001" {
+		t.Errorf("preview = %v", data["preview"])
+	}
+
+	// unknown kind -> 422
+	if b := postForm(t, New(&stubCompanies{}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.NumberingUpdate },
+		admin, "", map[string]string{"kind": "bogus", "prefix": "X"}); b["code"] != float64(422) || b["message"] != "Unknown document type." {
+		t.Errorf("unknown kind: %v", b)
+	}
+
+	// empty prefix -> 422
+	if b := postForm(t, New(&stubCompanies{setNumberFound: true}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.NumberingUpdate },
+		admin, "", map[string]string{"kind": "invoice", "prefix": ""}); b["code"] != float64(422) || b["message"] != "A prefix is required - it is what tells one series from another." {
+		t.Errorf("empty prefix: %v", b)
+	}
+
+	// purchaseOrder is a valid kind for update (even though read hides it)
+	s2 := &stubCompanies{setNumberFound: true}
+	if b := postForm(t, New(s2, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.NumberingUpdate },
+		admin, "", map[string]string{"kind": "purchaseOrder", "prefix": "PO"}); b["code"] != float64(200) {
+		t.Errorf("purchaseOrder update should be accepted: %v", b)
+	}
+
+	// company gone -> 404
+	if b := postForm(t, New(&stubCompanies{setNumberFound: false}, &stubUsers{}, &stubSessions{}), func(h *Handler) http.HandlerFunc { return h.NumberingUpdate },
+		admin, "", map[string]string{"kind": "invoice", "prefix": "X"}); b["code"] != float64(404) || b["message"] != "Company not found." {
+		t.Errorf("not found: %v", b)
 	}
 }

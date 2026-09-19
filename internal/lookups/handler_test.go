@@ -79,3 +79,7 @@ func TestPeople_PrependsOwnerAsAdmin(t *testing.T) {
 		t.Errorf("person row wrong: %v", data[1])
 	}
 }
+
+func (s *stubUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
+	return false, nil
+}

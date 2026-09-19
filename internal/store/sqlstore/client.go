@@ -2,14 +2,29 @@ package sqlstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
 type clients struct{ pool *pgxpool.Pool }
+
+// clientNotifyColumn maps a notify-preference wire field to its column. A whitelist: the result
+// is one of two literals, so building the query around it cannot inject SQL.
+func clientNotifyColumn(field string) (string, bool) {
+	switch field {
+	case "notifyOnCreate":
+		return "notify_on_create", true
+	case "notifyOnUpdate":
+		return "notify_on_update", true
+	default:
+		return "", false
+	}
+}
 
 func (s *Store) Clients() store.Clients { return &clients{pool: s.pool} }
 
@@ -152,4 +167,80 @@ func (c *clients) EnsureSupplier(ctx context.Context, uid store.ID, in store.Cli
 		return false, fmt.Errorf("insert supplier: %w", err)
 	}
 	return true, nil
+}
+
+func (c *clients) SetNotifyPreference(ctx context.Context, companyID, clientID store.ID, field string, value *bool) (*bool, *bool, bool, error) {
+	col, ok := clientNotifyColumn(field)
+	if !ok {
+		return nil, nil, false, fmt.Errorf("unknown notify field %q", field)
+	}
+	var onCreate, onUpdate *bool
+	// value is *bool: nil -> NULL ("ask each time"), &true/&false -> the boolean.
+	err := c.pool.QueryRow(ctx,
+		`UPDATE clients SET `+col+` = $3, updated_at = now()
+		  WHERE id = $1 AND company_id = $2
+	  RETURNING notify_on_create, notify_on_update`,
+		string(clientID), string(companyID), value).Scan(&onCreate, &onUpdate)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, false, nil
+	}
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("set client notify: %w", err)
+	}
+	return onCreate, onUpdate, true, nil
+}
+
+func (c *clients) NotifyPreferences(ctx context.Context, companyID store.ID, answeredOnly bool) ([]store.ClientNotify, error) {
+	q := `SELECT id, client_name, client_firm, client_phone, notify_on_create, notify_on_update
+	        FROM clients WHERE company_id = $1`
+	if answeredOnly {
+		// A boolean column is true/false/null, so IS NOT NULL is Node's $in:[true,false].
+		q += ` AND (notify_on_create IS NOT NULL OR notify_on_update IS NOT NULL)`
+	}
+	q += ` ORDER BY client_firm ASC, id ASC` // id tiebreak (#19); Node sorts clientFirm only
+	rows, err := c.pool.Query(ctx, q, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("listing notify preferences: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.ClientNotify, 0)
+	for rows.Next() {
+		var cn store.ClientNotify
+		if err := rows.Scan(&cn.ID, &cn.ClientName, &cn.ClientFirm, &cn.ClientPhone,
+			&cn.NotifyOnCreate, &cn.NotifyOnUpdate); err != nil {
+			return nil, fmt.Errorf("reading notify preferences: %w", err)
+		}
+		out = append(out, cn)
+	}
+	return out, rows.Err()
+}
+
+func (c *clients) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedClient, error) {
+	ids := make([]string, 0, len(companyIDs))
+	for _, id := range companyIDs {
+		ids = append(ids, string(id))
+	}
+	rows, err := c.pool.Query(ctx, `
+		SELECT id, client_name, client_firm, client_phone, client_gst, company_id
+		  FROM clients
+		 WHERE company_id = ANY ($1)
+		 ORDER BY client_firm ASC, id ASC`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("shared customers: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.SharedClient, 0)
+	for rows.Next() {
+		var sc store.SharedClient
+		var companyIDCol *string
+		if err := rows.Scan(&sc.ID, &sc.ClientName, &sc.ClientFirm, &sc.ClientPhone,
+			&sc.ClientGST, &companyIDCol); err != nil {
+			return nil, fmt.Errorf("reading shared customers: %w", err)
+		}
+		if companyIDCol != nil {
+			sc.CompanyID = store.ID(*companyIDCol)
+		}
+		out = append(out, sc)
+	}
+	return out, rows.Err()
 }

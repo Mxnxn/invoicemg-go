@@ -77,6 +77,20 @@ func objectID(id store.ID) (primitive.ObjectID, error) {
 
 func idOf(v primitive.ObjectID) store.ID { return store.ID(v.Hex()) }
 
+// objectIDs converts a set of ids to ObjectIDs, failing on the first malformed one. Used by the
+// cross-company shared reads, whose scope is a list of the owner's company ids.
+func objectIDs(ids []store.ID) ([]primitive.ObjectID, error) {
+	out := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		oid, err := objectID(id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, oid)
+	}
+	return out, nil
+}
+
 // ---------------------------------------------------------------------------------------
 
 type sessions struct{ db *mongo.Database }
@@ -392,6 +406,23 @@ func (s *sessions) BindCompany(ctx context.Context, token, tabID string, uid, co
 		options.Update().SetUpsert(true))
 	if err != nil {
 		return fmt.Errorf("binding tab to company: %w", err)
+	}
+	return nil
+}
+
+// DeactivateOthers retires every other session of uid (all but keepToken), matching Node's
+// UserSession.updateMany({uid, token:{$ne}}, {is_active:false}) - it does not filter on the
+// current active flag, so re-running it is idempotent.
+func (s *sessions) DeactivateOthers(ctx context.Context, uid store.ID, keepToken string) error {
+	oid, err := objectID(uid)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Collection(colUserSessions).UpdateMany(ctx,
+		bson.M{"uid": oid, "token": bson.M{"$ne": keepToken}},
+		bson.M{"$set": bson.M{"is_active": false}})
+	if err != nil {
+		return fmt.Errorf("deactivate other sessions: %w", err)
 	}
 	return nil
 }
