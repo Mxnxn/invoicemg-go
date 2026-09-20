@@ -19,9 +19,13 @@ import (
 type Handler struct {
 	store store.Jobs
 	notes store.JobNotes
+	// materials backs the Job Report's per-line HSN lookup (job rows do not store HSN).
+	materials store.Materials
 }
 
-func New(s store.Jobs, n store.JobNotes) *Handler { return &Handler{store: s, notes: n} }
+func New(s store.Jobs, n store.JobNotes, m store.Materials) *Handler {
+	return &Handler{store: s, notes: n, materials: m}
+}
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	sess := auth.MustFrom(r.Context())

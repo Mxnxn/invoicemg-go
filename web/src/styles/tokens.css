@@ -416,8 +416,9 @@ input[type="number"]::-webkit-inner-spin-button {
     font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace !important;
     background-color: var(--toast-bg) !important;
     color: var(--toast-text) !important;
-    border: 1px solid var(--toast-border);
-    border-left: 4px solid var(--toast-accent, var(--toast-info-accent));
+    /* Severity as a full quiet accent outline rather than a 4px colored side-slab (a generic-UI
+       tell); a 1px accent border still colour-codes info/success/error. */
+    border: 1px solid var(--toast-accent, var(--toast-border));
     border-radius: 10px;
     box-shadow: 0 12px 32px -4px rgba(13, 15, 20, 0.22), 0 2px 6px rgba(13, 15, 20, 0.1);
 }
@@ -527,9 +528,10 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .modal-header .modal-title {
     color: var(--text-primary);
-    font-weight: 800;
-        text-transform: uppercase;
-    letter-spacing: 1px;
+    font-family: var(--font-label);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 /* Matches .shell-icon-btn (same size, rounded-square radius, hover treatment) so the
@@ -731,11 +733,18 @@ html[data-theme="dark"] h6 {
     line-height: calc(18px * var(--font-scale-body, 1));
 }
 .text-label-caps {
+    font-family: var(--font-label);
     font-weight: 500;
     font-size: calc(12px * var(--font-scale-body, 1));
     line-height: calc(16px * var(--font-scale-body, 1));
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     text-transform: uppercase;
+}
+
+/* Form field captions in the quiet label voice; the input beneath carries the data in the
+   interface font. */
+.form-control-label {
+    font-family: var(--font-label);
 }
 
 /*
@@ -782,6 +791,13 @@ html[data-theme="dark"] h6 {
        character by character, where a proportional face makes l/1/I and 0/O the same shape.
        Those read this instead. */
     --font-code: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+    /* The voice of the small labels - uppercase field captions, figure captions, column heads,
+       table headers, status badges. Deliberately NOT repainted by Appearance, so labels stay a
+       quiet proportional sans whatever face the content is set in. A label is chrome, not data:
+       at 10-12px, uppercase, tracked, a monospace caption reads heavy and wide and competes with
+       the value it names. Inter recedes into metadata, which is what a label should do. */
+    --font-label: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Status badge fills — bind color to meaning, not to raw hex, when composing new components */
@@ -1001,9 +1017,10 @@ html[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator:h
 .perm-matrix-head {
     background: var(--xan-glass-overlay);
     border-bottom: 1px solid var(--border-default);
+    font-family: var(--font-label);
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-tertiary);
 }

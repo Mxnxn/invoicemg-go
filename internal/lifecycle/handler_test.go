@@ -128,7 +128,7 @@ func serve(t *testing.T, s store.Jobs) map[string]any {
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	New(s, &stubNotes{}).List(rec, r)
+	New(s, &stubNotes{}, nil).List(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -208,7 +208,7 @@ func TestJobsList_EmptyIsArray(t *testing.T) {
 
 func TestNextChallan(t *testing.T) {
 	s := &stubJobs{challans: []string{"MG/26-27/00004", "MG/26-27/00002"}}
-	h := New(s, &stubNotes{})
+	h := New(s, &stubNotes{}, nil)
 	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
 	defer func() { now = func() time.Time { return time.Now().UTC() } }()
 	r := httptest.NewRequest("POST", "/", nil)
@@ -229,7 +229,7 @@ func TestByEntry(t *testing.T) {
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	New(s, &stubNotes{}).ByEntry(rec, r)
+	New(s, &stubNotes{}, nil).ByEntry(rec, r)
 	var body map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	if _, ok := body["data"].(map[string]any); !ok {
@@ -241,7 +241,7 @@ func TestByEntry(t *testing.T) {
 	r2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r2 = r2.WithContext(auth.WithSession(r2.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec2 := httptest.NewRecorder()
-	New(&stubJobs{byEntryFound: false}, &stubNotes{}).ByEntry(rec2, r2)
+	New(&stubJobs{byEntryFound: false}, &stubNotes{}, nil).ByEntry(rec2, r2)
 	var body2 map[string]any
 	json.Unmarshal(rec2.Body.Bytes(), &body2)
 	if v, ok := body2["data"]; !ok || v != nil {
@@ -252,7 +252,7 @@ func TestByEntry(t *testing.T) {
 	r3 := httptest.NewRequest("POST", "/", nil)
 	r3 = r3.WithContext(auth.WithSession(r3.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec3 := httptest.NewRecorder()
-	New(&stubJobs{}, &stubNotes{}).ByEntry(rec3, r3)
+	New(&stubJobs{}, &stubNotes{}, nil).ByEntry(rec3, r3)
 	var body3 map[string]any
 	json.Unmarshal(rec3.Body.Bytes(), &body3)
 	if body3["code"] != float64(422) {
@@ -295,7 +295,7 @@ func postNotes(t *testing.T, n store.JobNotes, fn func(*Handler) func(http.Respo
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1", Role: "admin"}))
 	rec := httptest.NewRecorder()
-	fn(New(&stubJobs{}, n))(rec, r)
+	fn(New(&stubJobs{}, n, nil))(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -421,7 +421,7 @@ func postNotesJob(t *testing.T, s store.Jobs, fn func(*Handler) func(http.Respon
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1", Role: "admin"}))
 	rec := httptest.NewRecorder()
-	fn(New(s, &stubNotes{}))(rec, r)
+	fn(New(s, &stubNotes{}, nil))(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())

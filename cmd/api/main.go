@@ -182,7 +182,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users(), db.Clients(), exportsDir)
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
-	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes())
+	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
 	settingsHandler := settings.New(db.Settings())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies(), uploadsDir)
@@ -351,6 +351,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 
 	// The Jobs board. Behind the lifecycle feature. Only /jobs/list is ported.
 	mux.Handle("POST /lifecycle/jobs/list", feature("lifecycle", lifecycleHandler.List))
+	mux.Handle("POST /lifecycle/jobs/report", feature("lifecycle", lifecycleHandler.Report))
 	mux.Handle("POST /lifecycle/jobs/next-challan-number", feature("lifecycle", lifecycleHandler.NextChallan))
 	mux.Handle("POST /lifecycle/jobs/by-entry", feature("lifecycle", lifecycleHandler.ByEntry))
 	mux.Handle("POST /lifecycle/jobs/create", feature("lifecycle", lifecycleHandler.Create))

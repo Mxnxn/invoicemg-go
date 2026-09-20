@@ -1869,9 +1869,9 @@ html[data-theme="dark"] .segmented-option.active small {
    These used legacy utility classes and Bootstrap button colours, so the text stayed
    light-theme dark in dark mode and used a different typeface from the rest of the app. */
 .confirm-modal-title {
-    font-family: var(--font-outfit);
+    font-family: var(--font-label);
     font-size: calc(18px * var(--font-scale-body, 1));
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
 }
 

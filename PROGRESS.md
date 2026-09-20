@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (153 of 209)
+## Routes ready (154 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -109,6 +109,7 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/lookups/materials` | name/rate picker for job & quotation forms | Live · Unit |
 | `POST /lifecycle/lookups/people` | employees + suppliers + owner-as-Admin prepended | Live · Unit |
 | `POST /lifecycle/jobs/list` (+ `GET /jobs`) | the Jobs board: 6 populates (#6), invoiceState/lock/alerts (sha1 sig), per-row invoiced | Live · Unit |
+| `POST /lifecycle/jobs/report` | Job Report (More > Reports): reuses `Jobs.List` (client filter + per-row invoice numbers), filters a Job-Date range, resolves HSN from `Materials.Visible` by name; per line area=qty·(L·W or 1), tax=base·gst%, amount=base+tax, Final Bill=Σ; derived job name | Unit |
 | `POST /lifecycle/jobs/next-challan-number` | next MG/FY/ challan (docnumber, empty code) | Live · Unit |
 | `POST /lifecycle/jobs/by-entry` | populated job owning an entry, or data:null | Live · Unit |
 | `POST /lifecycle/jobs/create` | create a job + rows (dimensional total, rowIds), assignee→In Progress; logs "Created" history; dup challan 422 | Live · Unit |
