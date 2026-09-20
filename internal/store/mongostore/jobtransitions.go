@@ -413,20 +413,24 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 
 	name := j.actorName(ctx, actor)
 	actorID, _ := objectID(actor.ActorID())
-	hsnCache := map[string]string{}
-	hsnFor := func(material string) string {
+	type matInfo struct{ hsn, unit string }
+	matCache := map[string]matInfo{}
+	// hsn and unit are both snapshotted off the same Material (like Node's materialFor).
+	matFor := func(material string) matInfo {
 		if material == "" {
-			return ""
+			return matInfo{}
 		}
-		if h, ok := hsnCache[material]; ok {
-			return h
+		if m, ok := matCache[material]; ok {
+			return m
 		}
 		var m struct {
-			Hsn string `bson:"hsn"`
+			Hsn  string `bson:"hsn"`
+			Unit string `bson:"unit"`
 		}
 		_ = j.db.Collection(colMaterials).FindOne(ctx, bson.M{"material_name": material, "company_id": companyOID}).Decode(&m)
-		hsnCache[material] = m.Hsn
-		return m.Hsn
+		info := matInfo{hsn: m.Hsn, unit: m.Unit}
+		matCache[material] = info
+		return info
 	}
 
 	var created []store.Entry
@@ -443,16 +447,17 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 			if row.EntryID != nil || row.Queue != "Done" {
 				continue
 			}
+			mi := matFor(row.Material)
 			ce := store.ConvertRow(store.ConvertJobRow{
 				Material: row.Material, Description: row.Description, Rate: row.Rate, Qty: row.Qty,
 				Length: row.Length, Width: row.Width, Cgst: row.Cgst, Sgst: row.Sgst, Igst: row.Igst,
 				Discount: row.Discount, Charges: row.Charges,
-			}, job.Total, job.Advance, hsnFor(row.Material), job.ChallanNumber)
+			}, job.Total, job.Advance, mi.hsn, mi.unit, job.ChallanNumber)
 			entryOID := primitive.NewObjectID()
 			now := time.Now().UTC()
 			doc := bson.M{
 				"_id": entryOID, "uid": job.UID, "company_id": companyOID, "client_id": job.ClientID,
-				"description": ce.Description, "material": ce.Material, "hsn": ce.Hsn, "rate": ce.Rate, "qty": ce.Qty,
+				"description": ce.Description, "material": ce.Material, "hsn": ce.Hsn, "unit": ce.Unit, "rate": ce.Rate, "qty": ce.Qty,
 				"length": ce.Length, "width": ce.Width, "date": entryDate, "amount": ce.Amount,
 				"cgst": ce.Cgst, "sgst": ce.Sgst, "igst": ce.Igst, "discount": ce.Discount, "charges": ce.Charges,
 				"advance": ce.Advance, "total": ce.Total, "has_issued": false, "issued": nil,
@@ -476,7 +481,7 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 			}
 			newRows[i].EntryID = &entryOID
 			created = append(created, store.Entry{
-				ID: idOf(entryOID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Rate: ce.Rate, Qty: ce.Qty,
+				ID: idOf(entryOID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Unit: ce.Unit, Rate: ce.Rate, Qty: ce.Qty,
 				Length: ce.Length, Width: ce.Width, Date: entryDate, Amount: ce.Amount, Cgst: ce.Cgst, Sgst: ce.Sgst, Igst: ce.Igst,
 				Discount: ce.Discount, Charges: ce.Charges, Advance: ce.Advance, Total: ce.Total,
 			})

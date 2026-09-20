@@ -58,7 +58,7 @@ func (i *invoices) List(ctx context.Context, companyID store.ID) ([]store.Invoic
 	// #6: one batched query for every invoice's entries, ordered by creation to reproduce the
 	// invoice.entries array order.
 	eRows, err := i.pool.Query(ctx, `
-		SELECT invoice_id, id, description, material, hsn, rate, qty, has_dimensions, length, width,
+		SELECT invoice_id, id, description, material, hsn, unit, rate, qty, has_dimensions, length, width,
 		       date, amount, cgst, sgst, igst, discount, charges, advance, total, created_at, updated_at
 		  FROM entries
 		 WHERE invoice_id = ANY ($1)
@@ -71,7 +71,7 @@ func (i *invoices) List(ctx context.Context, companyID store.ID) ([]store.Invoic
 		var iid string
 		var e store.Entry
 		var hasDim bool
-		if err := eRows.Scan(&iid, &e.ID, &e.Description, &e.Material, &e.Hsn, &e.Rate, &e.Qty, &hasDim,
+		if err := eRows.Scan(&iid, &e.ID, &e.Description, &e.Material, &e.Hsn, &e.Unit, &e.Rate, &e.Qty, &hasDim,
 			&e.Length, &e.Width, &e.Date, &e.Amount, &e.Cgst, &e.Sgst, &e.Igst, &e.Discount, &e.Charges,
 			&e.Advance, &e.Total, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("reading entries: %w", err)

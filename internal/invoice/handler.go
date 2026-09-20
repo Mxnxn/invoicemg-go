@@ -105,7 +105,7 @@ func toEntryDTO(e store.Entry) entryDTO {
 		hasDim = *e.HasDimensions
 	}
 	return entryDTO{
-		ID: string(e.ID), Description: e.Description, Material: e.Material, Hsn: e.Hsn,
+		ID: string(e.ID), Description: e.Description, Material: e.Material, Hsn: e.Hsn, Unit: e.Unit,
 		Rate: e.Rate, Qty: e.Qty, HasDimensions: hasDim, Length: e.Length, Width: e.Width,
 		Date: e.Date, Amount: e.Amount, Cgst: e.Cgst, Sgst: e.Sgst, Igst: e.Igst,
 		Discount: e.Discount, Charges: e.Charges, Advance: e.Advance, Total: e.Total,
@@ -149,6 +149,7 @@ type entryDTO struct {
 	Description   string     `json:"description"`
 	Material      string     `json:"material"`
 	Hsn           string     `json:"hsn"`
+	Unit          string     `json:"unit"`
 	Rate          float64    `json:"rate"`
 	Qty           float64    `json:"qty"`
 	HasDimensions bool       `json:"hasDimensions"`

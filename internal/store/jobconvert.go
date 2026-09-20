@@ -9,6 +9,9 @@ type ConvertedEntry struct {
 	Description string
 	Material    string
 	Hsn         string
+	// Unit is the product's unit of measure, snapshotted from the Material at conversion the same
+	// way and at the same point as Hsn. The invoice's optional Unit column reads it.
+	Unit        string
 	Rate        float64
 	Qty         float64
 	Length      string
@@ -40,7 +43,7 @@ type ConvertJobRow struct {
 
 // ConvertRow computes the Entry fields for one row, given the owning job's paid ratio and the
 // resolved hsn / display fallbacks. It ports the amount/gross/advance/total math exactly.
-func ConvertRow(r ConvertJobRow, jobTotal, jobAdvance float64, hsn, fallbackDesc string) ConvertedEntry {
+func ConvertRow(r ConvertJobRow, jobTotal, jobAdvance float64, hsn, unit, fallbackDesc string) ConvertedEntry {
 	amount := r.Qty * jobNum(r.Length) * jobNum(r.Width) * r.Rate
 	net := amount - r.Discount + r.Charges
 	tax := (r.Cgst + r.Sgst + r.Igst) / 100
@@ -74,7 +77,7 @@ func ConvertRow(r ConvertJobRow, jobTotal, jobAdvance float64, hsn, fallbackDesc
 		width = "0"
 	}
 	return ConvertedEntry{
-		Description: description, Material: material, Hsn: hsn, Rate: r.Rate, Qty: r.Qty,
+		Description: description, Material: material, Hsn: hsn, Unit: unit, Rate: r.Rate, Qty: r.Qty,
 		Length: length, Width: width, Cgst: r.Cgst, Sgst: r.Sgst, Igst: r.Igst,
 		Discount: r.Discount, Charges: r.Charges, Amount: amount, Advance: advance, Total: total,
 	}

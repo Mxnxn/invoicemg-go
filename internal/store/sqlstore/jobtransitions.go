@@ -345,23 +345,26 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 	defer tx.Rollback(ctx)
 
 	name := resolveActorName(ctx, j.pool, actor)
-	hsnCache := map[string]string{}
-	hsnFor := func(material string) (string, error) {
+	type matInfo struct{ hsn, unit string }
+	matCache := map[string]matInfo{}
+	// One lookup per distinct product name across the batch - hsn and unit are both snapshotted
+	// off the same Material row (like Node's materialFor).
+	matFor := func(material string) (matInfo, error) {
 		if material == "" {
-			return "", nil
+			return matInfo{}, nil
 		}
-		if h, ok := hsnCache[material]; ok {
-			return h, nil
+		if m, ok := matCache[material]; ok {
+			return m, nil
 		}
-		var h string
-		err := tx.QueryRow(ctx, `SELECT hsn FROM materials WHERE material_name=$1 AND company_id=$2 LIMIT 1`, material, string(companyID)).Scan(&h)
+		var m matInfo
+		err := tx.QueryRow(ctx, `SELECT hsn, unit FROM materials WHERE material_name=$1 AND company_id=$2 LIMIT 1`, material, string(companyID)).Scan(&m.hsn, &m.unit)
 		if noRows(err) {
-			h = ""
+			m = matInfo{}
 		} else if err != nil {
-			return "", err
+			return matInfo{}, err
 		}
-		hsnCache[material] = h
-		return h, nil
+		matCache[material] = m
+		return m, nil
 	}
 
 	var created []store.Entry
@@ -404,28 +407,28 @@ func (j *jobs) ConvertToEntries(ctx context.Context, uid, companyID store.ID, jo
 		}
 		converted := 0
 		for _, p := range pending {
-			hsn, err := hsnFor(p.in.Material)
+			mi, err := matFor(p.in.Material)
 			if err != nil {
 				return nil, nil, false, err
 			}
-			ce := store.ConvertRow(p.in, jobTotal, jobAdvance, hsn, challan)
+			ce := store.ConvertRow(p.in, jobTotal, jobAdvance, mi.hsn, mi.unit, challan)
 			var clientArg any
 			if clientID != nil {
 				clientArg = *clientID
 			}
 			var entryID string
 			if err := tx.QueryRow(ctx, `
-				INSERT INTO entries (uid, company_id, client_id, description, material, hsn, rate, qty, length, width, date, amount, cgst, sgst, igst, discount, charges, advance, total, has_issued)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,false) RETURNING id`,
+				INSERT INTO entries (uid, company_id, client_id, description, material, hsn, rate, qty, length, width, date, amount, cgst, sgst, igst, discount, charges, advance, total, unit, has_issued)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,false) RETURNING id`,
 				jobUID, string(companyID), clientArg, ce.Description, ce.Material, ce.Hsn, ce.Rate, ce.Qty, ce.Length, ce.Width,
-				entryDate, ce.Amount, ce.Cgst, ce.Sgst, ce.Igst, ce.Discount, ce.Charges, ce.Advance, ce.Total).Scan(&entryID); err != nil {
+				entryDate, ce.Amount, ce.Cgst, ce.Sgst, ce.Igst, ce.Discount, ce.Charges, ce.Advance, ce.Total, ce.Unit).Scan(&entryID); err != nil {
 				return nil, nil, false, fmt.Errorf("insert entry: %w", err)
 			}
 			if _, err := tx.Exec(ctx, `UPDATE job_rows SET entry_id=$2 WHERE id=$1`, p.rowID, entryID); err != nil {
 				return nil, nil, false, err
 			}
 			created = append(created, store.Entry{
-				ID: store.ID(entryID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Rate: ce.Rate, Qty: ce.Qty,
+				ID: store.ID(entryID), Description: ce.Description, Material: ce.Material, Hsn: ce.Hsn, Unit: ce.Unit, Rate: ce.Rate, Qty: ce.Qty,
 				Length: ce.Length, Width: ce.Width, Date: entryDate, Amount: ce.Amount, Cgst: ce.Cgst, Sgst: ce.Sgst, Igst: ce.Igst,
 				Discount: ce.Discount, Charges: ce.Charges, Advance: ce.Advance, Total: ce.Total,
 			})

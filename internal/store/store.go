@@ -1043,6 +1043,8 @@ type Entry struct {
 	Description   string
 	Material      string
 	Hsn           string
+	// Unit is the product's unit of measure, snapshotted from the Material at conversion like Hsn.
+	Unit          string
 	Rate          float64
 	Qty           float64
 	HasDimensions *bool

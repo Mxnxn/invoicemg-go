@@ -37,6 +37,7 @@ type entryDoc struct {
 	Description   string             `bson:"description"`
 	Material      string             `bson:"material"`
 	Hsn           string             `bson:"hsn"`
+	Unit          string             `bson:"unit"`
 	Rate          float64            `bson:"rate"`
 	Qty           float64            `bson:"qty"`
 	HasDimensions *bool              `bson:"hasDimensions"`
@@ -58,7 +59,7 @@ type entryDoc struct {
 
 func (e entryDoc) toStore() store.Entry {
 	return store.Entry{
-		ID: idOf(e.ID), Description: e.Description, Material: e.Material, Hsn: e.Hsn,
+		ID: idOf(e.ID), Description: e.Description, Material: e.Material, Hsn: e.Hsn, Unit: e.Unit,
 		Rate: e.Rate, Qty: e.Qty, HasDimensions: e.HasDimensions, Length: e.Length, Width: e.Width,
 		Date: e.Date, Amount: e.Amount, Cgst: e.Cgst, Sgst: e.Sgst, Igst: e.Igst,
 		Discount: e.Discount, Charges: e.Charges, Advance: e.Advance, Total: e.Total,

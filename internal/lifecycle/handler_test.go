@@ -572,12 +572,12 @@ func TestConvertToEntries(t *testing.T) {
 // ConvertRow parity (values from routes/Lifecycle convert-to-entries math).
 func TestConvertRowMath(t *testing.T) {
 	// qty 1, L 2, W 3, rate 100 -> base 600; net 600; gross (18% tax) 708; job fully paid -> advance 708, total 0
-	ce := store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 1000, "HSN1", "JOB/1")
-	if ce.Amount != 600 || ce.Advance < 707.9 || ce.Advance > 708.1 || ce.Total != 0 {
+	ce := store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 1000, "HSN1", "Sqft", "JOB/1")
+	if ce.Amount != 600 || ce.Advance < 707.9 || ce.Advance > 708.1 || ce.Total != 0 || ce.Unit != "Sqft" {
 		t.Errorf("fully paid: %+v", ce)
 	}
 	// unpaid job (advance 0) -> advance 0, total = gross 708
-	ce = store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 0, "", "JOB/1")
+	ce = store.ConvertRow(store.ConvertJobRow{Qty: 1, Length: "2", Width: "3", Rate: 100, Cgst: 9, Sgst: 9}, 1000, 0, "", "", "JOB/1")
 	if ce.Advance != 0 || ce.Total < 707.9 || ce.Total > 708.1 {
 		t.Errorf("unpaid: %+v", ce)
 	}

@@ -519,6 +519,9 @@ CREATE TABLE entries (
     description   text NOT NULL DEFAULT '',
     material      text NOT NULL DEFAULT '',
     hsn           text NOT NULL DEFAULT '',
+    -- The product's unit of measure, snapshotted from the Material at conversion like hsn. The
+    -- invoice's optional Unit column reads it; "" on entries created before this existed.
+    unit          text NOT NULL DEFAULT '',
     rate          numeric(14,2) NOT NULL DEFAULT 0,
     qty           numeric(14,3) NOT NULL DEFAULT 0,
     has_dimensions boolean NOT NULL DEFAULT true,
