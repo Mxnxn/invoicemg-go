@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Repeat, BookOpen, Percent, Clock, TrendingUp, ArrowLeft, Briefcase, Package } from "react-feather";
+import { Repeat, BookOpen, Percent, Clock, TrendingUp, ArrowLeft, Briefcase, Package, FileText } from "react-feather";
 import LiteHeader from "../../Common/Header/LiteHeader";
 import SpotlightCard from "../../Common/DataTable/SpotlightCard";
 import { hasAccess } from "../../Common/access";
@@ -9,6 +9,7 @@ import { batchReceiveBackend } from "../BatchReceive/batch_receive_backend";
 import BatchReceiveForm from "../BatchReceive/component/BatchReceiveForm";
 import { lifecycleBackend } from "../Lifecycle/lifecycle_backend";
 import LedgerIndex from "../Ledger/component/LedgerIndex";
+import JobReportIndex from "../JobReport/component/JobReportIndex";
 import GstReportIndex from "../GstReport/component/GstReportIndex";
 import DuesIndex from "../Dues/component/DuesIndex";
 import PurchaseDuesIndex from "../PurchaseDues/component/PurchaseDuesIndex";
@@ -18,8 +19,8 @@ import InventoryIndex from "../Inventory/component/InventoryIndex";
 import { purchaseReportBackend } from "../PurchaseReport/purchase_report_backend";
 import { ledgerBackend } from "../Ledger/ledger_backend";
 
-const ICONS = { "batch-receive": Repeat, ledger: BookOpen, "customer-dues": Clock, "gst-report": Percent, "purchase-report": TrendingUp, "purchase-dues": Clock, "bank-report": Briefcase, inventory: Package };
-const BODIES = { "batch-receive": BatchReceiveForm, ledger: LedgerIndex, "customer-dues": DuesIndex, "gst-report": GstReportIndex, "purchase-report": PurchaseReportIndex, "purchase-dues": PurchaseDuesIndex, "bank-report": BankReportIndex, inventory: InventoryIndex };
+const ICONS = { "job-report": FileText, "batch-receive": Repeat, ledger: BookOpen, "customer-dues": Clock, "gst-report": Percent, "purchase-report": TrendingUp, "purchase-dues": Clock, "bank-report": Briefcase, inventory: Package };
+const BODIES = { "job-report": JobReportIndex, "batch-receive": BatchReceiveForm, ledger: LedgerIndex, "customer-dues": DuesIndex, "gst-report": GstReportIndex, "purchase-report": PurchaseReportIndex, "purchase-dues": PurchaseDuesIndex, "bank-report": BankReportIndex, inventory: InventoryIndex };
 const ACCENTS = {
     blue: { fg: "var(--xan-blue)", bg: "var(--xan-blue-bg)" },
     emerald: { fg: "var(--xan-emerald)", bg: "var(--xan-emerald-bg)" },

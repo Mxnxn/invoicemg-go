@@ -41,6 +41,7 @@ export const PATH_FEATURES = [
     { prefix: "/admin/purchase-orders", key: "purchase_orders" },
     { prefix: "/admin/quotations", key: "quotations" },
     { prefix: "/admin/bank-transfers", key: "batch_receive" },
+    { prefix: "/admin/more/job-report", key: "lifecycle" },
     { prefix: "/admin/more/ledger", key: "ledger" },
     { prefix: "/admin/more/customer-dues", key: "ledger" },
     { prefix: "/admin/more/gst-report", key: "gst_report" },
@@ -82,6 +83,8 @@ export const CONFIGURE_SECTIONS = [
 // Sections under /admin/more (see Views/More/MoreIndex.jsx) - same card-grid hub pattern as
 // Configure. Batch Receive (now Bank Transfers) moved to its own top-level sidebar item.
 export const MORE_SECTIONS = [
+    // Behind the lifecycle permission - a report ON jobs, so anyone who can see the Jobs board.
+    { id: "job-report", key: "lifecycle", label: "Job Report", accent: "violet", wide: true },
     { id: "ledger", key: "ledger", label: "Client Ledger", accent: "blue", wide: true },
     // Shares the `ledger` permission rather than adding a key of its own - it's the same
     // receivables data the Client Ledger already exposes, just every client at once.
