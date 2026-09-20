@@ -57,6 +57,33 @@ class UserBackend {
         });
     }
 
+    // The invoice Units / Size display toggles, persisted through the same /set-template write.
+    // Their own methods because the value is a boolean that can legitimately be false, and the
+    // route reads presence (not truthiness) to tell a deliberate off from a field never sent.
+    setShowUnits(on, stoken) {
+        return this.#setToggle("documentShowUnits", on, stoken);
+    }
+
+    setShowSize(on, stoken) {
+        return this.#setToggle("documentShowSize", on, stoken);
+    }
+
+    #setToggle(field, on, stoken) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const formData = new FormData();
+                formData.set(field, on ? "true" : "false");
+                const res = await axios.post(`${import.meta.env.VITE_API_URL}/userinfo/set-template`, formData, {
+                    headers: { "SESSION-TOKEN": stoken },
+                });
+                if (res.data.code !== 200) throw res.data;
+                resolve(res.data);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
     addUserImage(formData, setProgressCount, stoken) {
         return new Promise(async (resolve, reject) => {
             try {

@@ -23,7 +23,8 @@ import InvoiceDetailModal from "./InvoiceDetailModal";
 import usePagedRows from "../../../Common/useRowsPerPage";
 import InvoicePreviewModal from "./InvoicePreviewModal";
 import { invoiceBackend } from "../invoice_backend";
-import { CheckCircle, ChevronDown, ChevronUp, Eye, Search, Trash, Trash2, TrendingUp, X, Plus } from "react-feather";
+import { userBackend } from "../../UserProfile/user_backend";
+import { CheckCircle, ChevronDown, ChevronUp, Columns, Eye, Maximize2, Search, Trash, Trash2, TrendingUp, X, Plus } from "react-feather";
 import AssigneeDropdown from "../../Lifecycle/component/AssigneeDropdown";
 import ModalDelete from "../../Client/component/ModalDelete";
 import ConfirmModal from "./ConfirmModal";
@@ -64,9 +65,9 @@ const DEMO_INVOICE = {
     account: "1234567890",
     ifsc: "SAMP0001234",
     entries: [
-        { product: "Granite Slab", description: "Polished, Grade A", qty: 2, length: 8, width: 4, rate: 120 },
-        { product: "Marble Tile", description: "Matte finish", qty: 10, length: 2, width: 2, rate: 60 },
-        { product: "Sandstone Block", description: "Rough cut", qty: 5, length: 3, width: 3, rate: 45 },
+        { product: "Granite Slab", description: "Polished, Grade A", qty: 2, length: 8, width: 4, rate: 120, unit: "Sqft" },
+        { product: "Marble Tile", description: "Matte finish", qty: 10, length: 2, width: 2, rate: 60, unit: "Sqft" },
+        { product: "Sandstone Block", description: "Rough cut", qty: 5, length: 3, width: 3, rate: 45, unit: "Nos" },
     ],
 };
 
@@ -100,6 +101,11 @@ const InvoiceIndex = ({ user }) => {
     console.log(user);
     const [demoPreviewOpen, setDemoPreviewOpen] = useState(false);
     const [createFromJobs, setCreateFromJobs] = useState(false);
+    // Company invoice display toggles (documentShowUnits/documentShowSize), admin-only, beside Demo.
+    const [showUnits, setShowUnits] = useState(false);
+    const [savingUnits, setSavingUnits] = useState(false);
+    const [showSize, setShowSize] = useState(false);
+    const [savingSize, setSavingSize] = useState(false);
     const [state, setState] = useState({
         invoices: [],
         preview: { view: false },
@@ -166,6 +172,49 @@ const InvoiceIndex = ({ user }) => {
     useEffect(() => {
         getInvoices();
     }, [getInvoices]);
+
+    // Initialise the toggles from the saved company setting (admin-only; the write is requireAdmin).
+    useEffect(() => {
+        if (!can(null)) return;
+        const formData = new FormData();
+        formData.set("uid", window.localStorage.getItem("uid"));
+        userBackend
+            .getUserInfo(formData, window.localStorage.getItem("session_token"))
+            .then((res) => {
+                setShowUnits(res.data.documentShowUnits === true);
+                setShowSize(res.data.documentShowSize === true);
+            })
+            .catch(() => {});
+    }, []);
+
+    // Optimistic flip; reverts only if the save is rejected (the interceptor toasts the failure).
+    const toggleShowUnits = async () => {
+        if (savingUnits) return;
+        const next = !showUnits;
+        setShowUnits(next);
+        setSavingUnits(true);
+        try {
+            await userBackend.setShowUnits(next, window.localStorage.getItem("session_token"));
+        } catch (error) {
+            setShowUnits(!next);
+        } finally {
+            setSavingUnits(false);
+        }
+    };
+
+    const toggleShowSize = async () => {
+        if (savingSize) return;
+        const next = !showSize;
+        setShowSize(next);
+        setSavingSize(true);
+        try {
+            await userBackend.setShowSize(next, window.localStorage.getItem("session_token"));
+        } catch (error) {
+            setShowSize(!next);
+        } finally {
+            setSavingSize(false);
+        }
+    };
 
     const onInvoicePaid = () => {
         setModals((prev) => ({ ...prev, receive: false }));
@@ -415,16 +464,46 @@ const InvoiceIndex = ({ user }) => {
                                             looking at a sample and raising a real invoice were
                                             comparable acts; a second line, smaller and quieter, says
                                             which of the two the page is actually for. */}
-                                        <button
-                                            type="button"
-                                            className="shell-btn shell-btn-sm shell-btn-secondary d-flex align-items-center invoice-demo-btn"
-                                            style={{ gap: 6 }}
-                                            title="Preview a sample invoice in the current design"
-                                            onClick={() => setDemoPreviewOpen(true)}
-                                        >
-                                            <Eye size={14} />
-                                            Demo
-                                        </button>
+                                        <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                            <button
+                                                type="button"
+                                                className="shell-btn shell-btn-sm shell-btn-secondary d-flex align-items-center invoice-demo-btn"
+                                                style={{ gap: 6 }}
+                                                title="Preview a sample invoice in the current design"
+                                                onClick={() => setDemoPreviewOpen(true)}
+                                            >
+                                                <Eye size={14} />
+                                                Demo
+                                            </button>
+                                            {can(null) && (
+                                                <button
+                                                    type="button"
+                                                    className={`shell-btn shell-btn-sm d-flex align-items-center ${showUnits ? "shell-btn-primary" : "shell-btn-secondary"}`}
+                                                    style={{ gap: 6 }}
+                                                    title="Show each line's unit of measure on the invoice"
+                                                    aria-pressed={showUnits}
+                                                    disabled={savingUnits}
+                                                    onClick={toggleShowUnits}
+                                                >
+                                                    <Columns size={14} />
+                                                    Units: {showUnits ? "On" : "Off"}
+                                                </button>
+                                            )}
+                                            {can(null) && (
+                                                <button
+                                                    type="button"
+                                                    className={`shell-btn shell-btn-sm d-flex align-items-center ${showSize ? "shell-btn-primary" : "shell-btn-secondary"}`}
+                                                    style={{ gap: 6 }}
+                                                    title="Show each line's size (length x width) as its own column"
+                                                    aria-pressed={showSize}
+                                                    disabled={savingSize}
+                                                    onClick={toggleShowSize}
+                                                >
+                                                    <Maximize2 size={14} />
+                                                    Size: {showSize ? "On" : "Off"}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 {view === VIEW_BOARD ? (

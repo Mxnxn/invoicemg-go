@@ -13,7 +13,7 @@ import { downloadName } from "../../../Common/downloadName";
 //
 // The blob is built on demand rather than up front - generating a PDF for a preview nobody
 // asked to keep is wasted work on a phone.
-const InvoiceActions = ({ invoice, templateKey, fontKey, scaleId, compact = false }) => {
+const InvoiceActions = ({ invoice, templateKey, fontKey, scaleId, showUnits = false, showSize = false, compact = false }) => {
     const [busy, setBusy] = useState("");
 
     const filename = downloadName({
@@ -26,7 +26,7 @@ const InvoiceActions = ({ invoice, templateKey, fontKey, scaleId, compact = fals
     const buildBlob = async () => {
         const { pdf } = await import("@react-pdf/renderer");
         const Template = getInvoiceTemplate(templateKey || "classic");
-        return pdf(<Template invoice={invoice} fontKey={fontKey} scaleId={scaleId} />).toBlob();
+        return pdf(<Template invoice={invoice} fontKey={fontKey} scaleId={scaleId} showUnits={showUnits} showSize={showSize} />).toBlob();
     };
 
     const onDownload = async () => {

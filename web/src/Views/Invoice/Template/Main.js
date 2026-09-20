@@ -15,6 +15,9 @@ const Main = ({ invoice }) => {
     const [fontKey, setFontKey] = useState(null);
     // Company-wide too, and fetched on the same profile call for the same reason.
     const [scaleId, setScaleId] = useState(null);
+    // The invoice Units/Size display toggles (Company.documentShowUnits/documentShowSize).
+    const [showUnits, setShowUnits] = useState(false);
+    const [showSize, setShowSize] = useState(false);
 
     // Matches the shell's phone breakpoint. Tracked live so a rotation or a resized window
     // swaps between the viewer and the actions instead of being decided once at mount.
@@ -35,6 +38,8 @@ const Main = ({ invoice }) => {
                 setTemplateKey(res.data.invoiceTemplate || "classic");
                 setFontKey(res.data.documentFont || "open-sans");
                 setScaleId(res.data.documentScale || "normal");
+                setShowUnits(res.data.documentShowUnits === true);
+                setShowSize(res.data.documentShowSize === true);
             })
             .catch(() => {
                 setTemplateKey("classic");
@@ -51,7 +56,7 @@ const Main = ({ invoice }) => {
     if (isPhone) {
         return (
             <div style={{ padding: 20 }}>
-                <InvoiceActions invoice={invoice} templateKey={templateKey} fontKey={fontKey} scaleId={scaleId} compact />
+                <InvoiceActions invoice={invoice} templateKey={templateKey} fontKey={fontKey} scaleId={scaleId} showUnits={showUnits} showSize={showSize} compact />
             </div>
         );
     }
@@ -60,10 +65,10 @@ const Main = ({ invoice }) => {
     return (
         <>
             <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-default)" }}>
-                <InvoiceActions invoice={invoice} templateKey={templateKey} fontKey={fontKey} scaleId={scaleId} />
+                <InvoiceActions invoice={invoice} templateKey={templateKey} fontKey={fontKey} scaleId={scaleId} showUnits={showUnits} showSize={showSize} />
             </div>
             <PDFViewer className="app">
-                <Template invoice={invoice} fontKey={fontKey} scaleId={scaleId} />
+                <Template invoice={invoice} fontKey={fontKey} scaleId={scaleId} showUnits={showUnits} showSize={showSize} />
             </PDFViewer>
         </>
     );

@@ -31,10 +31,13 @@ export const rowNetAmount = (item) =>
 // Brackets read as an aside; a bare space ran the size into the end of the note so that
 // "Banner 2 x 3" could be read as part of the description itself. The dot says these are two
 // facts about one line, which is what they are.
-export const describeGoods = (item = {}) => {
+// `includeSize` folds the size into the description ("Vinyl: Banner · 2 x 3"). The invoice
+// passes false when its Size toggle is on, because then the size has a column of its own.
+export const describeGoods = (item = {}, includeSize = true) => {
     const product = String(item.material || item.product || "").trim();
     const detail = String(item.description || "").trim();
     const base = product && detail ? `${product}: ${detail}` : product || detail || "";
+    if (!includeSize) return base;
     const size = describeSize(item);
     if (!size) return base;
     return base ? `${base} · ${size}` : size;

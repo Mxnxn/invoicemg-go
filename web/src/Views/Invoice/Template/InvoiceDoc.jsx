@@ -6,7 +6,7 @@ import { registerDocumentFont, money } from "../../../Common/pdf/fonts";
 import { makeStyles, Letterhead, Party, DocTable, Totals } from "../../../Common/pdf/parts";
 import { getDateForInvoice } from "../../../Common/DateAndTime/getDate";
 import { amountInWords } from "../../../Common/numberToWords";
-import { describeGoods, hsnTaxRows } from "../invoiceFormat";
+import { describeGoods, describeSize, hsnTaxRows, rowNetAmount } from "../invoiceFormat";
 import { invoiceTotals } from "../invoiceTotals";
 
 // The one invoice renderer. Which of the six designs it draws is decided by `designKey`
@@ -17,18 +17,26 @@ import { invoiceTotals } from "../invoiceTotals";
 // everything at a hardcoded 18%. The arithmetic now lives in invoiceTotals.js and the look
 // in designs.js, so a new design cannot bring a new rounding bug with it.
 
-const COLUMNS = (detailed) =>
-    [
-        { key: "sr", label: "#", width: "5%", align: "center" },
-        { key: "desc", label: "Description of Goods", width: detailed ? "33%" : "40%" },
-        detailed ? { key: "hsn", label: "HSN", width: "10%" } : null,
-        { key: "qty", label: "Qty", width: "10%", align: "center" },
-        { key: "rate", label: "Rate", width: "14%", align: "right" },
-        detailed ? { key: "gst", label: "GST", width: "8%", align: "right" } : null,
-        { key: "amount", label: "Amount", width: detailed ? "20%" : "31%", align: "right" },
+// `showSize` breaks the size (length x width) out into its own column before Qty; `showUnits`
+// adds a Unit column after it. Both optional and independent, so each column carries a relative
+// weight and the widths are normalised to 100 - Description gives up room as the extras appear.
+const COLUMNS = (detailed, showUnits, showSize) => {
+    const cols = [
+        { key: "sr", label: "#", weight: 4, align: "center" },
+        { key: "desc", label: "Description of Goods", weight: 34 },
+        detailed ? { key: "hsn", label: "HSN", weight: 9 } : null,
+        showSize ? { key: "size", label: "Size", weight: 11, align: "center" } : null,
+        { key: "qty", label: "Qty", weight: 8, align: "center" },
+        showUnits ? { key: "unit", label: "Unit", weight: 8, align: "center" } : null,
+        { key: "rate", label: "Rate", weight: 12, align: "right" },
+        detailed ? { key: "gst", label: "GST", weight: 8, align: "right" } : null,
+        { key: "amount", label: "Amount", weight: 18, align: "right" },
     ].filter(Boolean);
+    const total = cols.reduce((sum, col) => sum + col.weight, 0);
+    return cols.map(({ weight, ...col }) => ({ ...col, width: `${((weight / total) * 100).toFixed(2)}%` }));
+};
 
-const InvoiceDoc = ({ invoice, designKey, fontKey, scaleId }) => {
+const InvoiceDoc = ({ invoice, designKey, fontKey, scaleId, showUnits = false, showSize = false }) => {
     // Scaled here rather than in each renderer: the size preference is one setting
     // across every design, so it belongs where a design is resolved.
     const design = resolveDesignScaled(designKey, scaleId);
@@ -36,6 +44,17 @@ const InvoiceDoc = ({ invoice, designKey, fontKey, scaleId }) => {
     const font = registerDocumentFont(fontKey);
     const styles = makeStyles(spec, font);
     const amount = (value) => money(value, font);
+
+    // Either optional column costs horizontal room; drop the line-item type a point so the
+    // narrower Description and Amount still read comfortably. A no-op when both are hidden.
+    const tableStyles =
+        showUnits || showSize
+            ? {
+                  ...styles,
+                  th: { ...styles.th, fontSize: styles.th.fontSize - 1 },
+                  td: { ...styles.td, fontSize: styles.td.fontSize - 1 },
+              }
+            : styles;
 
     const entries = invoice?.entries || [];
     const totals = invoiceTotals(entries, invoice);
@@ -45,14 +64,19 @@ const InvoiceDoc = ({ invoice, designKey, fontKey, scaleId }) => {
 
     const rows = entries.map((item, index) => ({
         sr: index + 1,
-        desc: describeGoods(item),
+        // With the Size column on, the size leaves the description so it is not printed twice.
+        desc: describeGoods(item, !showSize),
         hsn: item.hsn || "-",
+        size: showSize ? describeSize(item) : "",
         qty: item.qty,
+        // Snapshotted onto the Entry from the product (Entry.unit); "" on older lines.
+        unit: item.unit || "",
         rate: amount(item.rate),
         gst: `${(Number(item.cgst) || 0) + (Number(item.sgst) || 0) + (Number(item.igst) || 0)}%`,
-        amount: amount(
-            (Number(item.qty) || 0) * (Number(item.rate) || 0) - (Number(item.discount) || 0) + (Number(item.charges) || 0)
-        ),
+        // Same net-amount formula as the totals block and every tax line: qty * rate *
+        // dimensionFactor - discount + charges. The inline qty*rate here dropped the dimensional
+        // factor, so a 2 x 3 line printed qty*rate while the subtotal billed qty*L*W*rate.
+        amount: amount(rowNetAmount(item)),
     }));
 
     const hsnRows = detailed ? hsnTaxRows(entries) : [];
@@ -114,7 +138,7 @@ const InvoiceDoc = ({ invoice, designKey, fontKey, scaleId }) => {
                         </View>
                     </View>
 
-                    <DocTable styles={styles} columns={COLUMNS(detailed)} rows={rows} />
+                    <DocTable styles={tableStyles} columns={COLUMNS(detailed, showUnits, showSize)} rows={rows} />
 
                     <Totals
                         styles={styles}
