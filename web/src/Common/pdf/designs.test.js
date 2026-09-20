@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DESIGNS, DESIGN_KEYS, DOCUMENT_SCALES, resolveDesign, resolveDesignKey, resolveDesignScaled } from "./designs";
+import { DESIGNS, DESIGN_KEYS, DOCUMENT_SIZES, resolveDesign, resolveDesignKey, resolveDesignScaled } from "./designs";
 
 // The design set is shared by invoice, quotation and ledger - "same names in all three tabs"
 // is the whole point of it, so the invariants that keep the three lists identical are worth
@@ -102,12 +102,31 @@ describe("document text size", () => {
     // 9.450000000000001 into the styles.
     it("rounds every scaled size to a tenth of a point", () => {
         DESIGN_KEYS.forEach((key) =>
-            DOCUMENT_SCALES.forEach((scale) => {
-                const t = resolveDesignScaled(key, scale.id).spec.tokens;
+            DOCUMENT_SIZES.forEach((size) => {
+                const t = resolveDesignScaled(key, size).spec.tokens;
                 ["baseSize", "titleSize", "labelSize"].forEach((token) => {
                     expect(Math.round(t[token] * 10) / 10).toBe(t[token]);
                 });
             })
+        );
+    });
+
+    // A numeric point size sets the body text to exactly that size (bar the tenth-of-a-point
+    // rounding), whatever base the design itself carries - that is what "8-18pt" means.
+    it("brings any design's body text to the chosen point size", () => {
+        DESIGN_KEYS.forEach((key) => {
+            [8, 11, 14, 18].forEach((size) => {
+                const base = resolveDesignScaled(key, size).spec.tokens.baseSize;
+                expect(Math.abs(base - size)).toBeLessThanOrEqual(0.05);
+            });
+        });
+    });
+
+    // Values saved before the switch to point sizes still resolve to what they meant then.
+    it("still honours the legacy label scales", () => {
+        const normal = resolveDesign("classic");
+        expect(resolveDesignScaled("classic", "large").spec.tokens.baseSize).toBe(
+            Math.round(normal.spec.tokens.baseSize * 1.12 * 10) / 10
         );
     });
 });

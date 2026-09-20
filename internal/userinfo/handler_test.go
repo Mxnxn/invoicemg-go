@@ -82,7 +82,7 @@ func TestProfile_MergesUserAndCompany(t *testing.T) {
 	if data["company_id"] != "co1" {
 		t.Errorf("company_id = %v", data["company_id"])
 	}
-	if data["documentFont"] != "open-sans" || data["invoiceTemplate"] != "classic" {
+	if data["documentFont"] != "lato" || data["invoiceTemplate"] != "classic" {
 		t.Errorf("template defaults wrong: %v", data)
 	}
 }

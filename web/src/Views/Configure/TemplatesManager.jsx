@@ -134,7 +134,7 @@ const TemplatesManager = () => {
     const savedKey = resolveDesignKey(profile[section.field]);
     const previewKey = (pending && pending.docType === section.docType && pending.key) || previewKeys[section.docType] || savedKey;
     const previewTemplate = section.templates.find((t) => t.key === previewKey) || section.templates[0];
-    const fontKey = profile.documentFont || "open-sans";
+    const fontKey = profile.documentFont || "lato";
     const scaleId = profile.documentScale || "normal";
 
     // True when all three document types are already on the same design, which is the only

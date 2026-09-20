@@ -151,17 +151,34 @@ export const resolveDesign = (key) => DESIGNS.find((d) => d.key === resolveDesig
 // The scale multiplies rather than replaces: a design's internal proportions - title against
 // body against label - survive, and the whole document moves together. Applied at resolve
 // time, so every renderer gets scaled sizes without knowing this exists.
-export const DOCUMENT_SCALES = [
-    { id: "compact", label: "Compact", factor: 0.9 },
-    { id: "normal", label: "Normal", factor: 1 },
-    { id: "large", label: "Large", factor: 1.12 },
-    { id: "xlarge", label: "Extra large", factor: 1.25 },
-];
+// The size preference is now an absolute base text size in points, chosen from a plain 8-18
+// range rather than the old Compact/Normal/Large/Extra-large labels - a firm asks for "11pt
+// body", not "large-ish". The chosen size is applied as a factor (target / the design's own
+// base) so a design's internal proportions - title against body against label - still survive;
+// picking one number brings every design to the same body size.
+export const DOCUMENT_SIZE_MIN = 8;
+export const DOCUMENT_SIZE_MAX = 18;
 
+// Point sizes offered in the picker. Whole points only - a half-point difference is invisible
+// on a printed A4 line item and just clutters the menu.
+export const DOCUMENT_SIZES = Array.from(
+    { length: DOCUMENT_SIZE_MAX - DOCUMENT_SIZE_MIN + 1 },
+    (_, i) => DOCUMENT_SIZE_MIN + i
+);
+
+// The legacy label scales, kept only so a value saved before this change still resolves to the
+// same size it used to - the picker no longer shows them.
+const LEGACY_SCALES = { compact: 0.9, normal: 1, large: 1.12, xlarge: 1.25 };
+
+// "normal" (factor 1) is the safe default: it keeps each design's own base size, so a company
+// that never touched this setting sees no change. A numeric value opts into an absolute size.
 export const DEFAULT_DOCUMENT_SCALE = "normal";
 
-export const scaleFactor = (id) =>
-    (DOCUMENT_SCALES.find((s) => s.id === id) || DOCUMENT_SCALES.find((s) => s.id === DEFAULT_DOCUMENT_SCALE)).factor;
+// Whether a stored value is one of the new absolute point sizes.
+const asPointSize = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= DOCUMENT_SIZE_MIN && n <= DOCUMENT_SIZE_MAX ? n : null;
+};
 
 // The size tokens, and only those: colours and the structural choices are untouched. Rounded
 // to a tenth of a point because @react-pdf lays out on fractional sizes and an unrounded
@@ -170,7 +187,11 @@ const SIZE_TOKENS = ["baseSize", "titleSize", "labelSize"];
 
 export const resolveDesignScaled = (key, scaleId) => {
     const design = resolveDesign(key);
-    const factor = scaleFactor(scaleId);
+    const base = design.spec.tokens.baseSize;
+    // An absolute point size targets baseSize directly; a legacy label maps to its old factor;
+    // anything else (absent, unknown) is left at the design's own size.
+    const target = asPointSize(scaleId);
+    const factor = target !== null && base ? target / base : LEGACY_SCALES[scaleId] || 1;
     if (factor === 1) return design;
     const tokens = { ...design.spec.tokens };
     SIZE_TOKENS.forEach((t) => {

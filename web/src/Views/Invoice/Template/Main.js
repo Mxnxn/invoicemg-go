@@ -36,14 +36,14 @@ const Main = ({ invoice }) => {
             .getUserInfo(formData, window.localStorage.getItem("session_token"))
             .then((res) => {
                 setTemplateKey(res.data.invoiceTemplate || "classic");
-                setFontKey(res.data.documentFont || "open-sans");
+                setFontKey(res.data.documentFont || "lato");
                 setScaleId(res.data.documentScale || "normal");
                 setShowUnits(res.data.documentShowUnits === true);
                 setShowSize(res.data.documentShowSize === true);
             })
             .catch(() => {
                 setTemplateKey("classic");
-                setFontKey("open-sans");
+                setFontKey("lato");
                 setScaleId("normal");
             });
     }, []);

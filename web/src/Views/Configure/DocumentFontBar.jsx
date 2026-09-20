@@ -2,7 +2,7 @@ import React from "react";
 import { Type, AlertTriangle } from "react-feather";
 
 import { FONTS } from "../../Common/pdf/fonts";
-import { DOCUMENT_SCALES, DEFAULT_DOCUMENT_SCALE } from "../../Common/pdf/designs";
+import { DOCUMENT_SIZES, DOCUMENT_SIZE_MIN, DOCUMENT_SIZE_MAX } from "../../Common/pdf/designs";
 
 // One typeface for every document this company issues - invoices, quotations and ledgers
 // alike. It sits above the tab strip rather than inside any one tab because it is not a
@@ -15,8 +15,12 @@ import { DOCUMENT_SCALES, DEFAULT_DOCUMENT_SCALE } from "../../Common/pdf/design
 // surprise on a customer-facing page.
 const DocumentFontBar = ({ value, onChange, saving, scale, onScaleChange, savingScale }) => {
     const active = FONTS.find((f) => f.key === value) || FONTS[0];
-    const activeScale =
-        DOCUMENT_SCALES.find((s) => s.id === scale) || DOCUMENT_SCALES.find((s) => s.id === DEFAULT_DOCUMENT_SCALE);
+    // The size is now an absolute point value (8-18). A legacy label or an absent value has no
+    // number to show, so the select falls to its "Default" option, which keeps each design's
+    // own base size until a point size is picked.
+    const sizeNum = Number(scale);
+    const activeSize =
+        Number.isFinite(sizeNum) && sizeNum >= DOCUMENT_SIZE_MIN && sizeNum <= DOCUMENT_SIZE_MAX ? String(sizeNum) : "normal";
 
     return (
         <div className="doc-font-bar">
@@ -66,18 +70,19 @@ const DocumentFontBar = ({ value, onChange, saving, scale, onScaleChange, saving
                     <select
                         id="document-scale"
                         className="form-control doc-font-select"
-                        value={activeScale.id}
+                        value={activeSize}
                         disabled={savingScale}
                         onChange={(event) => onScaleChange(event.target.value)}
                     >
-                        {DOCUMENT_SCALES.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.label}
+                        <option value="normal">Default</option>
+                        {DOCUMENT_SIZES.map((size) => (
+                            <option key={size} value={size}>
+                                {size} pt
                             </option>
                         ))}
                     </select>
                     <span className="doc-font-hint text-body-small">
-                        {savingScale ? "Saving…" : "Applies to every design, so they read the same size."}
+                        {savingScale ? "Saving…" : "Body text size in points; every design is brought to it."}
                     </span>
                 </>
             )}

@@ -215,7 +215,7 @@ func buildProfile(user store.User, company store.Company) profileDTO {
 		LedgerTemplate:    orClassic(company.LedgerTemplate),
 		// Font/scale are not stored in this port yet, so the Mongoose defaults; the Units/Size
 		// toggles ARE stored now (Company.documentShowUnits/documentShowSize).
-		DocumentFont:      "open-sans",
+		DocumentFont:      "lato",
 		DocumentScale:     "normal",
 		DocumentShowUnits: company.DocumentShowUnits,
 		DocumentShowSize:  company.DocumentShowSize,

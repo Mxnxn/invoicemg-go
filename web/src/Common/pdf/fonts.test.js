@@ -32,22 +32,22 @@ describe("font registry", () => {
         expect(FONT_KEYS).toContain(DEFAULT_FONT_KEY);
     });
 
-    // react-pdf 1.x has no fallback chain: a glyph the registered family lacks renders as
-    // .notdef, not as the same glyph from another font. Open Sans has no U+20B9, which is
-    // why this flag exists and why money() reads it.
-    // Google Sans was removed as a document face; resolveFont falls any company still set to
-    // it through to open-sans, which carries no rupee glyph - so their documents move from
-    // "₹" to "Rs ", which money() handles rather than printing an empty box.
-    it("records which families actually carry the rupee glyph", () => {
-        const byKey = Object.fromEntries(FONTS.map((f) => [f.key, f.rupee]));
-        expect(byKey["open-sans"]).toBe(false);
-        expect(byKey.lato).toBe(true);
-        expect(byKey["pt-serif"]).toBe(true);
+    // The non-rupee families (Open Sans, Open Sans Condensed, Sora, DM Mono) were removed, so
+    // every family now offered carries U+20B9 and prints a real "₹". The removed keys are gone
+    // from the registry entirely - a company still storing one resolves through the default.
+    it("offers only families that carry the rupee glyph", () => {
+        FONTS.forEach((f) => expect(f.rupee, `${f.key} rupee`).toBe(true));
+        expect(FONT_KEYS).not.toContain("open-sans");
+        expect(FONT_KEYS).not.toContain("open-sans-condensed");
+        expect(FONT_KEYS).not.toContain("sora");
+        expect(FONT_KEYS).not.toContain("dm-mono");
     });
 
-    // Changing the default would silently restyle every document already being issued.
-    it("defaults to the family documents already use", () => {
-        expect(DEFAULT_FONT_KEY).toBe("open-sans");
+    // Open Sans (the old default) has no rupee glyph and was removed, so the default moved to
+    // Lato, the closest remaining family that carries the sign.
+    it("defaults to a family that carries the rupee glyph", () => {
+        expect(DEFAULT_FONT_KEY).toBe("lato");
+        expect(resolveFont(DEFAULT_FONT_KEY).rupee).toBe(true);
     });
 });
 
@@ -68,9 +68,11 @@ describe("money", () => {
         expect(money(1234.5, resolveFont("lato"))).toBe("₹1,234.50");
     });
 
-    // Better a readable "Rs" than the empty box Open Sans renders for ₹ today.
-    it("falls back to Rs when the font does not", () => {
-        expect(money(1234.5, resolveFont("open-sans"))).toBe("Rs 1,234.50");
+    // Every offered family now carries the glyph, but money() keeps the defensive branch for a
+    // family that would not - a readable "Rs" beats the empty box react-pdf draws for a missing
+    // codepoint. Exercised with a synthetic non-rupee font since none remain in the registry.
+    it("falls back to Rs for a font without the glyph", () => {
+        expect(money(1234.5, { rupee: false })).toBe("Rs 1,234.50");
     });
 
     it("groups in the Indian system", () => {
