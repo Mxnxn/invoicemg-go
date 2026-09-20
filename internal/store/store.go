@@ -525,6 +525,10 @@ type Company struct {
 	WaPhoneNumberID     string
 	WaBusinessAccountID string
 	WaAPIToken          string
+	// Whether the invoice prints each line's unit of measure and/or breaks the size out into its
+	// own column. Off by default so existing paperwork is unchanged.
+	DocumentShowUnits bool
+	DocumentShowSize  bool
 	IsDefault           bool
 	IsActive            bool
 }
@@ -558,6 +562,10 @@ type CompanyPatch struct {
 	WaPhoneNumberID     *string
 	WaBusinessAccountID *string
 	WaAPIToken          *string
+	// Invoice display toggles - a nil means the field was not submitted. Booleans can be turned
+	// OFF, so the handler reads presence (not truthiness) before pointing these at a value.
+	DocumentShowUnits *bool
+	DocumentShowSize  *bool
 }
 
 // DeactivateResult is the outcome of /company/deactivate's guard rules.

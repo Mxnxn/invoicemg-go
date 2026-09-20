@@ -74,6 +74,11 @@ CREATE TABLE companies (
     invoice_template   text NOT NULL DEFAULT 'classic',
     quotation_template text NOT NULL DEFAULT 'classic',
     ledger_template    text NOT NULL DEFAULT 'classic',
+    -- Invoice display toggles (routes/UserInfo.js /set-template, Company.documentShowUnits /
+    -- documentShowSize): print each line's unit of measure, and/or break the size into its own
+    -- column. Off by default so existing paperwork is unchanged.
+    document_show_units boolean NOT NULL DEFAULT false,
+    document_show_size  boolean NOT NULL DEFAULT false,
     -- WhatsApp Cloud API credentials (routes/WhatsApp.js /config). Node nests these under
     -- Company.whatsapp; the api token is write-only over the wire (only "is one set" is echoed).
     wa_phone_number_id     text NOT NULL DEFAULT '',

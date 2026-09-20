@@ -14,7 +14,7 @@ type companies struct{ pool *pgxpool.Pool }
 
 func (s *Store) Companies() store.Companies { return &companies{pool: s.pool} }
 
-const companyColumns = `id, name, firm, address, phone, gst, url, upi_qr, account_no, ifsc, bank_name, invoice_template, quotation_template, ledger_template, wa_phone_number_id, wa_business_account_id, wa_api_token, is_default, is_active`
+const companyColumns = `id, name, firm, address, phone, gst, url, upi_qr, account_no, ifsc, bank_name, invoice_template, quotation_template, ledger_template, document_show_units, document_show_size, wa_phone_number_id, wa_business_account_id, wa_api_token, is_default, is_active`
 
 func scanCompany(row interface {
 	Scan(...any) error
@@ -22,7 +22,8 @@ func scanCompany(row interface {
 	var c store.Company
 	err := row.Scan(&c.ID, &c.Name, &c.Firm, &c.Address, &c.Phone, &c.Gst, &c.URL,
 		&c.UpiQr, &c.AccountNo, &c.Ifsc, &c.BankName, &c.InvoiceTemplate, &c.QuotationTemplate,
-		&c.LedgerTemplate, &c.WaPhoneNumberID, &c.WaBusinessAccountID, &c.WaAPIToken, &c.IsDefault, &c.IsActive)
+		&c.LedgerTemplate, &c.DocumentShowUnits, &c.DocumentShowSize,
+		&c.WaPhoneNumberID, &c.WaBusinessAccountID, &c.WaAPIToken, &c.IsDefault, &c.IsActive)
 	return c, err
 }
 
@@ -118,14 +119,23 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 	waPhone := orElse(patch.WaPhoneNumberID, cur.WaPhoneNumberID)
 	waBiz := orElse(patch.WaBusinessAccountID, cur.WaBusinessAccountID)
 	waToken := orElse(patch.WaAPIToken, cur.WaAPIToken)
+	orElseBool := func(p *bool, def bool) bool {
+		if p != nil {
+			return *p
+		}
+		return def
+	}
+	showUnits := orElseBool(patch.DocumentShowUnits, cur.DocumentShowUnits)
+	showSize := orElseBool(patch.DocumentShowSize, cur.DocumentShowSize)
 
 	company, err := scanCompany(c.pool.QueryRow(ctx, `
 		UPDATE companies SET name=$3, firm=$4, address=$5, phone=$6, gst=$7, url=$17, account_no=$8, ifsc=$9, bank_name=$10,
 			invoice_template=$11, quotation_template=$12, ledger_template=$13,
-			wa_phone_number_id=$14, wa_business_account_id=$15, wa_api_token=$16, updated_at=now()
+			wa_phone_number_id=$14, wa_business_account_id=$15, wa_api_token=$16,
+			document_show_units=$18, document_show_size=$19, updated_at=now()
 		 WHERE id=$1 AND uid=$2 RETURNING `+companyColumns,
 		string(companyID), string(uid), name, firm, address, phone, gst, accountNo, ifsc, bankName,
-		invoiceTpl, quotationTpl, ledgerTpl, waPhone, waBiz, waToken, url))
+		invoiceTpl, quotationTpl, ledgerTpl, waPhone, waBiz, waToken, url, showUnits, showSize))
 	if noRows(err) {
 		return store.Company{}, false, nil
 	}

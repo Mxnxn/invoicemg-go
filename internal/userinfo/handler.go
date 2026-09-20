@@ -144,12 +144,33 @@ func (h *Handler) SetTemplate(w http.ResponseWriter, r *http.Request) {
 	sess := auth.MustFrom(r.Context())
 	form, _ := httpx.ReadForm(r)
 	docType, template := form.String("docType"), form.String("template")
-	patch := templateField(docType, template)
-	if patch == nil || template == "" {
+
+	patch := store.CompanyPatch{}
+	if template != "" {
+		tf := templateField(docType, template)
+		if tf == nil {
+			httpx.Invalid(w, "")
+			return
+		}
+		patch = *tf
+	}
+	// Invoice display toggles, saved through the same write. Presence, not truthiness (Node reads
+	// req.body.x !== undefined), so an explicit "off" carries through and does not read as absent.
+	hasUnits, hasSize := form.Present("documentShowUnits"), form.Present("documentShowSize")
+	if hasUnits {
+		v := form.Bool("documentShowUnits")
+		patch.DocumentShowUnits = &v
+	}
+	if hasSize {
+		v := form.Bool("documentShowSize")
+		patch.DocumentShowSize = &v
+	}
+	if template == "" && !hasUnits && !hasSize {
 		httpx.Invalid(w, "")
 		return
 	}
-	company, found, err := h.companies.Update(r.Context(), sess.UID, sess.CompanyID, *patch)
+
+	company, found, err := h.companies.Update(r.Context(), sess.UID, sess.CompanyID, patch)
 	if err != nil {
 		httpx.Internal(w, err)
 		return
@@ -192,9 +213,12 @@ func buildProfile(user store.User, company store.Company) profileDTO {
 		InvoiceTemplate:   orClassic(company.InvoiceTemplate),
 		QuotationTemplate: orClassic(company.QuotationTemplate),
 		LedgerTemplate:    orClassic(company.LedgerTemplate),
-		// Not stored/edited here yet, so the Mongoose defaults.
-		DocumentFont:  "open-sans",
-		DocumentScale: "normal",
+		// Font/scale are not stored in this port yet, so the Mongoose defaults; the Units/Size
+		// toggles ARE stored now (Company.documentShowUnits/documentShowSize).
+		DocumentFont:      "open-sans",
+		DocumentScale:     "normal",
+		DocumentShowUnits: company.DocumentShowUnits,
+		DocumentShowSize:  company.DocumentShowSize,
 	}
 }
 
@@ -218,4 +242,6 @@ type profileDTO struct {
 	LedgerTemplate    string      `json:"ledgerTemplate"`
 	DocumentFont      string      `json:"documentFont"`
 	DocumentScale     string      `json:"documentScale"`
+	DocumentShowUnits bool        `json:"documentShowUnits"`
+	DocumentShowSize  bool        `json:"documentShowSize"`
 }

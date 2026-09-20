@@ -64,7 +64,7 @@ the 209 routes the Node API declares.
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/update` | admin; save company letterhead + the user's own email/name; 422 "Invalid GST number."/404 | Live · Unit |
-| `POST /userinfo/set-template` | admin; choose the PDF template (invoice/quotation/ledger) on the company; 422 unknown docType/blank, 404 | Live · Unit |
+| `POST /userinfo/set-template` | admin; choose the PDF template (invoice/quotation/ledger) AND/OR flip the invoice Units/Size display toggles (`documentShowUnits`/`documentShowSize`, presence-based so an "off" saves) on the company; 422 when nothing submitted / unknown docType, 404. New `companies.document_show_units`/`document_show_size` columns, stored in both backends and echoed by `/userinfo/get`. | Unit |
 | `POST /userinfo/upload` | admin; store the company logo (png/jpg/jpeg under userDP), replace the old one, update company.url; served publicly at `GET /uploads/{fname}`; non-image → 200 "Invalid request." | Live · Unit |
 | `POST /material/getall` (+ `GET /materials`) | whole product record; sharing-widened (#1); batched price history (#6); `borrowed` | Live · Unit |
 | `POST /material/add` | create product; Number-coerced rates; returns raw doc (no borrowed/sharing) | Live · Unit |

@@ -35,6 +35,8 @@ type companyDoc struct {
 	InvoiceTemplate   string             `bson:"invoiceTemplate"`
 	QuotationTemplate string             `bson:"quotationTemplate"`
 	LedgerTemplate    string             `bson:"ledgerTemplate"`
+	DocumentShowUnits bool               `bson:"documentShowUnits"`
+	DocumentShowSize  bool               `bson:"documentShowSize"`
 	Whatsapp          struct {
 		PhoneNumberID     string `bson:"phoneNumberId"`
 		BusinessAccountID string `bson:"businessAccountId"`
@@ -50,6 +52,7 @@ func (d companyDoc) toStore() store.Company {
 		Gst: d.Gst, URL: d.URL, UpiQr: d.UpiQr, AccountNo: d.AccountNo, Ifsc: d.Ifsc,
 		BankName: d.BankName, IsDefault: d.IsDefault, IsActive: d.IsActive,
 		InvoiceTemplate: d.InvoiceTemplate, QuotationTemplate: d.QuotationTemplate, LedgerTemplate: d.LedgerTemplate,
+		DocumentShowUnits: d.DocumentShowUnits, DocumentShowSize: d.DocumentShowSize,
 		WaPhoneNumberID: d.Whatsapp.PhoneNumberID, WaBusinessAccountID: d.Whatsapp.BusinessAccountID, WaAPIToken: d.Whatsapp.ApiToken,
 	}
 }
@@ -159,6 +162,13 @@ func (c *companies) Update(ctx context.Context, uid, companyID store.ID, patch s
 		"gst": patch.Gst, "url": patch.URL, "account_no": patch.AccountNo, "ifsc": patch.Ifsc, "bank_name": patch.BankName,
 		"invoiceTemplate": patch.InvoiceTemplate, "quotationTemplate": patch.QuotationTemplate, "ledgerTemplate": patch.LedgerTemplate,
 		"whatsapp.phoneNumberId": patch.WaPhoneNumberID, "whatsapp.businessAccountId": patch.WaBusinessAccountID, "whatsapp.apiToken": patch.WaAPIToken,
+	} {
+		if p != nil {
+			set[key] = *p
+		}
+	}
+	for key, p := range map[string]*bool{
+		"documentShowUnits": patch.DocumentShowUnits, "documentShowSize": patch.DocumentShowSize,
 	} {
 		if p != nil {
 			set[key] = *p
