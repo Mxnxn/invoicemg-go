@@ -364,6 +364,34 @@ type Banks interface {
 	// kept (found is not meaningful) so the handler can refuse with that exact count. When inUse
 	// is 0, found reports whether a bank was actually deleted (false -> 404).
 	Remove(ctx context.Context, companyID, bankID ID) (inUse int, found bool, err error)
+	// ReportData gathers the company's cash-moving rows (batch receipts, supplier payments,
+	// expenses) plus its banks' opening balances, for the Bank Report (/bank/report). The pure
+	// bankledger.Compute turns these into per-bank ledgers. InvoiceReceived is deliberately not
+	// included - the report tracks transfers and expenses, not invoice settlement.
+	ReportData(ctx context.Context, companyID ID) (BankReportData, error)
+}
+
+// BankTxn is one cash-moving row for the Bank Report (its sign is applied by bankledger).
+type BankTxn struct {
+	BankID ID
+	Date   string
+	Amount float64
+	Note   string
+}
+
+// BankOpening is a bank's carried-in balance for the Bank Report.
+type BankOpening struct {
+	ID             ID
+	Name           string
+	OpeningBalance float64
+}
+
+// BankReportData is the raw input to bankledger.Compute for one company.
+type BankReportData struct {
+	BatchReceives    []BankTxn
+	SupplierPayments []BankTxn
+	Expenses         []BankTxn
+	Banks            []BankOpening
 }
 
 // ---------------------------------------------------------------------------------------

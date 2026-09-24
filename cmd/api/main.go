@@ -247,6 +247,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /bank/create", feature("batch_receive", bankHandler.Create))
 	mux.Handle("POST /bank/update", feature("batch_receive", bankHandler.Update))
 	mux.Handle("POST /bank/remove", feature("batch_receive", bankHandler.Remove, auth.RequireDelete("batch_receive")))
+	mux.Handle("POST /bank/report", feature("batch_receive", bankHandler.Report))
 
 	// Customers, behind the customers feature. Both reads WIDEN by sharing (#1); the writes use
 	// company-only scope. The populate-heavy /client/get is not ported.

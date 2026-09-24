@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (163 of 209)
+## Routes ready (164 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -37,6 +37,7 @@ the 209 routes the Node API declares.
 | `POST /bank/create` | add a bank account (name trimmed/required); whole record echoed; no status field | Live · Unit |
 | `POST /bank/update` | rename + (only when submitted) re-set openingBalance so a name-only edit can't wipe a balance; 422 "A bank needs a name."; 404 on miss | Unit |
 | `POST /bank/remove` | requireDelete; refuses with the exact txn count when receipts/supplier-payments/expenses reference it (correct singular/plural); 404 on miss | Unit |
+| `POST /bank/report` | per-bank cash ledger via new pure `internal/bankledger` (= `Helpers/BankLedger.js`): batch receipts (+), supplier payments/expenses (−), opening-balance seed + synthetic row, opening/closing/current, richest-first; bank_id/from/to filters; server-summed totals; new `Banks.ReportData` (sql+mongo) | Unit (Node-captured) |
 | `GET /whatsapp/webhook` | Meta verify handshake; real 200/403/500 + plaintext | Live · Unit |
 | `POST /whatsapp/config` | company WhatsApp settings (phone/business ids, hasApiToken, configured); token never echoed; 404 | Live · Unit |
 | `POST /whatsapp/config/update` | admin; save phone/business ids and (only when non-blank) the api token; 404 | Live · Unit |

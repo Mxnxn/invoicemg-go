@@ -75,6 +75,72 @@ func (b *banks) List(ctx context.Context, companyID store.ID) ([]store.Bank, err
 	return out, nil
 }
 
+func (b *banks) ReportData(ctx context.Context, companyID store.ID) (store.BankReportData, error) {
+	var out store.BankReportData
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return out, err
+	}
+	if out.BatchReceives, err = b.reportTxns(ctx, colBatchReceives, "note", companyOID); err != nil {
+		return out, err
+	}
+	if out.SupplierPayments, err = b.reportTxns(ctx, colSupplierPayments, "note", companyOID); err != nil {
+		return out, err
+	}
+	if out.Expenses, err = b.reportTxns(ctx, colExpenses, "notes", companyOID); err != nil {
+		return out, err
+	}
+	cur, err := b.db.Collection(colBanks).Find(ctx, bson.M{"company_id": companyOID},
+		options.Find().SetProjection(bson.M{"name": 1, "openingBalance": 1}))
+	if err != nil {
+		return out, fmt.Errorf("bank report banks: %w", err)
+	}
+	var bankDocs []struct {
+		ID             primitive.ObjectID `bson:"_id"`
+		Name           string             `bson:"name"`
+		OpeningBalance float64            `bson:"openingBalance"`
+	}
+	if err := cur.All(ctx, &bankDocs); err != nil {
+		return out, err
+	}
+	for _, d := range bankDocs {
+		out.Banks = append(out.Banks, store.BankOpening{ID: idOf(d.ID), Name: d.Name, OpeningBalance: d.OpeningBalance})
+	}
+	return out, nil
+}
+
+// reportTxns reads one cash-moving collection's rows. A null bank_id becomes an empty id, which
+// bankledger buckets as Unassigned.
+func (b *banks) reportTxns(ctx context.Context, collection, noteField string, companyOID primitive.ObjectID) ([]store.BankTxn, error) {
+	cur, err := b.db.Collection(collection).Find(ctx, bson.M{"company_id": companyOID},
+		options.Find().SetProjection(bson.M{"bank_id": 1, "date": 1, "amount": 1, noteField: 1}))
+	if err != nil {
+		return nil, fmt.Errorf("bank report %s: %w", collection, err)
+	}
+	var docs []struct {
+		BankID *primitive.ObjectID `bson:"bank_id"`
+		Date   string              `bson:"date"`
+		Amount float64             `bson:"amount"`
+		Note   string              `bson:"note"`
+		Notes  string              `bson:"notes"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, fmt.Errorf("reading bank report %s: %w", collection, err)
+	}
+	out := make([]store.BankTxn, 0, len(docs))
+	for _, d := range docs {
+		t := store.BankTxn{Date: d.Date, Amount: d.Amount, Note: d.Note}
+		if noteField == "notes" {
+			t.Note = d.Notes
+		}
+		if d.BankID != nil {
+			t.BankID = idOf(*d.BankID)
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
 func (b *banks) Create(ctx context.Context, companyID, uid store.ID, name string) (store.Bank, error) {
 	companyOID, err := objectID(companyID)
 	if err != nil {

@@ -46,6 +46,58 @@ func (b *banks) List(ctx context.Context, companyID store.ID) ([]store.Bank, err
 	return out, rows.Err()
 }
 
+func (b *banks) ReportData(ctx context.Context, companyID store.ID) (store.BankReportData, error) {
+	var out store.BankReportData
+	var err error
+	// note column differs: batch receipts and supplier payments use "note", expenses use "notes".
+	if out.BatchReceives, err = b.reportTxns(ctx, "batch_receives", "note", companyID); err != nil {
+		return out, err
+	}
+	if out.SupplierPayments, err = b.reportTxns(ctx, "supplier_payments", "note", companyID); err != nil {
+		return out, err
+	}
+	if out.Expenses, err = b.reportTxns(ctx, "expenses", "notes", companyID); err != nil {
+		return out, err
+	}
+	rows, err := b.pool.Query(ctx, `SELECT id, name, opening_balance FROM banks WHERE company_id = $1`, string(companyID))
+	if err != nil {
+		return out, fmt.Errorf("bank report banks: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bo store.BankOpening
+		if err := rows.Scan(&bo.ID, &bo.Name, &bo.OpeningBalance); err != nil {
+			return out, fmt.Errorf("reading bank report banks: %w", err)
+		}
+		out.Banks = append(out.Banks, bo)
+	}
+	return out, rows.Err()
+}
+
+// reportTxns reads one cash-moving table's rows (table/noteCol are fixed literals, never user
+// input). bank_id is nullable - a null becomes an empty id, which bankledger buckets as Unassigned.
+func (b *banks) reportTxns(ctx context.Context, table, noteCol string, companyID store.ID) ([]store.BankTxn, error) {
+	q := fmt.Sprintf(`SELECT bank_id, date, amount, %s FROM %s WHERE company_id = $1`, noteCol, table)
+	rows, err := b.pool.Query(ctx, q, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("bank report %s: %w", table, err)
+	}
+	defer rows.Close()
+	var out []store.BankTxn
+	for rows.Next() {
+		var t store.BankTxn
+		var bankID *string
+		if err := rows.Scan(&bankID, &t.Date, &t.Amount, &t.Note); err != nil {
+			return nil, fmt.Errorf("reading bank report %s: %w", table, err)
+		}
+		if bankID != nil {
+			t.BankID = store.ID(*bankID)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 func (b *banks) Create(ctx context.Context, companyID, uid store.ID, name string) (store.Bank, error) {
 	var out store.Bank
 	var companyCol *string

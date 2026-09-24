@@ -31,6 +31,9 @@ type stubBanks struct {
 	removeFound bool
 	removeErr   error
 	gotRemoveID store.ID
+
+	// report
+	reportData store.BankReportData
 }
 
 func (s *stubBanks) List(_ context.Context, companyID store.ID) ([]store.Bank, error) {
@@ -54,6 +57,71 @@ func (s *stubBanks) Remove(_ context.Context, companyID, bankID store.ID) (int, 
 	s.got = companyID
 	s.gotRemoveID = bankID
 	return s.removeInUse, s.removeFound, s.removeErr
+}
+
+func (s *stubBanks) ReportData(_ context.Context, companyID store.ID) (store.BankReportData, error) {
+	s.got = companyID
+	return s.reportData, s.err
+}
+
+func TestReport_NamesRowsFiltersAndTotals(t *testing.T) {
+	s := &stubBanks{reportData: store.BankReportData{
+		BatchReceives: []store.BankTxn{{BankID: "b1", Date: "2026-05-10", Amount: 1000}, {BankID: "b2", Date: "2026-05-10", Amount: 200}},
+		Expenses:      []store.BankTxn{{BankID: "", Date: "2026-05-12", Amount: 50, Note: "Fuel"}}, // unassigned bucket
+		Banks:         []store.BankOpening{{ID: "b1", Name: "HDFC", OpeningBalance: 0}, {ID: "b2", Name: "ICICI"}},
+	}}
+	// No filter: expect b1 (1000), b2 (200), Unassigned (-50).
+	r := httptest.NewRequest("POST", "/", strings.NewReader(neturl.Values{}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Report(rec, r)
+
+	var out map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if out["code"] != float64(200) {
+		t.Fatalf("code = %v (%s)", out["code"], rec.Body.String())
+	}
+	data := out["data"].(map[string]any)
+	rows := data["rows"].([]any)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3 (b1, b2, unassigned)", len(rows))
+	}
+	first := rows[0].(map[string]any)
+	if first["bankName"] != "HDFC" || first["current"] != float64(1000) {
+		t.Errorf("row0 = %v, want HDFC/1000 (richest first)", first)
+	}
+	// The null-bank row is labelled Unassigned.
+	last := rows[2].(map[string]any)
+	if last["bankName"] != "Unassigned" {
+		t.Errorf("unassigned row bankName = %v", last["bankName"])
+	}
+	totals := data["totals"].(map[string]any)
+	if totals["credits"] != float64(1200) || totals["debits"] != float64(50) {
+		t.Errorf("totals credits=%v debits=%v, want 1200/50", totals["credits"], totals["debits"])
+	}
+	if len(data["banks"].([]any)) != 2 {
+		t.Errorf("banks list = %v, want 2", data["banks"])
+	}
+}
+
+func TestReport_FilterByBank(t *testing.T) {
+	s := &stubBanks{reportData: store.BankReportData{
+		BatchReceives: []store.BankTxn{{BankID: "b1", Date: "2026-05-10", Amount: 1000}, {BankID: "b2", Date: "2026-05-10", Amount: 200}},
+		Banks:         []store.BankOpening{{ID: "b1", Name: "HDFC"}, {ID: "b2", Name: "ICICI"}},
+	}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(neturl.Values{"bank_id": {"b2"}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).Report(rec, r)
+
+	var out map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	rows := out["data"].(map[string]any)["rows"].([]any)
+	if len(rows) != 1 || rows[0].(map[string]any)["bankName"] != "ICICI" {
+		t.Errorf("filtered rows = %v, want only ICICI", rows)
+	}
 }
 
 func serve(t *testing.T, s store.Banks, companyID store.ID) (map[string]any, *stubBanks) {
