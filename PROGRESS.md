@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (168 of 209)
+## Routes ready (173 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -97,6 +97,11 @@ the 209 routes the Node API declares.
 | `POST /purchase-invoice/update` | partial edit; row change recomputes total, refused if below amount paid; 404 | Live · Unit |
 | `POST /purchase-invoice/delete` | blocked while a supplier payment allocates to it (JSONB `@>`); 404 on miss | Live · Unit |
 | `POST /purchase-invoice/next-number` | suggested (editable) next number, one past the highest in the company's series; hardcoded `MG/<FY>/PINV-` scheme pending the numbering ripple; new `PurchaseInvoices.Numbers` (sql+mongo) | Unit |
+| `POST /purchase-order/next-number` | generated PO number, one past the company's series (`MG/<FY>/PO-` pending the ripple) | Unit |
+| `POST /purchase-order/list` | company POs (newest first), supplier populated, optional supplier filter, each row's derived send state (`internal/posend`) | Unit |
+| `POST /purchase-order/detail` | one PO + its history + notes + send state; 422 no id, 404 miss | Unit |
+| `POST /purchase-order/create` | requireCreate; generate number, coerce rows, compute total (`PurchaseRowTotal` w/ dimension), log "Created"; 422 supplier/date | Unit |
+| `POST /purchase-order/update` | requireCreate; partial edit, recompute total, drop approval to draft when the price-bearing fingerprint changes (`internal/pochanges`), log "Updated"/"Approval revoked"; 404 miss, 409 already converted | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

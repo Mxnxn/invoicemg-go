@@ -696,3 +696,97 @@ CREATE TABLE user_settings (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------------------
+-- Purchase orders (routes/PurchaseOrder.js). We generate the number (PO/<FY>/NNNNNN), the
+-- approval fingerprint gates edits (Helpers/PoChanges.js), and converting one mints a
+-- purchase invoice from the same rows. Send state derives from the sent-channel columns.
+-- ---------------------------------------------------------------------------------------
+CREATE TABLE purchase_orders (
+    id                   text PRIMARY KEY DEFAULT gen_ulid(),
+    uid                  text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id           text REFERENCES companies(id) ON DELETE CASCADE,
+    supplier_id          text REFERENCES persons(id) ON DELETE SET NULL,
+    po_number            text NOT NULL,
+    date                 text NOT NULL,
+    total                numeric(14,2) NOT NULL DEFAULT 0,
+    -- Approval (Helpers/PoChanges.js): fingerprint is the approved price-bearing content.
+    approval_state       text NOT NULL DEFAULT 'draft',
+    approved_by          text,
+    approved_by_name     text NOT NULL DEFAULT '',
+    approved_at          timestamptz,
+    approval_fingerprint text NOT NULL DEFAULT '',
+    -- Presence of purchase_invoice_id IS "converted".
+    purchase_invoice_id  text REFERENCES purchase_invoices(id) ON DELETE SET NULL,
+    converted_at         timestamptz,
+    -- Minimal send state for PoSend.sendState (the sent channel); the confirm channel's time.
+    sent_count           integer NOT NULL DEFAULT 0,
+    sent_fingerprint     text NOT NULL DEFAULT '',
+    sent_at              timestamptz,
+    confirm_sent_at      timestamptz,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    updated_at           timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (company_id, po_number)
+);
+CREATE INDEX purchase_orders_company_idx ON purchase_orders (company_id);
+
+CREATE TABLE purchase_order_rows (
+    id             text PRIMARY KEY DEFAULT gen_ulid(),
+    po_id          text NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    position       integer NOT NULL DEFAULT 0,
+    description    text NOT NULL DEFAULT '',
+    material       text NOT NULL DEFAULT '',
+    hsn            text NOT NULL DEFAULT '',
+    gst            numeric(6,2) NOT NULL DEFAULT 0,
+    has_dimensions boolean NOT NULL DEFAULT false,
+    length         text NOT NULL DEFAULT '1',
+    width          text NOT NULL DEFAULT '1',
+    rate           numeric(14,2) NOT NULL DEFAULT 0,
+    qty            numeric(14,3) NOT NULL DEFAULT 1,
+    unit           text NOT NULL DEFAULT '',
+    discount       numeric(14,2) NOT NULL DEFAULT 0,
+    charges        numeric(14,2) NOT NULL DEFAULT 0,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    updated_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_order_rows_po_idx ON purchase_order_rows (po_id);
+
+CREATE TABLE purchase_order_history (
+    id         text PRIMARY KEY DEFAULT gen_ulid(),
+    po_id      text NOT NULL,
+    uid        text,
+    company_id text REFERENCES companies(id) ON DELETE CASCADE,
+    actor_type text NOT NULL DEFAULT '',
+    actor_id   text,
+    actor_name text NOT NULL DEFAULT '',
+    action     text NOT NULL DEFAULT '',
+    changes    jsonb NOT NULL DEFAULT '[]',
+    detail     text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_order_history_po_idx ON purchase_order_history (po_id, created_at DESC);
+
+CREATE TABLE purchase_order_notes (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    po_id       text NOT NULL,
+    uid         text,
+    company_id  text REFERENCES companies(id) ON DELETE CASCADE,
+    author_type text NOT NULL DEFAULT '',
+    author_id   text,
+    author_name text NOT NULL DEFAULT '',
+    text        text NOT NULL DEFAULT '',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_order_notes_po_idx ON purchase_order_notes (po_id, created_at DESC);
+
+-- Per-person "I have seen this version" for the approval queue, honoured only while the order
+-- still matches the dismissed version (po_updated_at).
+CREATE TABLE po_approval_dismissals (
+    id                 text PRIMARY KEY DEFAULT gen_ulid(),
+    actor_id           text NOT NULL,
+    purchase_order_id  text NOT NULL,
+    po_updated_at      timestamptz NOT NULL,
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (actor_id, purchase_order_id)
+);

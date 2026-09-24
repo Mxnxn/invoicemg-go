@@ -44,6 +44,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/material"
 	"github.com/mxnxn/invoicemg-go/internal/person"
 	"github.com/mxnxn/invoicemg-go/internal/purchaseinvoice"
+	"github.com/mxnxn/invoicemg-go/internal/purchaseorder"
 	"github.com/mxnxn/invoicemg-go/internal/purchasereport"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/settings"
@@ -183,6 +184,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	purchaseInvoiceHandler := purchaseinvoice.New(db.PurchaseInvoices())
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users(), db.Clients(), db.Jobs(), exportsDir)
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
+	purchaseOrderHandler := purchaseorder.New(db.PurchaseOrders())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
@@ -344,6 +346,12 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /purchase-invoice/update", feature("purchase_invoices", purchaseInvoiceHandler.Update))
 	mux.Handle("POST /purchase-invoice/delete", feature("purchase_invoices", purchaseInvoiceHandler.Delete, auth.RequireDelete("purchase_invoices")))
 	mux.Handle("POST /purchase-invoice/next-number", feature("purchase_invoices", purchaseInvoiceHandler.NextNumber))
+
+	mux.Handle("POST /purchase-order/next-number", feature("purchase_orders", purchaseOrderHandler.NextNumber))
+	mux.Handle("POST /purchase-order/list", feature("purchase_orders", purchaseOrderHandler.List))
+	mux.Handle("POST /purchase-order/detail", feature("purchase_orders", purchaseOrderHandler.Detail))
+	mux.Handle("POST /purchase-order/create", feature("purchase_orders", purchaseOrderHandler.Create, auth.RequireCreate("purchase_orders")))
+	mux.Handle("POST /purchase-order/update", feature("purchase_orders", purchaseOrderHandler.Update, auth.RequireCreate("purchase_orders")))
 
 	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
 	// the populated entries and computed totals. Only /getAll is ported.
