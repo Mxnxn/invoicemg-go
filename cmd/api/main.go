@@ -47,6 +47,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/purchasereport"
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/settings"
+	"github.com/mxnxn/invoicemg-go/internal/shared"
 	"github.com/mxnxn/invoicemg-go/internal/sheet"
 	"github.com/mxnxn/invoicemg-go/internal/statistics"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -184,6 +185,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
+	sharedHandler := shared.New(db.Companies(), db.Clients(), db.Materials())
 	settingsHandler := settings.New(db.Settings())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies(), uploadsDir)
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"), db.Companies())
@@ -271,6 +273,12 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /company/numbering", authed(companyHandler.Numbering))
 	mux.Handle("POST /company/numbering/update", admin(companyHandler.NumberingUpdate))
 	mux.Handle("POST /company/deactivate", admin(companyHandler.Deactivate))
+	mux.Handle("POST /company/sharing", admin(companyHandler.Sharing))
+
+	// Cross-account read-only reports (routes/Shared.js), gated by the same feature keys as the
+	// per-company lists they widen. Never a picker's source - see internal/shared.
+	mux.Handle("GET /shared/customers", feature("customers", sharedHandler.Customers))
+	mux.Handle("GET /shared/materials", feature("products", sharedHandler.Materials))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 	mux.Handle("POST /userinfo/update", admin(userinfoHandler.Update))

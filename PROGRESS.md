@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (154 of 209)
+## Routes ready (157 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -61,6 +61,9 @@ the 209 routes the Node API declares.
 | `POST /company/numbering` | per-type numbering formats (invoice/job/quotation/purchase), each filled from DEFAULT_FORMATS where unset, + a next-number preview; never 404s | Unit |
 | `POST /company/numbering/update` | admin; set one type's format (incl. purchaseOrder); normalises (prefix trim, year whitelist, pad clamp 1-8) then requires a prefix (422); stores in `companies.numbering` jsonb; 422 unknown-kind, 404 miss | Unit |
 | `POST /company/deactivate` | admin; keep-one + not-the-default guards; clears tab bindings; never deletes | Live · Unit |
+| `POST /company/sharing` | admin; flip the acting company's `reportsAcrossCompanies` toggle via `SetReportsAcrossCompanies` (fail-closed: only `"true"` turns it on); 404 no-company / company-gone; echoes `{reportsAcrossCompanies}` | Unit |
+| `GET /shared/customers` | requireFeature("customers"); cross-account customer report over `Companies.Scope` (widens only when the toggle is on) + `Clients.SharedList`; each row tagged with its owning company label; `duplicates` = phone numbers seen in >1 company; never a picker source | Unit |
+| `GET /shared/materials` | requireFeature("products"); product twin of /shared/customers over `Materials.SharedList`; `duplicates` on the (case-folded) product name | Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/update` | admin; save company letterhead + the user's own email/name; 422 "Invalid GST number."/404 | Live · Unit |
@@ -259,10 +262,12 @@ Still blocking a Node-free frontend:
   `Clients.SharedList` / `Materials.SharedList` (the firm/name-sorted cross-company projections),
   all implemented in BOTH backends + a mongostore `objectIDs` helper. Remaining before these
   screens work:
-  - Wire the handlers/routes for `GET /shared/customers`, `GET /shared/materials`,
-    `POST /company/sharing`. The store methods above already back these — a handler package
-    (`internal/shared`) that combines `Scope` (labels + `shared` flag + `companyCount`) with
-    `SharedList` (rows) and the `countDuplicates` tally, mirroring `routes/Shared.js`.
+  - **DONE** — `GET /shared/customers`, `GET /shared/materials` and `POST /company/sharing` are
+    wired. New handler package `internal/shared` combines `Companies.Scope` (labels + `shared`
+    flag + `companyCount`) with `Clients/Materials.SharedList` (rows) and a `countDuplicates`
+    tally; `/company/sharing` (admin) flips the toggle via `SetReportsAcrossCompanies`. Unit-tested
+    (scope/labels/duplicates, fail-closed toggle, 404s). ⚠️ Not yet Node-diffed with
+    `scripts/parity.js` — the ROUTES.md boxes stay unchecked.
   - `GET /shared/duplicate-materials` and the write pair `POST /sharing/preview` + `/sharing/set`
     still need NEW store surface: the owner's full company set with a per-record `sharing` count
     (duplicate-materials, grouped on `InventoryMath.normaliseKey`), and read/write of a record's

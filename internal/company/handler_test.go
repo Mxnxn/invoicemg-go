@@ -38,6 +38,10 @@ type stubCompanies struct {
 	gotNumberKind   string
 	gotNumberFormat json.RawMessage
 	setNumberCalled bool
+
+	setReportsFound  bool
+	setReportsOn     bool
+	setReportsCalled bool
 }
 
 func (s *stubCompanies) List(_ context.Context, _ store.ID) ([]store.Company, error) {
@@ -50,8 +54,10 @@ func (s *stubCompanies) Count(_ context.Context, _ store.ID) (int, error) { retu
 func (s *stubCompanies) Scope(context.Context, store.ID, store.ID) ([]store.ID, bool, map[store.ID]string, error) {
 	return nil, false, nil, nil
 }
-func (s *stubCompanies) SetReportsAcrossCompanies(context.Context, store.ID, store.ID, bool) (bool, error) {
-	return false, nil
+func (s *stubCompanies) SetReportsAcrossCompanies(_ context.Context, _, _ store.ID, on bool) (bool, error) {
+	s.setReportsCalled = true
+	s.setReportsOn = on
+	return s.setReportsFound, nil
 }
 func (s *stubCompanies) Create(_ context.Context, _ store.ID, in store.CompanyWrite) (store.Company, error) {
 	s.gotCreate = in
