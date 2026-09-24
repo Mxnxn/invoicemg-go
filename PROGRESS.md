@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (167 of 209)
+## Routes ready (168 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -110,6 +110,7 @@ the 209 routes the Node API declares.
 | `POST /invoice/next-invoice-number` | next MG/FY/INV- number (docnumber) | Live · Unit |
 | `POST /invoice/entries-jobs` | map entry ids → job challan numbers (reverse lookup) | Live · Unit |
 | `POST /invoice/invoiceable-jobs` | a client's jobs the invoice run can pick up; per-row billable math (available/invoiced/unconverted/convertible/pending, amount, hasIgst); a job-id shows only when nothing is still in production and there is something to bill; new `Jobs.InvoiceableJobs` (sql+mongo) | Unit |
+| `POST /invoice/history` | an invoice's entries (display total via entrymath) + the jobs they came from (via the row→entry chain, since Go invoices store no job_ids) + those jobs' audit trail (newest first, ≤200, challan resolved per row); 422 no id, 404 miss; new `Invoices.History` (sql+mongo) | Unit |
 | `POST /invoice/getReceived` | payments recorded against an invoice, bank populated | Live · Unit |
 | `POST /invoice/save` | issue/re-issue: mark entries issued, amount=Σadvance, total=Σ RoundOffWithAmount(amount·1.18) | Live · Unit |
 | `POST /invoice/paid` | record payment; manual / auto-full-close / auto-partial; bumps entries + owning jobs (capped) + invoice.amount; logs InvoiceReceived | Live · Unit |

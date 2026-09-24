@@ -25,6 +25,8 @@ type stubInvoices struct {
 	removeFound      bool
 	gotSave          store.InvoiceSaveInput
 	gotPaid          store.InvoicePaidInput
+	history          store.InvoiceHistory
+	historyFound     bool
 }
 
 func (s *stubInvoices) List(_ context.Context, _ store.ID) ([]store.Invoice, error) {
@@ -52,6 +54,9 @@ func (s *stubInvoices) Paid(_ context.Context, _ store.ID, in store.InvoicePaidI
 }
 func (s *stubInvoices) Remove(_ context.Context, _, _ store.ID) (bool, error) {
 	return s.removeFound, nil
+}
+func (s *stubInvoices) History(_ context.Context, _, _ store.ID) (store.InvoiceHistory, bool, error) {
+	return s.history, s.historyFound, nil
 }
 
 type stubCompanies struct{ c store.Company }

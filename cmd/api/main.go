@@ -356,6 +356,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /invoice/next-invoice-number", feature("invoices", invoiceHandler.NextNumber))
 	mux.Handle("POST /invoice/entries-jobs", feature("invoices", invoiceHandler.EntriesJobs))
 	mux.Handle("POST /invoice/invoiceable-jobs", feature("invoices", invoiceHandler.InvoiceableJobs))
+	mux.Handle("POST /invoice/history", feature("invoices", invoiceHandler.History))
 	mux.Handle("POST /invoice/getReceived", feature("invoices", invoiceHandler.GetReceived))
 	mux.Handle("POST /invoice/save", feature("invoices", invoiceHandler.Save, auth.RequireCreate("invoices")))
 	mux.Handle("POST /invoice/paid", feature("invoices", invoiceHandler.Paid))

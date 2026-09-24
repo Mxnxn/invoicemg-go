@@ -110,6 +110,9 @@ func (s *stubJobs) ConvertToEntries(_ context.Context, _, _ store.ID, jobIDs []s
 	s.gotConvert = jobIDs
 	return s.convEntries, s.convJobs, s.convFound, nil
 }
+func (s *stubJobs) InvoiceableJobs(_ context.Context, _, _ store.ID) ([]store.InvoiceableJob, error) {
+	return nil, nil
+}
 func (s *stubJobs) Unlock(_ context.Context, _, _, _ store.ID, _ store.NoteActor, wanted bool) (store.Job, bool, store.JobTxStatus, error) {
 	s.gotUnlockWanted = &wanted
 	return s.txJob, s.unlockChanged, s.txStatus, nil

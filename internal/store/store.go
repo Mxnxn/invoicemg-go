@@ -1142,6 +1142,51 @@ type InvoiceClient struct {
 	ClientGST     string
 }
 
+// InvoiceHistoryEntry is one of the invoice's entries for /invoice/history (the pricing fields are
+// carried so the handler can recompute the display total via entrymath).
+type InvoiceHistoryEntry struct {
+	EntryID     ID
+	Date        string
+	Material    string
+	Description string
+	Qty         float64
+	Rate        float64
+	Amount      float64
+	Advance     float64
+	Cgst        float64
+	Sgst        float64
+	Igst        float64
+	Discount    float64
+	Charges     float64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// InvoiceHistoryJob is one job an invoice's entries came from.
+type InvoiceHistoryJob struct {
+	JobID         ID
+	ChallanNumber string
+}
+
+// InvoiceHistoryTrail is one audit-trail row for the invoice's jobs (the handler adds the job's
+// challan number from the jobs list).
+type InvoiceHistoryTrail struct {
+	At        time.Time
+	Action    string
+	Detail    string
+	ActorName string
+	JobID     ID
+}
+
+// InvoiceHistory is the assembled /invoice/history payload (challan numbers on the trail are joined
+// by the handler).
+type InvoiceHistory struct {
+	InvoiceNumber string
+	Entries       []InvoiceHistoryEntry
+	Jobs          []InvoiceHistoryJob
+	Trail         []InvoiceHistoryTrail
+}
+
 // Entry is one billed line on an invoice (Model/Entry.js), the pricing fields plus display.
 type Entry struct {
 	ID            ID
@@ -1315,6 +1360,10 @@ type Invoices interface {
 	Paid(ctx context.Context, companyID ID, in InvoicePaidInput) (found bool, err error)
 	// Remove deletes an invoice and un-issues its entries. found is false on a miss.
 	Remove(ctx context.Context, companyID, invoiceID ID) (found bool, err error)
+	// History assembles /invoice/history: the invoice's number and entries, the jobs its entries
+	// came from (resolved via the row->entry chain, since Go invoices don't store job_ids), and
+	// those jobs' audit trail (newest first, capped 200). found is false on a miss/other company.
+	History(ctx context.Context, companyID, invoiceID ID) (InvoiceHistory, bool, error)
 }
 
 // ---------------------------------------------------------------------------------------
