@@ -32,6 +32,59 @@ type expenseDoc struct {
 	Version   int                 `bson:"__v"`
 }
 
+func (e *expenses) Create(ctx context.Context, companyID, uid store.ID, in store.ExpenseWrite) (store.Expense, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return store.Expense{}, err
+	}
+	uidOID, err := objectID(uid)
+	if err != nil {
+		return store.Expense{}, err
+	}
+	bankOID, err := objectID(in.BankID)
+	if err != nil {
+		return store.Expense{}, store.ErrBadID
+	}
+	now := time.Now().UTC()
+	doc := bson.M{"uid": uidOID, "company_id": companyOID, "bank_id": bankOID, "date": in.Date,
+		"amount": in.Amount, "notes": in.Notes, "createdAt": now, "updatedAt": now, "__v": 0}
+	res, err := e.db.Collection(colExpenses).InsertOne(ctx, doc)
+	if err != nil {
+		return store.Expense{}, fmt.Errorf("insert expense: %w", err)
+	}
+	ex := store.Expense{UID: uid, CompanyID: companyID, Date: in.Date, Amount: in.Amount, Notes: in.Notes,
+		CreatedAt: now, UpdatedAt: now}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		ex.ID = idOf(oid)
+	}
+	names, err := e.bankNames(ctx, []primitive.ObjectID{bankOID})
+	if err != nil {
+		return store.Expense{}, err
+	}
+	if name, ok := names[bankOID]; ok {
+		ex.Bank = &store.ExpenseBank{ID: in.BankID, Name: name}
+	}
+	return ex, nil
+}
+
+func (e *expenses) Delete(ctx context.Context, companyID, expenseID store.ID) (bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return false, err
+	}
+	expOID, err := objectID(expenseID)
+	if err != nil {
+		// A malformed id matches nothing (404), matching the SQL path; the frontend only ever
+		// sends real ids.
+		return false, nil
+	}
+	res, err := e.db.Collection(colExpenses).DeleteOne(ctx, bson.M{"_id": expOID, "company_id": companyOID})
+	if err != nil {
+		return false, fmt.Errorf("delete expense: %w", err)
+	}
+	return res.DeletedCount > 0, nil
+}
+
 func (e *expenses) List(ctx context.Context, companyID store.ID, f store.ExpenseFilter) ([]store.Expense, error) {
 	oid, err := objectID(companyID)
 	if err != nil {

@@ -28,15 +28,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]expenseDTO, 0, len(list))
 	for _, e := range list {
-		dto := expenseDTO{
-			ID: string(e.ID), UID: string(e.UID), CompanyID: idPtr(e.CompanyID),
-			Date: e.Date, Amount: e.Amount, Notes: e.Notes,
-			CreatedAt: httpx.NewTime(e.CreatedAt), UpdatedAt: httpx.NewTime(e.UpdatedAt), Version: e.Version,
-		}
-		if e.Bank != nil {
-			dto.BankID = &bankDTO{ID: string(e.Bank.ID), Name: e.Bank.Name}
-		}
-		out = append(out, dto)
+		out = append(out, toExpenseDTO(e))
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Operation successful.", Data: out})
 }

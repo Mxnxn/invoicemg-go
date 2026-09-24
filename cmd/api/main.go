@@ -405,6 +405,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /supplier-payment/delete", feature("purchase_invoices", supplierPaymentHandler.Delete, auth.RequireDelete("purchase_invoices")))
 	mux.Handle("POST /expense/list", feature("batch_receive", expenseHandler.List))
 	mux.Handle("GET /expenses", feature("batch_receive", expenseHandler.List))
+	mux.Handle("POST /expense/create", feature("batch_receive", expenseHandler.Create, auth.RequireCreate("batch_receive")))
+	mux.Handle("POST /expense/remove", feature("batch_receive", expenseHandler.Remove, auth.RequireDelete("batch_receive")))
 
 	// Analytics (the reporting dashboards). Only /revenue is ported so far; the other tabs
 	// still 404 until their aggregations are ported.

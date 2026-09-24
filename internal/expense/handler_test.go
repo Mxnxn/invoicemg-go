@@ -15,11 +15,26 @@ import (
 type stubExpenses struct {
 	list []store.Expense
 	got  store.ExpenseFilter
+
+	created     store.Expense
+	gotWrite    store.ExpenseWrite
+	createCalled bool
+	deleteFound bool
+	gotDeleteID store.ID
 }
 
 func (s *stubExpenses) List(_ context.Context, _ store.ID, f store.ExpenseFilter) ([]store.Expense, error) {
 	s.got = f
 	return s.list, nil
+}
+func (s *stubExpenses) Create(_ context.Context, _, _ store.ID, in store.ExpenseWrite) (store.Expense, error) {
+	s.createCalled = true
+	s.gotWrite = in
+	return s.created, nil
+}
+func (s *stubExpenses) Delete(_ context.Context, _, expenseID store.ID) (bool, error) {
+	s.gotDeleteID = expenseID
+	return s.deleteFound, nil
 }
 
 func TestList_PopulatedBankAndFilters(t *testing.T) {

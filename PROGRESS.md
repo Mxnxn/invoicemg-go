@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (160 of 209)
+## Routes ready (162 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -139,6 +139,8 @@ the 209 routes the Node API declares.
 | `POST /lifecycle/history/list` | a job's audit trail, newest-first | Live · Unit |
 | `POST /challan/getAll` | delivery challans; {code,data,status} with NO message | Live · Unit |
 | `POST /expense/list` (+ `GET /expenses`) | bank_id populated (#6); bank/from/to filters | Live · Unit |
+| `POST /expense/create` | requireCreate("batch_receive"); bank+date+positive-finite-amount guard (422); inserts a company-scoped expense and echoes it with the bank populated | Unit |
+| `POST /expense/remove` | requireDelete("batch_receive"); company-scoped hard delete; 422 no id, 404 miss | Unit |
 | `POST /batch-receive/lookups/open-jobs` | client's unpaid jobs (advance<total), oldest first, entryCount | Live · Unit |
 | `POST /batch-receive/create` | client lump payment; auto (oldest-first) or manual allocation; propagates to entries+invoices (applyJobPaymentDownstream) | Live · Unit |
 | `POST /batch-receive/delete` | reverses job advances + entry/invoice propagation, then removes; 404 on miss | Live · Unit |

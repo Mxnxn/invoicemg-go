@@ -1625,8 +1625,22 @@ type ExpenseFilter struct {
 	To     string
 }
 
+// ExpenseWrite is the writable field set of /expense/create.
+type ExpenseWrite struct {
+	BankID ID
+	Date   string
+	Amount float64
+	Notes  string
+}
+
 type Expenses interface {
 	List(ctx context.Context, companyID ID, f ExpenseFilter) ([]Expense, error)
+	// Create records a company-scoped expense owned by uid and returns it with the bank populated
+	// (Node's save + findById().populate). For /expense/create.
+	Create(ctx context.Context, companyID, uid ID, in ExpenseWrite) (Expense, error)
+	// Delete hard-deletes a company-scoped expense (Node's findOneAndDelete). found is false on a
+	// miss or another company's row. For /expense/remove.
+	Delete(ctx context.Context, companyID, expenseID ID) (found bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------
