@@ -13,6 +13,25 @@ type purchaseInvoices struct{ pool *pgxpool.Pool }
 
 func (s *Store) PurchaseInvoices() store.PurchaseInvoices { return &purchaseInvoices{pool: s.pool} }
 
+func (p *purchaseInvoices) Numbers(ctx context.Context, companyID store.ID) ([]string, error) {
+	rows, err := p.pool.Query(ctx, `SELECT invoice_number FROM purchase_invoices WHERE company_id=$1`, string(companyID))
+	if err != nil {
+		return nil, fmt.Errorf("purchase invoice numbers: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var n *string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		if n != nil {
+			out = append(out, *n)
+		}
+	}
+	return out, rows.Err()
+}
+
 func (p *purchaseInvoices) List(ctx context.Context, uid, companyID store.ID) ([]store.PurchaseInvoice, error) {
 	// populate supplier_id via LEFT JOIN on persons (#6); a dangling supplier yields NULLs -> nil.
 	rows, err := p.pool.Query(ctx, `

@@ -1051,6 +1051,8 @@ type PurchaseInvoices interface {
 	Update(ctx context.Context, uid, companyID, invoiceID ID, in PurchaseInvoiceUpdate) (PurchaseInvoice, PurchaseUpdateResult, error)
 	// Delete removes an invoice unless a supplier payment allocates to it (PurchaseDeleteHasPayment).
 	Delete(ctx context.Context, uid, companyID, invoiceID ID) (PurchaseDeleteStatus, error)
+	// Numbers returns a company's existing purchase invoice numbers, for the /next-number suggestion.
+	Numbers(ctx context.Context, companyID ID) ([]string, error)
 }
 
 // ---------------------------------------------------------------------------------------

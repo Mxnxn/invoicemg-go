@@ -5,14 +5,34 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/auth"
+	"github.com/mxnxn/invoicemg-go/internal/docnumber"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
 func invalid(w http.ResponseWriter, msg string) {
 	httpx.Write(w, httpx.Envelope{Code: 422, Message: msg, Status: httpx.False()})
+}
+
+// piClock is injectable so the suggested number's financial year is deterministic in tests.
+var piClock = func() time.Time { return time.Now().UTC() }
+
+// NextNumber is POST /purchase-invoice/next-number: a SUGGESTED next number, one past the highest
+// in this company's series. Suggested, not imposed - the field stays editable because a purchase
+// number often belongs to the supplier, not to us. Uses the hardcoded MG/<FY>/PINV- scheme like
+// the other next-number routes, pending the per-company numbering ripple.
+func (h *Handler) NextNumber(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	numbers, err := h.store.Numbers(r.Context(), sess.CompanyID)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	next := docnumber.Next(numbers, "PINV-", piClock())
+	httpx.Write(w, httpx.Envelope{Code: 200, Status: httpx.True(), Data: map[string]any{"invoiceNumber": next}})
 }
 
 // rawPurchaseRow is one submitted row before coercion. Numeric fields accept a string or number.

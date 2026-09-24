@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (162 of 209)
+## Routes ready (163 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -95,6 +95,7 @@ the 209 routes the Node API declares.
 | `POST /purchase-invoice/create` | rows coerced; total = Σ(qty·rate−disc+chg)·(1+gst/100); ≥1 row required | Live · Unit |
 | `POST /purchase-invoice/update` | partial edit; row change recomputes total, refused if below amount paid; 404 | Live · Unit |
 | `POST /purchase-invoice/delete` | blocked while a supplier payment allocates to it (JSONB `@>`); 404 on miss | Live · Unit |
+| `POST /purchase-invoice/next-number` | suggested (editable) next number, one past the highest in the company's series; hardcoded `MG/<FY>/PINV-` scheme pending the numbering ripple; new `PurchaseInvoices.Numbers` (sql+mongo) | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

@@ -19,6 +19,29 @@ type purchaseInvoices struct{ db *mongo.Database }
 
 func (s *Store) PurchaseInvoices() store.PurchaseInvoices { return &purchaseInvoices{db: s.db} }
 
+func (p *purchaseInvoices) Numbers(ctx context.Context, companyID store.ID) ([]string, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	cur, err := p.db.Collection(colPurchaseInvoices).Find(ctx, bson.M{"company_id": companyOID},
+		options.Find().SetProjection(bson.M{"invoiceNumber": 1}))
+	if err != nil {
+		return nil, fmt.Errorf("purchase invoice numbers: %w", err)
+	}
+	var docs []struct {
+		N string `bson:"invoiceNumber"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(docs))
+	for _, d := range docs {
+		out = append(out, d.N)
+	}
+	return out, nil
+}
+
 type purchaseRowDoc struct {
 	ID            primitive.ObjectID `bson:"_id"`
 	Description   string             `bson:"description"`

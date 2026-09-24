@@ -22,6 +22,7 @@ type stubPI struct {
 	deleteRes store.PurchaseDeleteStatus
 	gotCreate store.PurchaseInvoiceWrite
 	gotUpdate store.PurchaseInvoiceUpdate
+	numbers   []string
 }
 
 func (s *stubPI) List(_ context.Context, _, _ store.ID) ([]store.PurchaseInvoice, error) {
@@ -37,6 +38,31 @@ func (s *stubPI) Update(_ context.Context, _, _, _ store.ID, in store.PurchaseIn
 }
 func (s *stubPI) Delete(_ context.Context, _, _, _ store.ID) (store.PurchaseDeleteStatus, error) {
 	return s.deleteRes, nil
+}
+func (s *stubPI) Numbers(_ context.Context, _ store.ID) ([]string, error) {
+	return s.numbers, nil
+}
+
+func TestNextNumber_OnePastHighestInSeries(t *testing.T) {
+	piClock = func() time.Time { return time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC) } // FY 2025-2026
+	defer func() { piClock = func() time.Time { return time.Now().UTC() } }()
+
+	s := &stubPI{numbers: []string{"MG/25-26/PINV-00004", "MG/25-26/PINV-00002", "MG/24-25/PINV-00009"}}
+	r := httptest.NewRequest("POST", "/", nil)
+	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
+	rec := httptest.NewRecorder()
+	New(s).NextNumber(rec, r)
+
+	var out map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if out["code"] != float64(200) {
+		t.Fatalf("code = %v (%s)", out["code"], rec.Body.String())
+	}
+	data := out["data"].(map[string]any)
+	// Highest in THIS FY's PINV series is 00004; last year's 00009 is a different series, ignored.
+	if data["invoiceNumber"] != "MG/25-26/PINV-00005" {
+		t.Errorf("invoiceNumber = %v, want MG/25-26/PINV-00005", data["invoiceNumber"])
+	}
 }
 
 func serve(t *testing.T, s store.PurchaseInvoices) map[string]any {
