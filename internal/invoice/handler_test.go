@@ -82,6 +82,17 @@ func (s *stubCompanies) Deactivate(_ context.Context, _, _ store.ID) (store.Deac
 
 type stubUsers struct{ u store.User }
 
+// stubJobsX embeds store.Jobs so it satisfies the interface; only the methods the invoice routes
+// call are overridden.
+type stubJobsX struct {
+	store.Jobs
+	invoiceable []store.InvoiceableJob
+}
+
+func (s stubJobsX) InvoiceableJobs(_ context.Context, _, _ store.ID) ([]store.InvoiceableJob, error) {
+	return s.invoiceable, nil
+}
+
 func (s *stubUsers) UpdateProfile(_ context.Context, _ store.ID, _, _ string) (store.User, bool, error) {
 	return s.u, true, nil
 }
@@ -95,7 +106,7 @@ func (s *stubUsers) CreateSession(_ context.Context, _ store.NewSession) (store.
 
 func serve(t *testing.T, inv []store.Invoice, c store.Company, u store.User) map[string]any {
 	t.Helper()
-	h := New(&stubInvoices{list: inv}, &stubCompanies{c: c}, &stubUsers{u: u}, stubClientsX{}, "")
+	h := New(&stubInvoices{list: inv}, &stubCompanies{c: c}, &stubUsers{u: u}, stubClientsX{}, stubJobsX{}, "")
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
@@ -179,7 +190,7 @@ func postInv(t *testing.T, s *stubInvoices, fn func(*Handler) http.HandlerFunc, 
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
-	fn(New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, ""))(rec, r)
+	fn(New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, stubJobsX{}, ""))(rec, r)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("not json: %v (%s)", err, rec.Body.String())
@@ -189,7 +200,7 @@ func postInv(t *testing.T, s *stubInvoices, fn func(*Handler) http.HandlerFunc, 
 
 func TestNextNumber(t *testing.T) {
 	s := &stubInvoices{numbers: []string{"MG/26-27/INV-00002"}}
-	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, "")
+	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, stubJobsX{}, "")
 	now = func() time.Time { return time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC) }
 	defer func() { now = func() time.Time { return time.Now().UTC() } }()
 	r := httptest.NewRequest("POST", "/", nil)
@@ -294,7 +305,7 @@ func TestGet_RawShapeWithProfile(t *testing.T) {
 	}}
 	h := New(&stubInvoices{list: inv},
 		&stubCompanies{c: store.Company{Firm: "Manan LLP", Gst: "GST1", BankName: "HDFC"}},
-		&stubUsers{u: store.User{Name: "Owner", Email: "o@x.test"}}, stubClientsX{}, "")
+		&stubUsers{u: store.User{Name: "Owner", Email: "o@x.test"}}, stubClientsX{}, stubJobsX{}, "")
 	r := httptest.NewRequest("POST", "/", nil)
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))
 	rec := httptest.NewRecorder()
@@ -327,7 +338,7 @@ func TestGetClientInvoices(t *testing.T) {
 			Entries: []store.Entry{{ID: "e9", Amount: 999}}},
 	}
 	s := &stubInvoices{list: inv, receivedByClient: []store.InvoiceReceivedRow{{ID: "r1", Amount: 300, Date: "2026-09-12"}}}
-	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, "")
+	h := New(s, &stubCompanies{}, &stubUsers{}, stubClientsX{}, stubJobsX{}, "")
 	r := httptest.NewRequest("POST", "/", strings.NewReader("cid=c1"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r = r.WithContext(auth.WithSession(r.Context(), store.Session{UID: "u1", CompanyID: "co1"}))

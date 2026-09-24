@@ -1373,6 +1373,27 @@ type JobClient struct {
 	NotifyOnUpdate *bool
 }
 
+// InvoiceableRow is one job row as the invoice picker reads it: its queue and IGST, plus the base
+// amount / issued state of its entry (HasEntry false when the row is not yet converted).
+type InvoiceableRow struct {
+	EntryID   ID
+	Queue     string
+	Igst      float64
+	Amount    float64
+	HasIssued bool
+	HasEntry  bool
+}
+
+// InvoiceableJob is one of a client's jobs for /invoice/invoiceable-jobs.
+type InvoiceableJob struct {
+	ID            ID
+	ChallanNumber string
+	ReceivedDate  string
+	Queue         string
+	Total         float64
+	Rows          []InvoiceableRow
+}
+
 // JobRowEntry is the populated rows[].entry_id (has_issued/total/advance).
 type JobRowEntry struct {
 	ID        ID
@@ -1507,6 +1528,10 @@ type Jobs interface {
 	// job, and returns the created entries and the re-populated jobs. found is false when none of
 	// the jobs has a convertible row.
 	ConvertToEntries(ctx context.Context, uid, companyID ID, jobIDs []ID, actor NoteActor) (entries []Entry, jobs []Job, found bool, err error)
+	// InvoiceableJobs returns a client's jobs (newest first, capped at 200) with the row + entry
+	// state the invoice picker needs to decide what can be billed (/invoice/invoiceable-jobs). The
+	// per-row billable math and the "everything done" filter live in the handler.
+	InvoiceableJobs(ctx context.Context, companyID, clientID ID) ([]InvoiceableJob, error)
 }
 
 // JobRowPatch is one row submitted to /lifecycle/jobs/update. ID (the existing row's id) matches
