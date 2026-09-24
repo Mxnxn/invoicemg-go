@@ -424,6 +424,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /analytics/reviews", feature("analytics", analyticsHandler.Reviews))
 	mux.Handle("POST /analytics/payout-weekday", feature("analytics", analyticsHandler.PayoutWeekday))
 	mux.Handle("POST /analytics/cashflow", feature("analytics", analyticsHandler.Cashflow))
+	mux.Handle("POST /analytics/production/wip", feature("analytics", analyticsHandler.ProductionWip))
+	mux.Handle("POST /analytics/production/throughput", feature("analytics", analyticsHandler.ProductionThroughput))
 
 	mux.Handle("POST /gst-report", feature("gst_report", gstHandler.Report))
 

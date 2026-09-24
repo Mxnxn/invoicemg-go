@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (164 of 209)
+## Routes ready (166 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -158,6 +158,8 @@ the 209 routes the Node API declares.
 | `POST /wastage/remove` | requireDelete(challan); hard-delete a company-scoped wastage row; 422 missing id, 404 on miss | Unit |
 | `POST /analytics/revenue` | Revenue trend; weekly/monthly/yearly buckets; Invoiced/All switch | Unit |
 | `POST /analytics/cashflow` | Cashflow tab: period totals, monthly series, cogsCoverage, best/worst margins; trailing-year default; cash vs profit from different sources | Live · Unit |
+| `POST /analytics/production/wip` | Operations WIP panel: open cards bucketed by stage/holder/age; dwell from the last "Queue advanced" (falls back to card creation, flags `agesExact`); rowless job = one card; new `internal/stagetiming` + `Analytics.ProductionWip` (sql+mongo, holder names resolved) | Unit |
+| `POST /analytics/production/throughput` | Operations throughput: weekly/monthly completed trend, per-actor counts, job cycle-time median/p90; only Done transitions/all-Done jobs counted; new `Analytics.ProductionThroughput` (sql+mongo) | Unit |
 | `POST /ledger/client` | client statement; bills+receipts, RoundOff strings, opening/closing/current balances; from/to window; 422/404 | Live · Unit |
 | `POST /ledger/dues` | all-client receivables; shared dues math (ties to /client); numbers not strings; deleted clients dropped; server-side totals | Live · Unit |
 | `POST /purchase-report/dues` | payables twin of /ledger/dues: per-supplier billed/paid/due + totals, due-sorted, numbers not strings | Live · Unit |
@@ -299,7 +301,10 @@ Still blocking a Node-free frontend:
     live Node diff. The infra to fix them (JobTxLocked, isJobInvoiced, structured histEntry) now exists.
 - **User account** (`/user/password/request-reset`, `/user/totp/reveal`, `/user/register`) —
   TOTP reveal depends on the unported TOTP (#10); request-reset likely involves email.
-- **Analytics production** (`/analytics/production/throughput`, `/analytics/production/wip`).
+- **Analytics production** (`/analytics/production/throughput`, `/analytics/production/wip`): **DONE**
+  — ported via the new pure `internal/stagetiming` (parse "Queue advanced", fold stage, age
+  bucket, median/percentile) + `Analytics.ProductionWip`/`ProductionThroughput` in both backends.
+  Unit-tested; not yet Node-diffed.
 
 Two audit-fidelity items still have no ported route to exercise them: **#25** (body-size limits)
 and **#27** (XLSX exports). Everything else in `docs/MIGRATION-AUDIT.md` (#1, #5, #6, #19–24, #26,

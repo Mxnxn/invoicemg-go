@@ -665,6 +665,50 @@ type Companies interface {
 	Scope(ctx context.Context, companyID, uid ID) (companyIDs []ID, shared bool, labels map[ID]string, err error)
 }
 
+// ProductionCard is one work card for the WIP panel: a job's row, or the whole job when it
+// predates per-row tracking (Key ""). Key is the per-job grouping key (rowId, or the row's id when
+// rowId is blank).
+type ProductionCard struct {
+	JobID      ID
+	Key        string
+	Queue      string
+	EmployeeID ID
+	CreatedAt  time.Time
+}
+
+// ProductionEvent is a "Queue advanced" job-history row (structured fields where present, else the
+// display detail string).
+type ProductionEvent struct {
+	JobID     ID
+	Detail    string
+	FromStage string
+	ToStage   string
+	RowKey    string
+	ActorName string
+	CreatedAt time.Time
+}
+
+// ProductionWipData is the raw input to /analytics/production/wip.
+type ProductionWipData struct {
+	Cards       []ProductionCard
+	Events      []ProductionEvent
+	PersonNames map[ID]string
+}
+
+// ProductionDoneJob is a job's create/finish span plus its rows' queues, for cycle time.
+type ProductionDoneJob struct {
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Queue     string
+	RowQueues []string
+}
+
+// ProductionThroughputData is the raw input to /analytics/production/throughput.
+type ProductionThroughputData struct {
+	Events   []ProductionEvent
+	DoneJobs []ProductionDoneJob
+}
+
 // ---------------------------------------------------------------------------------------
 // Materials (products)
 // ---------------------------------------------------------------------------------------
@@ -1771,6 +1815,12 @@ type Analytics interface {
 	// Cashflow returns the cashflow dashboard's raw inputs (all company-scoped, dates
 	// normalized). The handler does the date filtering, month bucketing, and cost matching.
 	Cashflow(ctx context.Context, companyID ID) (CashflowData, error)
+	// ProductionWip gathers the open-work cards, the "Queue advanced" history (ascending) and the
+	// holder names for /analytics/production/wip. A job with no rows is itself one card.
+	ProductionWip(ctx context.Context, companyID ID) (ProductionWipData, error)
+	// ProductionThroughput gathers the "Queue advanced" events since windowStart and the jobs
+	// created since then (with their row queues) for /analytics/production/throughput.
+	ProductionThroughput(ctx context.Context, companyID ID, windowStart time.Time) (ProductionThroughputData, error)
 }
 
 // CashflowRow is a dated money row (receipts, transfers, supplier payments, purchase invoices).

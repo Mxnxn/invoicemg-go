@@ -17,10 +17,22 @@ type stubAnalytics struct {
 	billed, collected []store.DatedAmount
 	gotSource         string
 	cashflow          store.CashflowData
+	wip               store.ProductionWipData
+	throughput        store.ProductionThroughputData
+	gotWindowStart    time.Time
 }
 
 func (s *stubAnalytics) Cashflow(_ context.Context, _ store.ID) (store.CashflowData, error) {
 	return s.cashflow, nil
+}
+
+func (s *stubAnalytics) ProductionWip(_ context.Context, _ store.ID) (store.ProductionWipData, error) {
+	return s.wip, nil
+}
+
+func (s *stubAnalytics) ProductionThroughput(_ context.Context, _ store.ID, windowStart time.Time) (store.ProductionThroughputData, error) {
+	s.gotWindowStart = windowStart
+	return s.throughput, nil
 }
 
 func (s *stubAnalytics) TopSales(_ context.Context, _ store.ID) ([]store.ClientRank, error) {
