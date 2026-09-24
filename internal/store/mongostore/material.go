@@ -248,6 +248,122 @@ func (m *materials) SetUnit(ctx context.Context, companyID, materialID store.ID,
 	return "", "", false, false, fmt.Errorf("set unit borrow check: %w", err)
 }
 
+// sharingDoc is the projection of a record's sharing.companies list, shared by the sharing
+// get/set reads. A nil pointer is a legacy record with no sharing block, read as empty.
+type sharingDoc struct {
+	Sharing *struct {
+		Companies []primitive.ObjectID `bson:"companies"`
+	} `bson:"sharing"`
+}
+
+// storeIDs turns a decoded sharingDoc's companies into store IDs (empty, never nil, on legacy).
+func storeIDs(d sharingDoc) []store.ID {
+	if d.Sharing == nil {
+		return []store.ID{}
+	}
+	out := make([]store.ID, 0, len(d.Sharing.Companies))
+	for _, oid := range d.Sharing.Companies {
+		out = append(out, idOf(oid))
+	}
+	return out
+}
+
+func (m *materials) OwnedSharing(ctx context.Context, companyID, materialID store.ID) ([]store.ID, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, false, err
+	}
+	matOID, err := objectID(materialID)
+	if err != nil {
+		return nil, false, err
+	}
+	var doc sharingDoc
+	err = m.db.Collection(colMaterials).FindOne(ctx,
+		bson.M{"_id": matOID, "company_id": companyOID},
+		options.FindOne().SetProjection(bson.M{"sharing.companies": 1})).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("material owned sharing: %w", err)
+	}
+	return storeIDs(doc), true, nil
+}
+
+func (m *materials) SetSharing(ctx context.Context, companyID, materialID store.ID, companies []store.ID) ([]store.ID, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, false, err
+	}
+	matOID, err := objectID(materialID)
+	if err != nil {
+		return nil, false, err
+	}
+	compOIDs, err := objectIDs(companies)
+	if err != nil {
+		return nil, false, err
+	}
+	if compOIDs == nil {
+		compOIDs = []primitive.ObjectID{}
+	}
+	var updated sharingDoc
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(bson.M{"sharing.companies": 1})
+	err = m.db.Collection(colMaterials).FindOneAndUpdate(ctx,
+		bson.M{"_id": matOID, "company_id": companyOID},
+		bson.M{"$set": bson.M{"sharing.companies": compOIDs}}, opts).Decode(&updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("material set sharing: %w", err)
+	}
+	return storeIDs(updated), true, nil
+}
+
+func (m *materials) DuplicatesSource(ctx context.Context, companyIDs []store.ID) ([]store.MaterialDuplicate, error) {
+	oids, err := objectIDs(companyIDs)
+	if err != nil {
+		return nil, err
+	}
+	proj := bson.M{"material_name": 1, "material_rate": 1, "purchase_rate": 1, "hsn": 1, "unit": 1, "company_id": 1, "sharing.companies": 1}
+	cur, err := m.db.Collection(colMaterials).Find(ctx, bson.M{"company_id": bson.M{"$in": oids}},
+		options.Find().SetProjection(proj).SetSort(bson.D{{Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("duplicate materials source: %w", err)
+	}
+	defer cur.Close(ctx)
+	var docs []struct {
+		ID           primitive.ObjectID  `bson:"_id"`
+		MaterialName string              `bson:"material_name"`
+		MaterialRate float64             `bson:"material_rate"`
+		PurchaseRate float64             `bson:"purchase_rate"`
+		Hsn          string              `bson:"hsn"`
+		Unit         string              `bson:"unit"`
+		CompanyID    *primitive.ObjectID `bson:"company_id"`
+		Sharing      *struct {
+			Companies []primitive.ObjectID `bson:"companies"`
+		} `bson:"sharing"`
+	}
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.MaterialDuplicate, 0, len(docs))
+	for _, d := range docs {
+		md := store.MaterialDuplicate{
+			ID: idOf(d.ID), MaterialName: d.MaterialName, MaterialRate: d.MaterialRate,
+			PurchaseRate: d.PurchaseRate, Hsn: d.Hsn, Unit: d.Unit,
+		}
+		if d.CompanyID != nil {
+			md.CompanyID = idOf(*d.CompanyID)
+		}
+		if d.Sharing != nil {
+			md.SharedWith = len(d.Sharing.Companies)
+		}
+		out = append(out, md)
+	}
+	return out, nil
+}
+
 func (m *materials) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedMaterial, error) {
 	oids, err := objectIDs(companyIDs)
 	if err != nil {

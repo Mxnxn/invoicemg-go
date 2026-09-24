@@ -212,6 +212,79 @@ func (m *materials) SetUnit(ctx context.Context, companyID, materialID store.ID,
 	return "", "", false, exists, nil
 }
 
+func (m *materials) OwnedSharing(ctx context.Context, companyID, materialID store.ID) ([]store.ID, bool, error) {
+	var shared []string
+	err := m.pool.QueryRow(ctx,
+		`SELECT shared_company_ids FROM materials WHERE id = $1 AND company_id = $2`,
+		string(materialID), string(companyID)).Scan(&shared)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("material owned sharing: %w", err)
+	}
+	out := make([]store.ID, 0, len(shared))
+	for _, id := range shared {
+		out = append(out, store.ID(id))
+	}
+	return out, true, nil
+}
+
+func (m *materials) SetSharing(ctx context.Context, companyID, materialID store.ID, companies []store.ID) ([]store.ID, bool, error) {
+	arr := make([]string, 0, len(companies))
+	for _, id := range companies {
+		arr = append(arr, string(id))
+	}
+	var stored []string
+	err := m.pool.QueryRow(ctx,
+		`UPDATE materials SET shared_company_ids = $1, updated_at = now()
+		  WHERE id = $2 AND company_id = $3
+	  RETURNING shared_company_ids`,
+		arr, string(materialID), string(companyID)).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("material set sharing: %w", err)
+	}
+	out := make([]store.ID, 0, len(stored))
+	for _, id := range stored {
+		out = append(out, store.ID(id))
+	}
+	return out, true, nil
+}
+
+func (m *materials) DuplicatesSource(ctx context.Context, companyIDs []store.ID) ([]store.MaterialDuplicate, error) {
+	ids := make([]string, 0, len(companyIDs))
+	for _, id := range companyIDs {
+		ids = append(ids, string(id))
+	}
+	rows, err := m.pool.Query(ctx, `
+		SELECT id, material_name, material_rate, purchase_rate, hsn, unit, company_id,
+		       coalesce(cardinality(shared_company_ids), 0)
+		  FROM materials
+		 WHERE company_id = ANY ($1)
+		 ORDER BY id ASC`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("duplicate materials source: %w", err)
+	}
+	defer rows.Close()
+	out := make([]store.MaterialDuplicate, 0)
+	for rows.Next() {
+		var d store.MaterialDuplicate
+		var companyIDCol *string
+		if err := rows.Scan(&d.ID, &d.MaterialName, &d.MaterialRate, &d.PurchaseRate,
+			&d.Hsn, &d.Unit, &companyIDCol, &d.SharedWith); err != nil {
+			return nil, fmt.Errorf("reading duplicate materials: %w", err)
+		}
+		if companyIDCol != nil {
+			d.CompanyID = store.ID(*companyIDCol)
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 func (m *materials) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedMaterial, error) {
 	ids := make([]string, 0, len(companyIDs))
 	for _, id := range companyIDs {

@@ -94,6 +94,12 @@ func (s *stubClients) NotifyPreferences(_ context.Context, companyID store.ID, a
 func (s *stubClients) SharedList(context.Context, []store.ID) ([]store.SharedClient, error) {
 	return nil, nil
 }
+func (s *stubClients) OwnedSharing(context.Context, store.ID, store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s *stubClients) SetSharing(context.Context, store.ID, store.ID, []store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
 
 func boolPtr(b bool) *bool { return &b }
 

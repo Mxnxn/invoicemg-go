@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (157 of 209)
+## Routes ready (160 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -64,6 +64,9 @@ the 209 routes the Node API declares.
 | `POST /company/sharing` | admin; flip the acting company's `reportsAcrossCompanies` toggle via `SetReportsAcrossCompanies` (fail-closed: only `"true"` turns it on); 404 no-company / company-gone; echoes `{reportsAcrossCompanies}` | Unit |
 | `GET /shared/customers` | requireFeature("customers"); cross-account customer report over `Companies.Scope` (widens only when the toggle is on) + `Clients.SharedList`; each row tagged with its owning company label; `duplicates` = phone numbers seen in >1 company; never a picker source | Unit |
 | `GET /shared/materials` | requireFeature("products"); product twin of /shared/customers over `Materials.SharedList`; `duplicates` on the (case-folded) product name | Unit |
+| `GET /shared/duplicate-materials` | requireFeature("products"); the owner's FULL company set (never the toggle scope) grouped by `InventoryMath.NormaliseKey`; groups >1 only, each with copies (per-company rate + `sharedWith`), distinct companies, `priceMismatch`, lowest/highest rate; heading = longest spelling. New `Materials.DuplicatesSource` (sql+mongo) | Unit |
+| `POST /sharing/preview` | admin; kind material\|client, `ownedScope`; `companiesLosingAccess(before,after)` + names the losing companies this admin owns; `requiresConfirmation` counts ALL losing; 422 bad-kind/no-id, 404 miss. New `Materials/Clients.OwnedSharing` (sql+mongo) | Unit |
+| `POST /sharing/set` | admin; filters requested companies to owner-owned, always keeps the acting company, replaces `sharing.companies` under `ownedScope`; echoes `{companies}`; 422/404. New `Materials/Clients.SetSharing` (sql+mongo) | Unit |
 | `POST /userinfo/get` | admin profile (user ⨝ company) | Live · Unit |
 | `POST /userinfo/add` | admin; save the company letterhead (phone/firm/address/gst + optional bank fields), return refreshed profile; 422 "Invalid GST number."/404 | Live · Unit |
 | `POST /userinfo/update` | admin; save company letterhead + the user's own email/name; 422 "Invalid GST number."/404 | Live · Unit |
@@ -268,12 +271,14 @@ Still blocking a Node-free frontend:
     tally; `/company/sharing` (admin) flips the toggle via `SetReportsAcrossCompanies`. Unit-tested
     (scope/labels/duplicates, fail-closed toggle, 404s). ⚠️ Not yet Node-diffed with
     `scripts/parity.js` — the ROUTES.md boxes stay unchecked.
-  - `GET /shared/duplicate-materials` and the write pair `POST /sharing/preview` + `/sharing/set`
-    still need NEW store surface: the owner's full company set with a per-record `sharing` count
-    (duplicate-materials, grouped on `InventoryMath.normaliseKey`), and read/write of a record's
-    `sharing.companies` under `ownedScope` plus `companiesLosingAccess` (the preview/set writes).
-    Node source: `InvoiceMG-Mxnxn/invoice-mg-api/routes/{Shared,Sharing}.js`,
-    `Helpers/{CompanyScope,SharedRecords}.js`.
+  - **DONE** — `GET /shared/duplicate-materials`, `POST /sharing/preview`, `POST /sharing/set`.
+    New store surface landed in BOTH backends: `Materials.DuplicatesSource` (owner's full set with a
+    per-record `sharedWith` count), and `Materials/Clients.OwnedSharing` + `SetSharing` (read/write
+    `sharing.companies` under `ownedScope`). `companiesLosingAccess` + `parseCompanies` are pure
+    helpers in the new `internal/sharing` handler. Unit-tested (grouping/priceMismatch, losing-set,
+    owned-filter + acting-company keep, 422/404). ⚠️ Not Node-diffed — the localeCompare tie-breaks
+    on the duplicate report and the losing-company ordering want a live diff before the ROUTES.md
+    boxes tick.
   - ⚠️ The store interface additions (`Scope`, `SetReportsAcrossCompanies`, `SharedList`) had
     briefly BROKEN the build (unimplemented in sqlstore + an undefined `objectIDs` in mongostore +
     lagging test stubs); that is fixed — `go build ./...` and `go test ./...` are both green again.

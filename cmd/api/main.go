@@ -48,6 +48,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/quotation"
 	"github.com/mxnxn/invoicemg-go/internal/settings"
 	"github.com/mxnxn/invoicemg-go/internal/shared"
+	"github.com/mxnxn/invoicemg-go/internal/sharing"
 	"github.com/mxnxn/invoicemg-go/internal/sheet"
 	"github.com/mxnxn/invoicemg-go/internal/statistics"
 	"github.com/mxnxn/invoicemg-go/internal/store"
@@ -186,6 +187,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
 	sharedHandler := shared.New(db.Companies(), db.Clients(), db.Materials())
+	sharingHandler := sharing.New(db.Companies(), db.Materials(), db.Clients())
 	settingsHandler := settings.New(db.Settings())
 	userinfoHandler := userinfo.New(db.Users(), db.Companies(), uploadsDir)
 	whatsappHandler := whatsapp.New(os.Getenv("WHATSAPP_VERIFY_TOKEN"), db.Companies())
@@ -279,6 +281,11 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	// per-company lists they widen. Never a picker's source - see internal/shared.
 	mux.Handle("GET /shared/customers", feature("customers", sharedHandler.Customers))
 	mux.Handle("GET /shared/materials", feature("products", sharedHandler.Materials))
+	mux.Handle("GET /shared/duplicate-materials", feature("products", sharedHandler.DuplicateMaterials))
+
+	// Per-record sharing writes (routes/Sharing.js), admin-only and owned-scoped.
+	mux.Handle("POST /sharing/preview", admin(sharingHandler.Preview))
+	mux.Handle("POST /sharing/set", admin(sharingHandler.Set))
 	mux.Handle("POST /userinfo/get", admin(userinfoHandler.Get))
 	mux.Handle("POST /userinfo/add", admin(userinfoHandler.Add))
 	mux.Handle("POST /userinfo/update", admin(userinfoHandler.Update))

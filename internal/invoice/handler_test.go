@@ -374,6 +374,12 @@ func (s stubClientsX) Visible(context.Context, store.ID, store.ID) ([]store.Clie
 func (s stubClientsX) SharedList(context.Context, []store.ID) ([]store.SharedClient, error) {
 	return nil, nil
 }
+func (s stubClientsX) OwnedSharing(context.Context, store.ID, store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s stubClientsX) SetSharing(context.Context, store.ID, store.ID, []store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
 func (s stubClientsX) Create(context.Context, store.ID, store.ID, int64, store.ClientWrite) (store.Client, store.Dup, error) {
 	return store.Client{}, "", nil
 }

@@ -455,6 +455,13 @@ type Clients interface {
 	// SharedList returns the projected customers across a set of companies (firm-sorted), for the
 	// /shared/customers report. Read-only and caller-scoped to the owner's companies.
 	SharedList(ctx context.Context, companyIDs []ID) ([]SharedClient, error)
+	// OwnedSharing returns a company-OWNED customer's sharing.companies list (ownedScope, never
+	// widened - Helpers/SharedRecords.ownedScope). found is false on a miss or another company's
+	// row. For /sharing/preview.
+	OwnedSharing(ctx context.Context, companyID, clientID ID) (companies []ID, found bool, err error)
+	// SetSharing replaces a company-OWNED customer's sharing.companies (ownedScope) and returns the
+	// stored list. found is false on a miss. For /sharing/set.
+	SetSharing(ctx context.Context, companyID, clientID ID, companies []ID) (stored []ID, found bool, err error)
 	// SetNotifyPreference sets ONE tri-state notify flag (field is "notifyOnCreate" or
 	// "notifyOnUpdate"; value nil clears to null "ask each time") on a company-scoped client and
 	// returns BOTH flags as stored. found is false on a miss. field is whitelisted by the store.
@@ -485,6 +492,20 @@ type SharedMaterial struct {
 	Hsn          string
 	Unit         string
 	CompanyID    ID
+}
+
+// MaterialDuplicate is the /shared/duplicate-materials source row: a product plus how many
+// companies it is shared with (SharedWith = len(sharing.companies)). The handler groups these by
+// InventoryMath.normaliseKey to surface the same product entered separately in two companies.
+type MaterialDuplicate struct {
+	ID           ID
+	MaterialName string
+	MaterialRate float64
+	PurchaseRate float64
+	Hsn          string
+	Unit         string
+	CompanyID    ID
+	SharedWith   int
 }
 
 // ClientNotify is the /client/notify-preferences projection: a customer plus their two tri-state
@@ -672,6 +693,16 @@ type Materials interface {
 	// SharedList returns the projected products across a set of companies (name-sorted), for the
 	// /shared/materials report. Read-only and caller-scoped to the owner's companies.
 	SharedList(ctx context.Context, companyIDs []ID) ([]SharedMaterial, error)
+	// OwnedSharing returns a company-OWNED product's sharing.companies list (ownedScope, never
+	// widened). found is false on a miss or another company's product. For /sharing/preview.
+	OwnedSharing(ctx context.Context, companyID, materialID ID) (companies []ID, found bool, err error)
+	// SetSharing replaces a company-OWNED product's sharing.companies (ownedScope) and returns the
+	// stored list. found is false on a miss. For /sharing/set.
+	SetSharing(ctx context.Context, companyID, materialID ID, companies []ID) (stored []ID, found bool, err error)
+	// DuplicatesSource returns every product across the owner's full company set with its
+	// shared-with count, for /shared/duplicate-materials (grouped by normalised name in the
+	// handler). Always the owner's whole set, never the report toggle's scope.
+	DuplicatesSource(ctx context.Context, companyIDs []ID) ([]MaterialDuplicate, error)
 	// SetUnit sets a company-OWNED product's unit (ownedScope, not sharing-widened) and returns
 	// its name+unit. found is false when no owned product matches; borrowed is true when the id
 	// exists but belongs to another company (shared in), so the handler can name that case.

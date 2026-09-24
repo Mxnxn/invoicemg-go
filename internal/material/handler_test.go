@@ -43,6 +43,15 @@ func (s *stubMaterials) SetUnit(context.Context, store.ID, store.ID, string) (st
 func (s *stubMaterials) SharedList(context.Context, []store.ID) ([]store.SharedMaterial, error) {
 	return nil, nil
 }
+func (s *stubMaterials) OwnedSharing(context.Context, store.ID, store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s *stubMaterials) SetSharing(context.Context, store.ID, store.ID, []store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s *stubMaterials) DuplicatesSource(context.Context, []store.ID) ([]store.MaterialDuplicate, error) {
+	return nil, nil
+}
 
 // writeStub drives the write-path tests.
 type writeStub struct {
@@ -84,6 +93,15 @@ func (s *writeStub) SetUnit(_ context.Context, _, id store.ID, unit string) (str
 	return s.setName, s.setUnit, s.setFound, s.setBorrowed, nil
 }
 func (s *writeStub) SharedList(context.Context, []store.ID) ([]store.SharedMaterial, error) {
+	return nil, nil
+}
+func (s *writeStub) OwnedSharing(context.Context, store.ID, store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s *writeStub) SetSharing(context.Context, store.ID, store.ID, []store.ID) ([]store.ID, bool, error) {
+	return nil, false, nil
+}
+func (s *writeStub) DuplicatesSource(context.Context, []store.ID) ([]store.MaterialDuplicate, error) {
 	return nil, nil
 }
 

@@ -314,6 +314,58 @@ func (c *clients) NotifyPreferences(ctx context.Context, companyID store.ID, ans
 	return out, nil
 }
 
+func (c *clients) OwnedSharing(ctx context.Context, companyID, clientID store.ID) ([]store.ID, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, false, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return nil, false, err
+	}
+	var doc sharingDoc
+	err = c.db.Collection(colClients).FindOne(ctx,
+		bson.M{"_id": clientOID, "company_id": companyOID},
+		options.FindOne().SetProjection(bson.M{"sharing.companies": 1})).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("client owned sharing: %w", err)
+	}
+	return storeIDs(doc), true, nil
+}
+
+func (c *clients) SetSharing(ctx context.Context, companyID, clientID store.ID, companies []store.ID) ([]store.ID, bool, error) {
+	companyOID, err := objectID(companyID)
+	if err != nil {
+		return nil, false, err
+	}
+	clientOID, err := objectID(clientID)
+	if err != nil {
+		return nil, false, err
+	}
+	compOIDs, err := objectIDs(companies)
+	if err != nil {
+		return nil, false, err
+	}
+	if compOIDs == nil {
+		compOIDs = []primitive.ObjectID{}
+	}
+	var updated sharingDoc
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(bson.M{"sharing.companies": 1})
+	err = c.db.Collection(colClients).FindOneAndUpdate(ctx,
+		bson.M{"_id": clientOID, "company_id": companyOID},
+		bson.M{"$set": bson.M{"sharing.companies": compOIDs}}, opts).Decode(&updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("client set sharing: %w", err)
+	}
+	return storeIDs(updated), true, nil
+}
+
 func (c *clients) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedClient, error) {
 	oids, err := objectIDs(companyIDs)
 	if err != nil {

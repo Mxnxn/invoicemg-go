@@ -15,16 +15,23 @@ import (
 // one method these reports call; any other call would nil-panic, which is the point.
 type stubCompanies struct {
 	store.Companies
-	ids    []store.ID
-	shared bool
-	labels map[store.ID]string
-	gotID  store.ID
-	gotUID store.ID
+	ids     []store.ID
+	shared  bool
+	labels  map[store.ID]string
+	gotID   store.ID
+	gotUID  store.ID
+	list    []store.Company
+	gotList store.ID
 }
 
 func (s *stubCompanies) Scope(_ context.Context, companyID, uid store.ID) ([]store.ID, bool, map[store.ID]string, error) {
 	s.gotID, s.gotUID = companyID, uid
 	return s.ids, s.shared, s.labels, nil
+}
+
+func (s *stubCompanies) List(_ context.Context, uid store.ID) ([]store.Company, error) {
+	s.gotList = uid
+	return s.list, nil
 }
 
 type stubClients struct {
@@ -41,10 +48,15 @@ func (s *stubClients) SharedList(_ context.Context, ids []store.ID) ([]store.Sha
 type stubMaterials struct {
 	store.Materials
 	list []store.SharedMaterial
+	dups []store.MaterialDuplicate
 }
 
 func (s *stubMaterials) SharedList(_ context.Context, _ []store.ID) ([]store.SharedMaterial, error) {
 	return s.list, nil
+}
+
+func (s *stubMaterials) DuplicatesSource(_ context.Context, _ []store.ID) ([]store.MaterialDuplicate, error) {
+	return s.dups, nil
 }
 
 func req(sess store.Session) *http.Request {

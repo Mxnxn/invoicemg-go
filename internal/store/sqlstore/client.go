@@ -215,6 +215,48 @@ func (c *clients) NotifyPreferences(ctx context.Context, companyID store.ID, ans
 	return out, rows.Err()
 }
 
+func (c *clients) OwnedSharing(ctx context.Context, companyID, clientID store.ID) ([]store.ID, bool, error) {
+	var shared []string
+	err := c.pool.QueryRow(ctx,
+		`SELECT shared_company_ids FROM clients WHERE id = $1 AND company_id = $2`,
+		string(clientID), string(companyID)).Scan(&shared)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("client owned sharing: %w", err)
+	}
+	out := make([]store.ID, 0, len(shared))
+	for _, id := range shared {
+		out = append(out, store.ID(id))
+	}
+	return out, true, nil
+}
+
+func (c *clients) SetSharing(ctx context.Context, companyID, clientID store.ID, companies []store.ID) ([]store.ID, bool, error) {
+	arr := make([]string, 0, len(companies))
+	for _, id := range companies {
+		arr = append(arr, string(id))
+	}
+	var stored []string
+	err := c.pool.QueryRow(ctx,
+		`UPDATE clients SET shared_company_ids = $1, updated_at = now()
+		  WHERE id = $2 AND company_id = $3
+	  RETURNING shared_company_ids`,
+		arr, string(clientID), string(companyID)).Scan(&stored)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("client set sharing: %w", err)
+	}
+	out := make([]store.ID, 0, len(stored))
+	for _, id := range stored {
+		out = append(out, store.ID(id))
+	}
+	return out, true, nil
+}
+
 func (c *clients) SharedList(ctx context.Context, companyIDs []store.ID) ([]store.SharedClient, error) {
 	ids := make([]string, 0, len(companyIDs))
 	for _, id := range companyIDs {
