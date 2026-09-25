@@ -376,6 +376,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /purchase-order/pending-approvals", feature("purchase_orders", purchaseOrderHandler.PendingApprovals, auth.RequireFeature("purchase_orders_approve")))
 	mux.Handle("POST /purchase-order/approvals/dismiss", feature("purchase_orders", purchaseOrderHandler.ApprovalsDismiss, auth.RequireFeature("purchase_orders_approve")))
 	mux.Handle("POST /purchase-order/convert", feature("purchase_orders", purchaseOrderHandler.Convert, auth.RequireCreate("purchase_invoices")))
+	mux.Handle("POST /purchase-order/share", feature("purchase_orders", purchaseOrderHandler.Share, auth.RequireFeature("purchase_orders_send")))
+	mux.Handle("POST /purchase-order/confirm", feature("purchase_orders", purchaseOrderHandler.Confirm, auth.RequireFeature("purchase_orders_send")))
 
 	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
 	// the populated entries and computed totals. Only /getAll is ported.

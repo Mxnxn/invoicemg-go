@@ -47,8 +47,10 @@ type stubPO struct {
 	convertInvoiceID store.ID
 	gotConvertNumber string
 
-	public      store.PublicPO
-	publicFound bool
+	public          store.PublicPO
+	publicFound     bool
+	recordSendFound bool
+	gotSendKind     string
 }
 
 func (s *stubPO) Numbers(context.Context, store.ID, store.ID) ([]string, error) { return s.numbers, nil }
@@ -95,6 +97,10 @@ func (s *stubPO) Convert(_ context.Context, _, _, _ store.ID, _ store.NoteActor,
 }
 func (s *stubPO) PublicView(context.Context, store.ID, store.ID) (store.PublicPO, bool, error) {
 	return s.public, s.publicFound, nil
+}
+func (s *stubPO) RecordSend(_ context.Context, _, _, _ store.ID, kind, _ string) (store.PurchaseOrder, bool, error) {
+	s.gotSendKind = kind
+	return s.actionPO, s.recordSendFound, nil
 }
 
 func TestNextNumber(t *testing.T) {

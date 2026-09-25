@@ -192,3 +192,28 @@ func (p *purchaseOrders) Convert(ctx context.Context, uid, companyID, poID store
 	out, _, err := p.loadOne(ctx, uid, companyID, poID)
 	return out, idOf(invOID), store.POActionOK, err
 }
+
+func (p *purchaseOrders) RecordSend(ctx context.Context, uid, companyID, poID store.ID, kind, sendFingerprint string) (store.PurchaseOrder, bool, error) {
+	poOID, err := objectID(poID)
+	if err != nil {
+		return store.PurchaseOrder{}, false, nil
+	}
+	uidOID, _ := objectID(uid)
+	companyOID, _ := objectID(companyID)
+	now := time.Now().UTC()
+	var update bson.M
+	if kind == "confirm" {
+		update = bson.M{"$set": bson.M{"alerts.confirm.sentAt": now, "updatedAt": now}, "$inc": bson.M{"alerts.confirm.count": 1}}
+	} else {
+		update = bson.M{"$set": bson.M{"alerts.sent.fingerprint": sendFingerprint, "alerts.sent.sentAt": now, "updatedAt": now}, "$inc": bson.M{"alerts.sent.count": 1}}
+	}
+	res, err := p.db.Collection(colPurchaseOrders).UpdateOne(ctx, bson.M{"_id": poOID, "uid": uidOID, "company_id": companyOID}, update)
+	if err != nil {
+		return store.PurchaseOrder{}, false, fmt.Errorf("po record send: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return store.PurchaseOrder{}, false, nil
+	}
+	po, _, err := p.loadOne(ctx, uid, companyID, poID)
+	return po, true, err
+}

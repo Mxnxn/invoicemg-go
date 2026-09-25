@@ -218,3 +218,24 @@ func (p *purchaseOrders) Convert(ctx context.Context, uid, companyID, poID store
 	out, _, err := p.loadOne(ctx, uid, companyID, poID)
 	return out, store.ID(invID), store.POActionOK, err
 }
+
+func (p *purchaseOrders) RecordSend(ctx context.Context, uid, companyID, poID store.ID, kind, sendFingerprint string) (store.PurchaseOrder, bool, error) {
+	var sql string
+	var args []any
+	if kind == "confirm" {
+		sql = `UPDATE purchase_orders SET confirm_sent_at=now(), updated_at=now() WHERE id=$1 AND uid=$2 AND company_id=$3`
+		args = []any{string(poID), string(uid), string(companyID)}
+	} else {
+		sql = `UPDATE purchase_orders SET sent_fingerprint=$4, sent_at=now(), sent_count=sent_count+1, updated_at=now() WHERE id=$1 AND uid=$2 AND company_id=$3`
+		args = []any{string(poID), string(uid), string(companyID), sendFingerprint}
+	}
+	tag, err := p.pool.Exec(ctx, sql, args...)
+	if err != nil {
+		return store.PurchaseOrder{}, false, fmt.Errorf("po record send: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return store.PurchaseOrder{}, false, nil
+	}
+	po, _, err := p.loadOne(ctx, uid, companyID, poID)
+	return po, true, err
+}

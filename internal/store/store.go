@@ -1422,6 +1422,10 @@ type PurchaseOrders interface {
 	// logs "Converted to Purchase Invoice". status is NotFound, Converted (already), or NotApproved.
 	// On success it returns the reloaded PO (now converted) and the new invoice id.
 	Convert(ctx context.Context, uid, companyID, poID ID, actor NoteActor, invoiceNumber, date string) (po PurchaseOrder, invoiceID ID, status POActionStatus, err error)
+	// RecordSend advances a PO's send channel after a (mocked) WhatsApp send: kind "sent" stamps the
+	// send fingerprint + bumps the count; kind "confirm" stamps the confirm time. Returns the
+	// reloaded PO. found is false on a miss.
+	RecordSend(ctx context.Context, uid, companyID, poID ID, kind, sendFingerprint string) (PurchaseOrder, bool, error)
 	// PublicView is the unauthenticated supplier link (GET /po-public/:supplier_id/:po_id): both ids
 	// must match the same order. found is false on a mismatch. Closed is true once the order became a
 	// purchase invoice (the link is spent) - then no order/company detail is returned.
