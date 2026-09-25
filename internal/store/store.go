@@ -1304,6 +1304,15 @@ type PurchaseOrders interface {
 	// EditNote edits a note within the author's 24h window; logs "Note edited". found false on a
 	// miss, forbidden true when the actor is not the author or the window has passed.
 	EditNote(ctx context.Context, companyID, noteID ID, actor NoteActor, text string) (n PONote, found, forbidden bool, err error)
+	// PendingApprovals derives the approval queue: `pending` is every draft, un-converted PO with
+	// rows (Helpers/PoChanges.isAwaitingApproval); `visible` drops the ones this actor has dismissed
+	// at their current version (a PO edited since a dismissal reappears).
+	PendingApprovals(ctx context.Context, uid, companyID, actorID ID) (pending, visible []PurchaseOrder, err error)
+	// DismissApprovals records "seen" for this actor: prunes dismissals for orders no longer
+	// pending, then upserts one per target (all currently-visible, or the single poID). Returns the
+	// number of targets dismissed and the fresh visible/total counts. targets 0 means nothing to
+	// dismiss (-> 404).
+	DismissApprovals(ctx context.Context, uid, companyID, actorID ID, actorType string, all bool, poID ID) (targets, freshVisible, freshTotal int, err error)
 }
 
 // ---------------------------------------------------------------------------------------

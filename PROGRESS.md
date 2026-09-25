@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (177 of 209)
+## Routes ready (179 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -106,6 +106,8 @@ the 209 routes the Node API declares.
 | `POST /purchase-order/revoke` | requireFeature("purchase_orders_approve"); back to draft; 409 not-approved, 404 miss; logs "Approval revoked" | Unit |
 | `POST /purchase-order/note` | requireCreate; add a note (author from actor), log "Note added"; 422 blank, 404 miss | Unit |
 | `POST /purchase-order/note/edit` | requireCreate; author-only within 24h (`store.CanEditNote`); 403 otherwise, 404 miss, 422 blank; logs "Note edited" | Unit |
+| `POST /purchase-order/pending-approvals` | purchase_orders_approve; derived queue (draft+rows+not-converted), per-actor dismissals dropped, badge `count` (visible) vs `totalPending`, up to 8 items with ageDays | Unit |
+| `POST /purchase-order/approvals/dismiss` | purchase_orders_approve; per-person "seen" (upsert w/ po updatedAt), prunes stale dismissals, dismisses all-visible or one; 422 no args, 404 nothing-to-dismiss; returns fresh counts | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

@@ -35,6 +35,14 @@ type stubPO struct {
 	noteFound     bool
 	noteForbidden bool
 	gotNoteText   string
+
+	pending        []store.PurchaseOrder
+	visible        []store.PurchaseOrder
+	dismissTargets int
+	dismissVisible int
+	dismissTotal   int
+	gotDismissAll  bool
+	gotDismissID   store.ID
 }
 
 func (s *stubPO) Numbers(context.Context, store.ID, store.ID) ([]string, error) { return s.numbers, nil }
@@ -66,6 +74,14 @@ func (s *stubPO) AddNote(_ context.Context, _, _, _ store.ID, _ store.NoteActor,
 func (s *stubPO) EditNote(_ context.Context, _, _ store.ID, _ store.NoteActor, text string) (store.PONote, bool, bool, error) {
 	s.gotNoteText = text
 	return s.note, s.noteFound, s.noteForbidden, nil
+}
+func (s *stubPO) PendingApprovals(context.Context, store.ID, store.ID, store.ID) ([]store.PurchaseOrder, []store.PurchaseOrder, error) {
+	return s.pending, s.visible, nil
+}
+func (s *stubPO) DismissApprovals(_ context.Context, _, _, _ store.ID, _ string, all bool, poID store.ID) (int, int, int, error) {
+	s.gotDismissAll = all
+	s.gotDismissID = poID
+	return s.dismissTargets, s.dismissVisible, s.dismissTotal, nil
 }
 
 func TestNextNumber(t *testing.T) {
