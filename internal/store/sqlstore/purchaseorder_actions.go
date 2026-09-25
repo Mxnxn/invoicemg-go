@@ -164,3 +164,57 @@ func (p *purchaseOrders) EditNote(ctx context.Context, companyID, noteID store.I
 	n.AuthorType, n.AuthorID, n.AuthorName, n.Text = authorType, aID, authorName, text
 	return n, true, false, nil
 }
+
+func (p *purchaseOrders) Convert(ctx context.Context, uid, companyID, poID store.ID, actor store.NoteActor, invoiceNumber, date string) (store.PurchaseOrder, store.ID, store.POActionStatus, error) {
+	po, found, err := p.loadOne(ctx, uid, companyID, poID)
+	if err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	if !found {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, nil
+	}
+	if po.PurchaseInvoiceID != "" {
+		return store.PurchaseOrder{}, "", store.POActionConverted, nil
+	}
+	if po.Approval.State != "approved" {
+		return store.PurchaseOrder{}, "", store.POActionNotApproved, nil
+	}
+
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	defer tx.Rollback(ctx)
+
+	var invID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO purchase_invoices (uid, company_id, supplier_id, date, invoice_number, total)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+		string(uid), string(companyID), nullID(po.SupplierID), date, invoiceNumber, po.Total).Scan(&invID); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, fmt.Errorf("convert insert invoice: %w", err)
+	}
+	// Copy PO rows verbatim (dimensions preserved, unlike PurchaseInvoices.Create's input shape).
+	for i, r := range po.Rows {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO purchase_invoice_rows (invoice_id, position, description, material, hsn, gst, has_dimensions, length, width, rate, qty, unit, discount, charges)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+			invID, i, r.Description, r.Material, r.Hsn, r.Gst, r.HasDimensions, defaultStr(r.Length, "1"), defaultStr(r.Width, "1"),
+			r.Rate, defaultQty(r.Qty), r.Unit, r.Discount, r.Charges); err != nil {
+			return store.PurchaseOrder{}, "", store.POActionNotFound, fmt.Errorf("convert insert row: %w", err)
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE purchase_orders SET purchase_invoice_id=$2, converted_at=now(), updated_at=now() WHERE id=$1`,
+		string(poID), invID); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, fmt.Errorf("convert link po: %w", err)
+	}
+	at, aid, aname := poHistoryActor(ctx, p.pool, actor)
+	changes := []store.Change{{Field: "purchaseInvoice_id", From: "", To: invID}}
+	if err := poLogHistory(ctx, tx, poID, uid, companyID, at, aid, aname, "Converted to Purchase Invoice", changes, "Supplier invoice "+invoiceNumber); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	out, _, err := p.loadOne(ctx, uid, companyID, poID)
+	return out, store.ID(invID), store.POActionOK, err
+}

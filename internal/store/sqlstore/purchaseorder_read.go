@@ -159,3 +159,41 @@ func (p *purchaseOrders) notesFor(ctx context.Context, companyID, poID store.ID)
 	}
 	return out, rows.Err()
 }
+
+func (p *purchaseOrders) PublicView(ctx context.Context, supplierID, poID store.ID) (store.PublicPO, bool, error) {
+	var out store.PublicPO
+	var companyID *string
+	var invoiceID *string
+	var supName, supFirm *string
+	err := p.pool.QueryRow(ctx, `
+		SELECT po.po_number, po.date, po.total, po.company_id, po.purchase_invoice_id, s.name, s.firm
+		  FROM purchase_orders po LEFT JOIN persons s ON s.id = po.supplier_id
+		 WHERE po.id=$1 AND po.supplier_id=$2`,
+		string(poID), string(supplierID)).Scan(&out.PoNumber, &out.Date, &out.Total, &companyID, &invoiceID, &supName, &supFirm)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.PublicPO{}, false, nil
+	}
+	if err != nil {
+		return store.PublicPO{}, false, err
+	}
+	if invoiceID != nil { // spent link
+		return store.PublicPO{Closed: true}, true, nil
+	}
+	out.SupplierName, out.SupplierFirm = deref(supName), deref(supFirm)
+	byPO, err := p.rowsFor(ctx, []string{string(poID)})
+	if err != nil {
+		return store.PublicPO{}, false, err
+	}
+	out.Rows = byPO[poID]
+	if out.Rows == nil {
+		out.Rows = []store.PORow{}
+	}
+	if companyID != nil {
+		var firm, address, phone, gst, url *string
+		if err := p.pool.QueryRow(ctx, `SELECT firm, address, phone, gst, url FROM companies WHERE id=$1`, *companyID).
+			Scan(&firm, &address, &phone, &gst, &url); err == nil {
+			out.Company = store.PublicPOCompany{Firm: deref(firm), Address: deref(address), Phone: deref(phone), Gst: deref(gst), URL: deref(url)}
+		}
+	}
+	return out, true, nil
+}

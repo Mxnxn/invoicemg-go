@@ -358,6 +358,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /purchase-order/note/edit", feature("purchase_orders", purchaseOrderHandler.NoteEdit, auth.RequireCreate("purchase_orders")))
 	mux.Handle("POST /purchase-order/pending-approvals", feature("purchase_orders", purchaseOrderHandler.PendingApprovals, auth.RequireFeature("purchase_orders_approve")))
 	mux.Handle("POST /purchase-order/approvals/dismiss", feature("purchase_orders", purchaseOrderHandler.ApprovalsDismiss, auth.RequireFeature("purchase_orders_approve")))
+	mux.Handle("POST /purchase-order/convert", feature("purchase_orders", purchaseOrderHandler.Convert, auth.RequireCreate("purchase_invoices")))
 
 	// Invoices, behind the invoices feature. Each row carries the issuer letterhead, the client,
 	// the populated entries and computed totals. Only /getAll is ported.
@@ -470,6 +471,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	// both must resolve to the same job. This is the exact path baked into links already
 	// sent, so it is served as-is rather than under a REST alias nothing would call. The
 	// review GET/POST are not ported yet.
+	mux.HandleFunc("GET /po-public/{supplier_id}/{po_id}", purchaseOrderHandler.PublicView)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)

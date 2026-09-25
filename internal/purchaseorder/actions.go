@@ -115,3 +115,45 @@ func (h *Handler) NoteEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Note updated.", Status: httpx.True(), Data: toNoteDTO(note)})
 }
+
+type convertInvoiceDTO struct {
+	ID            string   `json:"_id"`
+	InvoiceNumber string   `json:"invoiceNumber"`
+	Date          string   `json:"date"`
+	SupplierID    string   `json:"supplier_id"`
+	Total         float64  `json:"total"`
+	Rows          []rowDTO `json:"rows"`
+}
+
+// Convert is POST /purchase-order/convert (requireCreate purchase_invoices): the supplier billed
+// us, so mint a purchase invoice from the approved order.
+func (h *Handler) Convert(w http.ResponseWriter, r *http.Request) {
+	sess := auth.MustFrom(r.Context())
+	form, _ := httpx.ReadForm(r)
+	poID := form.String("po_id")
+	invoiceNumber := form.String("invoiceNumber")
+	date := form.String("date")
+	if poID == "" || invoiceNumber == "" || date == "" {
+		httpx.Write(w, httpx.Envelope{Code: 422, Message: "The supplier's invoice number and date are required.", Status: httpx.False()})
+		return
+	}
+	po, invoiceID, status, err := h.store.Convert(r.Context(), sess.UID, sess.CompanyID, store.ID(poID), actorOf(r), invoiceNumber, date)
+	if err != nil {
+		httpx.Internal(w, err)
+		return
+	}
+	switch status {
+	case store.POActionNotFound:
+		httpx.Write(w, httpx.Envelope{Code: 404, Message: "Purchase order not found.", Status: httpx.False()})
+		return
+	case store.POActionConverted:
+		httpx.Write(w, httpx.Envelope{Code: 409, Message: "This purchase order has already been converted.", Status: httpx.False()})
+		return
+	case store.POActionNotApproved:
+		httpx.Write(w, httpx.Envelope{Code: 409, Message: "Approve this purchase order before converting it.", Status: httpx.False()})
+		return
+	}
+	dto := toPODTO(po)
+	inv := convertInvoiceDTO{ID: string(invoiceID), InvoiceNumber: invoiceNumber, Date: date, SupplierID: string(po.SupplierID), Total: po.Total, Rows: dto.Rows}
+	httpx.Write(w, httpx.Envelope{Code: 200, Message: "Purchase invoice created.", Status: httpx.True(), Data: map[string]any{"po": dto, "invoice": inv}})
+}

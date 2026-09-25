@@ -1313,6 +1313,36 @@ type PurchaseOrders interface {
 	// number of targets dismissed and the fresh visible/total counts. targets 0 means nothing to
 	// dismiss (-> 404).
 	DismissApprovals(ctx context.Context, uid, companyID, actorID ID, actorType string, all bool, poID ID) (targets, freshVisible, freshTotal int, err error)
+	// Convert mints a purchase invoice from an approved PO (same rows + total), links it back and
+	// logs "Converted to Purchase Invoice". status is NotFound, Converted (already), or NotApproved.
+	// On success it returns the reloaded PO (now converted) and the new invoice id.
+	Convert(ctx context.Context, uid, companyID, poID ID, actor NoteActor, invoiceNumber, date string) (po PurchaseOrder, invoiceID ID, status POActionStatus, err error)
+	// PublicView is the unauthenticated supplier link (GET /po-public/:supplier_id/:po_id): both ids
+	// must match the same order. found is false on a mismatch. Closed is true once the order became a
+	// purchase invoice (the link is spent) - then no order/company detail is returned.
+	PublicView(ctx context.Context, supplierID, poID ID) (PublicPO, bool, error)
+}
+
+// PublicPOCompany is the letterhead a supplier link carries (resolved from the ORDER's company).
+type PublicPOCompany struct {
+	Firm         string
+	Address      string
+	Phone        string
+	Gst          string
+	URL          string
+	DocumentFont string
+}
+
+// PublicPO is the payload of the public purchase-order link (Helpers/PoPublic.publicPurchaseOrder).
+type PublicPO struct {
+	Closed       bool
+	PoNumber     string
+	Date         string
+	Total        float64
+	SupplierName string
+	SupplierFirm string
+	Rows         []PORow
+	Company      PublicPOCompany
 }
 
 // ---------------------------------------------------------------------------------------

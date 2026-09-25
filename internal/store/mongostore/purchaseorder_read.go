@@ -295,3 +295,56 @@ func (p *purchaseOrders) Update(ctx context.Context, uid, companyID, poID store.
 	po, _, err := p.loadOne(ctx, uid, companyID, poID)
 	return po, res, err
 }
+
+func (p *purchaseOrders) PublicView(ctx context.Context, supplierID, poID store.ID) (store.PublicPO, bool, error) {
+	poOID, err := objectID(poID)
+	if err != nil {
+		return store.PublicPO{}, false, nil
+	}
+	supOID, err := objectID(supplierID)
+	if err != nil {
+		return store.PublicPO{}, false, nil
+	}
+	var d poDoc
+	err = p.db.Collection(colPurchaseOrders).FindOne(ctx, bson.M{"_id": poOID, "supplier_id": supOID}).Decode(&d)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return store.PublicPO{}, false, nil
+	}
+	if err != nil {
+		return store.PublicPO{}, false, err
+	}
+	if d.PurchaseInvoiceID != nil {
+		return store.PublicPO{Closed: true}, true, nil
+	}
+	out := store.PublicPO{PoNumber: d.PoNumber, Date: d.Date, Total: d.Total, Rows: []store.PORow{}}
+	if d.SupplierID != nil {
+		var sup struct {
+			Name string `bson:"name"`
+			Firm string `bson:"firm"`
+		}
+		if p.db.Collection(colPersons).FindOne(ctx, bson.M{"_id": *d.SupplierID}, options.FindOne().SetProjection(bson.M{"name": 1, "firm": 1})).Decode(&sup) == nil {
+			out.SupplierName, out.SupplierFirm = sup.Name, sup.Firm
+		}
+	}
+	for _, r := range d.Rows {
+		out.Rows = append(out.Rows, store.PORow{
+			ID: idOf(r.ID), Description: r.Description, Material: r.Material, Hsn: r.Hsn, Gst: r.Gst,
+			HasDimensions: r.HasDimensions, Length: r.Length, Width: r.Width, Rate: r.Rate, Qty: r.Qty,
+			Unit: r.Unit, Discount: r.Discount, Charges: r.Charges,
+		})
+	}
+	if d.CompanyID != nil {
+		var co struct {
+			Firm         string `bson:"firm"`
+			Address      string `bson:"address"`
+			Phone        string `bson:"phone"`
+			Gst          string `bson:"gst"`
+			URL          string `bson:"url"`
+			DocumentFont string `bson:"documentFont"`
+		}
+		if p.db.Collection(colCompanies).FindOne(ctx, bson.M{"_id": *d.CompanyID}).Decode(&co) == nil {
+			out.Company = store.PublicPOCompany{Firm: co.Firm, Address: co.Address, Phone: co.Phone, Gst: co.Gst, URL: co.URL, DocumentFont: co.DocumentFont}
+		}
+	}
+	return out, true, nil
+}

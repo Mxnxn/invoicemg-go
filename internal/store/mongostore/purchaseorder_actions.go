@@ -149,3 +149,46 @@ func (p *purchaseOrders) EditNote(ctx context.Context, companyID, noteID store.I
 		AuthorName: d.AuthorName, Text: text, CreatedAt: d.CreatedAt, UpdatedAt: now}
 	return n, true, false, nil
 }
+
+func (p *purchaseOrders) Convert(ctx context.Context, uid, companyID, poID store.ID, actor store.NoteActor, invoiceNumber, date string) (store.PurchaseOrder, store.ID, store.POActionStatus, error) {
+	po, found, err := p.loadOne(ctx, uid, companyID, poID)
+	if err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	if !found {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, nil
+	}
+	if po.PurchaseInvoiceID != "" {
+		return store.PurchaseOrder{}, "", store.POActionConverted, nil
+	}
+	if po.Approval.State != "approved" {
+		return store.PurchaseOrder{}, "", store.POActionNotApproved, nil
+	}
+	poOID, _ := objectID(poID)
+	uidOID, _ := objectID(uid)
+	companyOID, _ := objectID(companyID)
+	now := time.Now().UTC()
+
+	invDoc := bson.M{
+		"uid": uidOID, "company_id": companyOID, "supplier_id": optionalOID(po.SupplierID),
+		"date": date, "invoiceNumber": invoiceNumber, "rows": poRowsToDocs(po.Rows), "total": po.Total,
+		"amount": 0, "createdAt": now, "updatedAt": now, "__v": 0,
+	}
+	res, err := p.db.Collection(colPurchaseInvoices).InsertOne(ctx, invDoc)
+	if err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, fmt.Errorf("convert insert invoice: %w", err)
+	}
+	invOID := res.InsertedID.(primitive.ObjectID)
+
+	if _, err := p.db.Collection(colPurchaseOrders).UpdateOne(ctx, bson.M{"_id": poOID},
+		bson.M{"$set": bson.M{"purchaseInvoice_id": invOID, "convertedAt": now, "updatedAt": now}}); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, fmt.Errorf("convert link po: %w", err)
+	}
+	name := p.actorName(ctx, actor)
+	changes := []store.Change{{Field: "purchaseInvoice_id", From: "", To: invOID.Hex()}}
+	if err := p.logHistory(ctx, poOID, uidOID, companyOID, actor, name, "Converted to Purchase Invoice", changes, "Supplier invoice "+invoiceNumber); err != nil {
+		return store.PurchaseOrder{}, "", store.POActionNotFound, err
+	}
+	out, _, err := p.loadOne(ctx, uid, companyID, poID)
+	return out, idOf(invOID), store.POActionOK, err
+}

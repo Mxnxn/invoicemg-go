@@ -84,3 +84,30 @@ func TestNoteEdit_Statuses(t *testing.T) {
 		t.Errorf("ok -> %v, want 200", body["code"])
 	}
 }
+
+func TestConvert_Statuses(t *testing.T) {
+	// validation
+	if body := runForm(&stubPO{}, (*Handler).Convert, url.Values{"po_id": {"p1"}, "date": {"2026-09-01"}}); body["code"] != float64(422) {
+		t.Errorf("no invoiceNumber -> %v, want 422", body["code"])
+	}
+	v := url.Values{"po_id": {"p1"}, "invoiceNumber": {"SUP-9"}, "date": {"2026-09-01"}}
+	if body := runForm(&stubPO{actionStatus: store.POActionNotApproved}, (*Handler).Convert, v); body["code"] != float64(409) {
+		t.Errorf("not approved -> %v, want 409", body["code"])
+	}
+	if body := runForm(&stubPO{actionStatus: store.POActionConverted}, (*Handler).Convert, v); body["code"] != float64(409) {
+		t.Errorf("already converted -> %v, want 409", body["code"])
+	}
+	if body := runForm(&stubPO{actionStatus: store.POActionNotFound}, (*Handler).Convert, v); body["code"] != float64(404) {
+		t.Errorf("not found -> %v, want 404", body["code"])
+	}
+	s := &stubPO{actionStatus: store.POActionOK, convertInvoiceID: "inv1", actionPO: store.PurchaseOrder{ID: "p1", SupplierID: "s1", Total: 236}}
+	body := runForm(s, (*Handler).Convert, v)
+	if body["code"] != float64(200) || s.gotConvertNumber != "SUP-9" {
+		t.Fatalf("ok -> code=%v number=%q", body["code"], s.gotConvertNumber)
+	}
+	data := body["data"].(map[string]any)
+	inv := data["invoice"].(map[string]any)
+	if inv["_id"] != "inv1" || inv["invoiceNumber"] != "SUP-9" || inv["total"] != float64(236) {
+		t.Errorf("invoice = %v", inv)
+	}
+}

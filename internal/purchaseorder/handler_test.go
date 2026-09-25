@@ -43,6 +43,12 @@ type stubPO struct {
 	dismissTotal   int
 	gotDismissAll  bool
 	gotDismissID   store.ID
+
+	convertInvoiceID store.ID
+	gotConvertNumber string
+
+	public      store.PublicPO
+	publicFound bool
 }
 
 func (s *stubPO) Numbers(context.Context, store.ID, store.ID) ([]string, error) { return s.numbers, nil }
@@ -82,6 +88,13 @@ func (s *stubPO) DismissApprovals(_ context.Context, _, _, _ store.ID, _ string,
 	s.gotDismissAll = all
 	s.gotDismissID = poID
 	return s.dismissTargets, s.dismissVisible, s.dismissTotal, nil
+}
+func (s *stubPO) Convert(_ context.Context, _, _, _ store.ID, _ store.NoteActor, invoiceNumber, date string) (store.PurchaseOrder, store.ID, store.POActionStatus, error) {
+	s.gotConvertNumber = invoiceNumber
+	return s.actionPO, s.convertInvoiceID, s.actionStatus, nil
+}
+func (s *stubPO) PublicView(context.Context, store.ID, store.ID) (store.PublicPO, bool, error) {
+	return s.public, s.publicFound, nil
 }
 
 func TestNextNumber(t *testing.T) {
