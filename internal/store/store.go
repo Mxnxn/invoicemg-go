@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/mxnxn/invoicemg-go/internal/pochanges"
 )
 
 // ErrNotFound is what a lookup returns when the thing is not there. Handlers translate it
@@ -1255,6 +1257,30 @@ type POUpdateResult struct {
 	RevokedApproval  bool // approval dropped because price-bearing content changed
 }
 
+// POActionStatus is the outcome of a purchase-order state transition (approve/revoke).
+type POActionStatus int
+
+const (
+	POActionOK POActionStatus = iota
+	POActionNotFound
+	POActionConverted      // already a purchase invoice
+	POActionNoRows         // approve refused: no rows
+	POActionAlreadyApproved
+	POActionNotApproved    // revoke refused: not approved
+)
+
+// POFingerprint is Helpers/PoChanges.fingerprint over a stored purchase order, for approve.
+func POFingerprint(po PurchaseOrder) string {
+	p := pochanges.PO{SupplierID: string(po.SupplierID), Date: po.Date, Total: po.Total}
+	for _, r := range po.Rows {
+		p.Rows = append(p.Rows, pochanges.Row{
+			Material: r.Material, Description: r.Description, Unit: r.Unit, Hsn: r.Hsn,
+			Qty: r.Qty, Rate: r.Rate, Discount: r.Discount, Charges: r.Charges, Gst: r.Gst,
+		})
+	}
+	return pochanges.Fingerprint(p)
+}
+
 type PurchaseOrders interface {
 	// Numbers returns a company's existing PO numbers (owner+company scoped), for /next-number.
 	Numbers(ctx context.Context, uid, companyID ID) ([]string, error)
@@ -1268,6 +1294,16 @@ type PurchaseOrders interface {
 	// recomputes the total, and drops approval to draft when the price-bearing content changed.
 	// Logs "Updated" (with changes) and, on a revoke, "Approval revoked".
 	Update(ctx context.Context, uid, companyID, poID ID, actor NoteActor, in POUpdate) (PurchaseOrder, POUpdateResult, error)
+	// Approve sets sign-off with a fresh fingerprint, refusing a converted PO, an empty PO, or one
+	// already approved. Logs "Approved".
+	Approve(ctx context.Context, uid, companyID, poID ID, actor NoteActor) (PurchaseOrder, POActionStatus, error)
+	// Revoke withdraws approval (only from an approved PO). Logs "Approval revoked".
+	Revoke(ctx context.Context, uid, companyID, poID ID, actor NoteActor) (PurchaseOrder, POActionStatus, error)
+	// AddNote appends a note (author from the actor) and logs "Note added". found is false on a miss.
+	AddNote(ctx context.Context, uid, companyID, poID ID, actor NoteActor, text string) (PONote, bool, error)
+	// EditNote edits a note within the author's 24h window; logs "Note edited". found false on a
+	// miss, forbidden true when the actor is not the author or the window has passed.
+	EditNote(ctx context.Context, companyID, noteID ID, actor NoteActor, text string) (n PONote, found, forbidden bool, err error)
 }
 
 // ---------------------------------------------------------------------------------------

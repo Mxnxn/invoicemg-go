@@ -28,6 +28,13 @@ type stubPO struct {
 	updated   store.PurchaseOrder
 	updateRes store.POUpdateResult
 	gotUpdate store.POUpdate
+
+	actionPO      store.PurchaseOrder
+	actionStatus  store.POActionStatus
+	note          store.PONote
+	noteFound     bool
+	noteForbidden bool
+	gotNoteText   string
 }
 
 func (s *stubPO) Numbers(context.Context, store.ID, store.ID) ([]string, error) { return s.numbers, nil }
@@ -45,6 +52,20 @@ func (s *stubPO) Detail(context.Context, store.ID, store.ID, store.ID) (store.Pu
 func (s *stubPO) Update(_ context.Context, _, _, _ store.ID, _ store.NoteActor, in store.POUpdate) (store.PurchaseOrder, store.POUpdateResult, error) {
 	s.gotUpdate = in
 	return s.updated, s.updateRes, nil
+}
+func (s *stubPO) Approve(context.Context, store.ID, store.ID, store.ID, store.NoteActor) (store.PurchaseOrder, store.POActionStatus, error) {
+	return s.actionPO, s.actionStatus, nil
+}
+func (s *stubPO) Revoke(context.Context, store.ID, store.ID, store.ID, store.NoteActor) (store.PurchaseOrder, store.POActionStatus, error) {
+	return s.actionPO, s.actionStatus, nil
+}
+func (s *stubPO) AddNote(_ context.Context, _, _, _ store.ID, _ store.NoteActor, text string) (store.PONote, bool, error) {
+	s.gotNoteText = text
+	return s.note, s.noteFound, nil
+}
+func (s *stubPO) EditNote(_ context.Context, _, _ store.ID, _ store.NoteActor, text string) (store.PONote, bool, bool, error) {
+	s.gotNoteText = text
+	return s.note, s.noteFound, s.noteForbidden, nil
 }
 
 func TestNextNumber(t *testing.T) {

@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (173 of 209)
+## Routes ready (177 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -102,6 +102,10 @@ the 209 routes the Node API declares.
 | `POST /purchase-order/detail` | one PO + its history + notes + send state; 422 no id, 404 miss | Unit |
 | `POST /purchase-order/create` | requireCreate; generate number, coerce rows, compute total (`PurchaseRowTotal` w/ dimension), log "Created"; 422 supplier/date | Unit |
 | `POST /purchase-order/update` | requireCreate; partial edit, recompute total, drop approval to draft when the price-bearing fingerprint changes (`internal/pochanges`), log "Updated"/"Approval revoked"; 404 miss, 409 already converted | Unit |
+| `POST /purchase-order/approve` | requireFeature("purchase_orders_approve"); stamps a fresh fingerprint; 409 converted/already-approved, 422 no rows, 404 miss; logs "Approved" | Unit |
+| `POST /purchase-order/revoke` | requireFeature("purchase_orders_approve"); back to draft; 409 not-approved, 404 miss; logs "Approval revoked" | Unit |
+| `POST /purchase-order/note` | requireCreate; add a note (author from actor), log "Note added"; 422 blank, 404 miss | Unit |
+| `POST /purchase-order/note/edit` | requireCreate; author-only within 24h (`store.CanEditNote`); 403 otherwise, 404 miss, 422 blank; logs "Note edited" | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |
