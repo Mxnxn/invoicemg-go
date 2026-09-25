@@ -45,7 +45,8 @@ CREATE TABLE users (
     name          text NOT NULL DEFAULT '',
     firm          text NOT NULL DEFAULT '',
     role          text NOT NULL DEFAULT 'admin',
-    -- What actually locks a login out. NULL means no expiry.
+    -- What actually locks a login out: is_active AND (active_until is null or future).
+    is_active     boolean NOT NULL DEFAULT true,
     active_until  timestamptz,
     totp_enabled  boolean NOT NULL DEFAULT false,
     totp_secret   text,

@@ -162,8 +162,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// What actually locks a login out, checked before a session is created rather than after.
-	if user.ActiveUntil != nil && !user.ActiveUntil.After(h.Now()) {
+	// What actually locks a login out (Helpers/Tenancy.isTenantActive): the account must be active
+	// AND unexpired. Checked before a session is created rather than after.
+	if !user.IsActive || (user.ActiveUntil != nil && !user.ActiveUntil.After(h.Now())) {
 		httpx.Write(w, httpx.Envelope{
 			Code:    403,
 			Message: "This account is inactive. Please contact support.",

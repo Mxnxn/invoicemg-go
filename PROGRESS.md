@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (196 of 209)
+## Routes ready (199 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -119,6 +119,9 @@ the 209 routes the Node API declares.
 | `POST /dev/registration-token/create` \| `list` | superadmin; mint a token (optional yyyymmdd expiry via new `internal/tokenexpiry`, ≤90d) / newest 25 | Unit |
 | `GET /dev/registration-token` | unauth but DEV_TOTP_SECRET-gated, rate-limited, step-burned (one code mints one token) | — |
 | `POST /dev/password-requests` \| `resolve` | superadmin; pending queue / dismiss or reset to a one-time temp password (bcrypt, kills all the user's sessions) | Unit |
+| `POST /dev/admins` | superadmin; every account + company count, limit, last login, is_active/activeUntil (hasArchive false until wipe/restore land) | Unit |
+| `POST /dev/admin/status` | superadmin; set is_active/activeUntil (new `users.is_active` col, now enforced at login too); 403 superadmin, 404 miss, 422 nothing | Unit |
+| `POST /dev/admin/company-limit` | superadmin; raise/lower the company allowance, never below what's owned; 422 <owned, 404 miss | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

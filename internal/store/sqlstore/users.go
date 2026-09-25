@@ -18,11 +18,11 @@ func (u *users) FindByEmail(ctx context.Context, email string) (store.User, erro
 	var totpSecret *string
 
 	err := u.pool.QueryRow(ctx, `
-		SELECT id, email, password, name, firm, role, company_limit, active_until, totp_enabled, totp_secret
+		SELECT id, email, password, name, firm, role, company_limit, is_active, active_until, totp_enabled, totp_secret
 		  FROM users
 		 WHERE email = $1`, email).
 		Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.Firm,
-			&user.Role, &user.CompanyLimit, &activeUntil, &user.TotpEnabled, &totpSecret)
+			&user.Role, &user.CompanyLimit, &user.IsActive, &activeUntil, &user.TotpEnabled, &totpSecret)
 
 	if noRows(err) {
 		return store.User{}, store.ErrNotFound
@@ -44,11 +44,11 @@ func (u *users) FindByID(ctx context.Context, uid store.ID) (store.User, error) 
 	var totpSecret *string
 
 	err := u.pool.QueryRow(ctx, `
-		SELECT id, email, password, name, firm, role, company_limit, active_until, totp_enabled, totp_secret
+		SELECT id, email, password, name, firm, role, company_limit, is_active, active_until, totp_enabled, totp_secret
 		  FROM users
 		 WHERE id = $1`, string(uid)).
 		Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.Firm,
-			&user.Role, &user.CompanyLimit, &activeUntil, &user.TotpEnabled, &totpSecret)
+			&user.Role, &user.CompanyLimit, &user.IsActive, &activeUntil, &user.TotpEnabled, &totpSecret)
 
 	if noRows(err) {
 		return store.User{}, store.ErrNotFound
@@ -159,4 +159,62 @@ func (u *users) Register(ctx context.Context, email, passwordHash, name string, 
 		return "", false, fmt.Errorf("register user: %w", err)
 	}
 	return store.ID(id), false, nil
+}
+
+func (u *users) SetActive(ctx context.Context, uid store.ID, isActive *bool, activeUntil *time.Time, setActiveUntil bool) (store.User, bool, error) {
+	set := "updated_at=now()"
+	args := []any{string(uid)}
+	n := 2
+	if isActive != nil {
+		set += fmt.Sprintf(", is_active=$%d", n)
+		args = append(args, *isActive)
+		n++
+	}
+	if setActiveUntil {
+		set += fmt.Sprintf(", active_until=$%d", n)
+		args = append(args, activeUntil)
+		n++
+	}
+	tag, err := u.pool.Exec(ctx, "UPDATE users SET "+set+" WHERE id=$1", args...)
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("set active: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return store.User{}, false, nil
+	}
+	usr, err := u.FindByID(ctx, uid)
+	return usr, true, err
+}
+
+func (u *users) SetCompanyLimit(ctx context.Context, uid store.ID, limit int) (store.User, bool, error) {
+	tag, err := u.pool.Exec(ctx, `UPDATE users SET company_limit=$2, updated_at=now() WHERE id=$1`, string(uid), limit)
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("set company limit: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return store.User{}, false, nil
+	}
+	usr, err := u.FindByID(ctx, uid)
+	return usr, true, err
+}
+
+func (u *users) AdminList(ctx context.Context) ([]store.User, error) {
+	rows, err := u.pool.Query(ctx, `
+		SELECT id, email, name, firm, role, company_limit, is_active, active_until
+		  FROM users ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("admin list: %w", err)
+	}
+	defer rows.Close()
+	out := []store.User{}
+	for rows.Next() {
+		var usr store.User
+		var activeUntil *time.Time
+		if err := rows.Scan(&usr.ID, &usr.Email, &usr.Name, &usr.Firm, &usr.Role, &usr.CompanyLimit, &usr.IsActive, &activeUntil); err != nil {
+			return nil, err
+		}
+		usr.ActiveUntil = activeUntil
+		out = append(out, usr)
+	}
+	return out, rows.Err()
 }

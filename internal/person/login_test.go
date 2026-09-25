@@ -121,3 +121,11 @@ func (u *loginUsers) ClearTotp(context.Context, store.ID) error             { re
 func (u *loginUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
 	return "", false, nil
 }
+
+func (u *loginUsers) SetActive(context.Context, store.ID, *bool, *time.Time, bool) (store.User, bool, error) {
+	return store.User{}, false, nil
+}
+func (u *loginUsers) SetCompanyLimit(context.Context, store.ID, int) (store.User, bool, error) {
+	return store.User{}, false, nil
+}
+func (u *loginUsers) AdminList(context.Context) ([]store.User, error) { return nil, nil }

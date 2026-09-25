@@ -426,3 +426,27 @@ func (s *sessions) DeactivateOthers(ctx context.Context, uid store.ID, keepToken
 	}
 	return nil
 }
+
+func (s *sessions) LastLoginAt(ctx context.Context, uid store.ID) (*time.Time, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return nil, nil
+	}
+	var doc struct {
+		ID        primitive.ObjectID `bson:"_id"`
+		CreatedAt *time.Time         `bson:"createdAt"`
+	}
+	err = s.db.Collection(colUserSessions).FindOne(ctx, bson.M{"uid": oid},
+		options.FindOne().SetSort(bson.D{{Key: "_id", Value: -1}})).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("last login: %w", err)
+	}
+	if doc.CreatedAt != nil {
+		return doc.CreatedAt, nil
+	}
+	t := doc.ID.Timestamp()
+	return &t, nil
+}

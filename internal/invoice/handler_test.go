@@ -438,3 +438,11 @@ func (s *stubUsers) ClearTotp(context.Context, store.ID) error             { ret
 func (s *stubUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
 	return "", false, nil
 }
+
+func (s *stubUsers) SetActive(context.Context, store.ID, *bool, *time.Time, bool) (store.User, bool, error) {
+	return store.User{}, false, nil
+}
+func (s *stubUsers) SetCompanyLimit(context.Context, store.ID, int) (store.User, bool, error) {
+	return store.User{}, false, nil
+}
+func (s *stubUsers) AdminList(context.Context) ([]store.User, error) { return nil, nil }

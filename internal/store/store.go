@@ -91,6 +91,8 @@ type Sessions interface {
 	// what /user/password/change does so a password change signs out the other devices while
 	// leaving the caller signed in.
 	DeactivateOthers(ctx context.Context, uid ID, keepToken string) error
+	// LastLoginAt returns when uid most recently opened a session, nil if never (dev admins panel).
+	LastLoginAt(ctx context.Context, uid ID) (*time.Time, error)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -191,7 +193,9 @@ type User struct {
 	Role         string
 	// CompanyLimit is how many company profiles this admin may create (the switcher's cap).
 	CompanyLimit int
-	// ActiveUntil is what actually locks a login out. nil means no expiry.
+	// IsActive and ActiveUntil together lock a login out: active means IsActive AND (no expiry or a
+	// future one). IsActive defaults true for rows that predate the flag.
+	IsActive    bool
 	ActiveUntil *time.Time
 	TotpEnabled bool
 	TotpSecret  string
@@ -232,6 +236,14 @@ type Users interface {
 	SetTotpEnabled(ctx context.Context, uid ID, enabled bool) error
 	// ClearTotp turns 2FA off and forgets the secret (/user/totp/disable).
 	ClearTotp(ctx context.Context, uid ID) error
+	// SetActive updates a user's is_active and/or active_until (dev /admin/status). Only the
+	// submitted fields change: isActive is applied when non-nil; active_until when setActiveUntil is
+	// true (a nil activeUntil then clears it). found is false on a miss. Returns the updated user.
+	SetActive(ctx context.Context, uid ID, isActive *bool, activeUntil *time.Time, setActiveUntil bool) (User, bool, error)
+	// SetCompanyLimit sets a user's company allowance (dev /admin/company-limit). found false on miss.
+	SetCompanyLimit(ctx context.Context, uid ID, limit int) (User, bool, error)
+	// AdminList returns every user (basic fields), for the dev admins panel.
+	AdminList(ctx context.Context) ([]User, error)
 }
 
 // ---------------------------------------------------------------------------------------

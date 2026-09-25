@@ -27,6 +27,7 @@ type userDoc struct {
 	Firm         string             `bson:"firm"`
 	Role         string             `bson:"role"`
 	CompanyLimit int                `bson:"companyLimit"`
+	IsActive     *bool              `bson:"is_active"`
 	ActiveUntil  *time.Time         `bson:"activeUntil"`
 	TotpEnabled  bool               `bson:"totpEnabled"`
 	TotpSecret   string             `bson:"totpSecret"`
@@ -53,6 +54,8 @@ func (d userDoc) toStore() store.User {
 		Firm:         d.Firm,
 		Role:         d.Role,
 		CompanyLimit: d.CompanyLimit,
+		// A missing is_active (legacy docs) means active, matching Node's `is_active !== false`.
+		IsActive:     d.IsActive == nil || *d.IsActive,
 		ActiveUntil:  d.ActiveUntil,
 		TotpEnabled:  d.TotpEnabled,
 		TotpSecret:   d.TotpSecret,
@@ -197,4 +200,59 @@ func (u *usersStore) Register(ctx context.Context, email, passwordHash, name str
 		return idOf(oid), false, nil
 	}
 	return "", false, nil
+}
+
+func (u *usersStore) SetActive(ctx context.Context, uid store.ID, isActive *bool, activeUntil *time.Time, setActiveUntil bool) (store.User, bool, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return store.User{}, false, err
+	}
+	set := bson.M{"updatedAt": time.Now().UTC()}
+	if isActive != nil {
+		set["is_active"] = *isActive
+	}
+	if setActiveUntil {
+		set["activeUntil"] = activeUntil
+	}
+	res, err := u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": set})
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("set active: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return store.User{}, false, nil
+	}
+	usr, err := u.FindByID(ctx, uid)
+	return usr, true, err
+}
+
+func (u *usersStore) SetCompanyLimit(ctx context.Context, uid store.ID, limit int) (store.User, bool, error) {
+	oid, err := objectID(uid)
+	if err != nil {
+		return store.User{}, false, err
+	}
+	res, err := u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"companyLimit": limit, "updatedAt": time.Now().UTC()}})
+	if err != nil {
+		return store.User{}, false, fmt.Errorf("set company limit: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return store.User{}, false, nil
+	}
+	usr, err := u.FindByID(ctx, uid)
+	return usr, true, err
+}
+
+func (u *usersStore) AdminList(ctx context.Context) ([]store.User, error) {
+	cur, err := u.db.Collection(colUsers).Find(ctx, bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("admin list: %w", err)
+	}
+	var docs []userDoc
+	if err := cur.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	out := make([]store.User, 0, len(docs))
+	for _, d := range docs {
+		out = append(out, d.toStore())
+	}
+	return out, nil
 }

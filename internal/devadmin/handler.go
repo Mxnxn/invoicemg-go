@@ -18,6 +18,7 @@ type Handler struct {
 	passwordResets store.PasswordResetRequests
 	users          store.Users
 	sessions       store.Sessions
+	companies      store.Companies
 	devTotpSecret  string
 	now            func() time.Time
 
@@ -26,9 +27,9 @@ type Handler struct {
 	attempts  []time.Time
 }
 
-func New(e store.Enquiries, rt store.RegistrationTokens, pr store.PasswordResetRequests, u store.Users, s store.Sessions, devTotpSecret string) *Handler {
+func New(e store.Enquiries, rt store.RegistrationTokens, pr store.PasswordResetRequests, u store.Users, s store.Sessions, c store.Companies, devTotpSecret string) *Handler {
 	return &Handler{
-		enquiries: e, regTokens: rt, passwordResets: pr, users: u, sessions: s,
+		enquiries: e, regTokens: rt, passwordResets: pr, users: u, sessions: s, companies: c,
 		devTotpSecret: devTotpSecret, now: time.Now, usedSteps: map[int64]time.Time{},
 	}
 }

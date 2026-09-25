@@ -173,3 +173,12 @@ func (s *sessions) DeactivateOthers(ctx context.Context, uid store.ID, keepToken
 	}
 	return nil
 }
+
+func (s *sessions) LastLoginAt(ctx context.Context, uid store.ID) (*time.Time, error) {
+	var at *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT max(created_at) FROM user_sessions WHERE uid=$1`, string(uid)).Scan(&at)
+	if err != nil {
+		return nil, fmt.Errorf("last login: %w", err)
+	}
+	return at, nil
+}
