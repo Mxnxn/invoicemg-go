@@ -112,3 +112,7 @@ func TestPersonLogin(t *testing.T) {
 func (u *loginUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
 	return false, nil
 }
+
+func (u *loginUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
+func (u *loginUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
+func (u *loginUsers) ClearTotp(context.Context, store.ID) error             { return nil }

@@ -221,6 +221,11 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.HandleFunc("POST /person/login", personHandler.Login)
 	mux.Handle("POST /user/logout", authed(userHandler.Logout))
 	mux.Handle("POST /user/password/change", authed(userHandler.PasswordChange))
+	mux.Handle("POST /user/totp/status", authed(userHandler.TotpStatus))
+	mux.Handle("POST /user/totp/setup", authed(userHandler.TotpSetup))
+	mux.Handle("POST /user/totp/enable", authed(userHandler.TotpEnable))
+	mux.Handle("POST /user/totp/disable", authed(userHandler.TotpDisable))
+	mux.Handle("POST /user/totp/reveal", authed(userHandler.TotpReveal))
 	mux.HandleFunc("POST /sessions", userHandler.Login)
 
 	// Reads. GET under REST, so they are cacheable, safe to retry, and visible as reads in

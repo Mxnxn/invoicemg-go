@@ -16,13 +16,14 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (184 of 209)
+## Routes ready (189 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
 | `POST /user/login` (+ `POST /sessions`) | bcrypt (`$2a`), TOTP accounts refused, session issued | Live · Unit |
 | `POST /user/logout` | retire the caller's session (is_active=false) so its token can't be replayed | Live · Unit |
 | `POST /user/password/change` | verify current bcrypt (not just a live session), set new (cost 10, ≥8 chars, must differ); retires every OTHER session, keeps the caller's; 422 wrong-current/validation, 404 gone | Unit |
+| `POST /user/totp/status` \| `setup` \| `enable` \| `disable` \| `reveal` | 2FA via new pure `internal/totp` (RFC 6238, stdlib, no dep): setup mints a secret, enable/disable require a current code, reveal is password-gated; login now verifies the code (`totpRequired` envelope flag) instead of refusing 2FA accounts | Unit (RFC vector) |
 | `POST /person/login` | employee portal login: bcrypt verify, opens an "employee" session (person_id + permissions); 422 unknown/bad, 401 disabled | Live · Unit |
 | `POST /sheet/only` (+ `GET /days`) | day list from job `receivedDate`; no `status` field | Live |
 | `POST /sheet/open-jobs` (+ `GET /jobs/open`) | open job-ids, oldest first, client nested | Live |

@@ -37,6 +37,9 @@ type Envelope struct {
 	Code    int    `json:"code"`
 	Message string `json:"message,omitempty"`
 	Status  *bool  `json:"status,omitempty"`
+	// TotpRequired is a top-level flag a couple of auth responses carry (routes/User.js login);
+	// omitempty keeps it off every other response.
+	TotpRequired bool `json:"totpRequired,omitempty"`
 	// Data's presence and shape are governed by MarshalJSON, not by this tag - the tag is kept
 	// only so the field reads as part of the wire shape at a glance.
 	Data any `json:"data,omitempty"`
@@ -63,11 +66,12 @@ func (e Envelope) MarshalJSON() ([]byte, error) {
 	// A distinct type so this does not recurse back into MarshalJSON. code/message/status keep
 	// their existing tags, including the omitempty on message and status.
 	type head struct {
-		Code    int    `json:"code"`
-		Message string `json:"message,omitempty"`
-		Status  *bool  `json:"status,omitempty"`
+		Code         int    `json:"code"`
+		Message      string `json:"message,omitempty"`
+		Status       *bool  `json:"status,omitempty"`
+		TotpRequired bool   `json:"totpRequired,omitempty"`
 	}
-	out, err := json.Marshal(head{Code: e.Code, Message: e.Message, Status: e.Status})
+	out, err := json.Marshal(head{Code: e.Code, Message: e.Message, Status: e.Status, TotpRequired: e.TotpRequired})
 	if err != nil {
 		return nil, err
 	}

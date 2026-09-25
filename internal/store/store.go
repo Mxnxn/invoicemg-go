@@ -223,6 +223,12 @@ type Users interface {
 	// UpdatePassword replaces a user's bcrypt hash (for /user/password/change). found is false
 	// when no such user. The caller has already verified the current password.
 	UpdatePassword(ctx context.Context, uid ID, passwordHash string) (found bool, err error)
+	// SetTotpSecret stores a (not-yet-enabled) TOTP secret during enrolment (/user/totp/setup).
+	SetTotpSecret(ctx context.Context, uid ID, secret string) error
+	// SetTotpEnabled flips the enabled flag (/user/totp/enable).
+	SetTotpEnabled(ctx context.Context, uid ID, enabled bool) error
+	// ClearTotp turns 2FA off and forgets the secret (/user/totp/disable).
+	ClearTotp(ctx context.Context, uid ID) error
 }
 
 // ---------------------------------------------------------------------------------------

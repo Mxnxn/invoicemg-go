@@ -123,3 +123,27 @@ func (u *users) UpdatePassword(ctx context.Context, uid store.ID, passwordHash s
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+func (u *users) SetTotpSecret(ctx context.Context, uid store.ID, secret string) error {
+	_, err := u.pool.Exec(ctx, `UPDATE users SET totp_secret=$2 WHERE id=$1`, string(uid), secret)
+	if err != nil {
+		return fmt.Errorf("set totp secret: %w", err)
+	}
+	return nil
+}
+
+func (u *users) SetTotpEnabled(ctx context.Context, uid store.ID, enabled bool) error {
+	_, err := u.pool.Exec(ctx, `UPDATE users SET totp_enabled=$2 WHERE id=$1`, string(uid), enabled)
+	if err != nil {
+		return fmt.Errorf("set totp enabled: %w", err)
+	}
+	return nil
+}
+
+func (u *users) ClearTotp(ctx context.Context, uid store.ID) error {
+	_, err := u.pool.Exec(ctx, `UPDATE users SET totp_enabled=false, totp_secret=NULL WHERE id=$1`, string(uid))
+	if err != nil {
+		return fmt.Errorf("clear totp: %w", err)
+	}
+	return nil
+}

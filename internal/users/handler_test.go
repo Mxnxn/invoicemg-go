@@ -27,6 +27,9 @@ func (stubUsers) CreateSession(context.Context, store.NewSession) (store.Session
 	return store.Session{}, nil
 }
 func (stubUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) { return true, nil }
+func (stubUsers) SetTotpSecret(context.Context, store.ID, string) error         { return nil }
+func (stubUsers) SetTotpEnabled(context.Context, store.ID, bool) error          { return nil }
+func (stubUsers) ClearTotp(context.Context, store.ID) error                     { return nil }
 
 type stubSessions struct {
 	deactivated store.ID
@@ -193,3 +196,7 @@ func TestPasswordChange_AccountGone(t *testing.T) {
 		t.Errorf("missing account should be 404: %v", b)
 	}
 }
+
+func (s *pwUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
+func (s *pwUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
+func (s *pwUsers) ClearTotp(context.Context, store.ID) error             { return nil }

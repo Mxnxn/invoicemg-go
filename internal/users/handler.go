@@ -19,6 +19,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/auth"
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store"
+	"github.com/mxnxn/invoicemg-go/internal/totp"
 )
 
 type Handler struct {
@@ -144,15 +145,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	// Second factor, when the account has one. Checked AFTER the password, so a wrong password
 	// never reveals whether an account has 2FA - and no session exists until both have passed.
 	if user.TotpEnabled {
-		// Not implemented in this service yet. Refusing is the only safe answer: quietly
-		// signing someone in without their second factor would be worse than not signing them
-		// in at all.
-		httpx.Write(w, httpx.Envelope{
-			Code:    422,
-			Message: "This account uses two-factor sign-in, which this service does not support yet.",
-			Status:  httpx.False(),
-		})
-		return
+		code := strings.TrimSpace(form.String("totp"))
+		if code == "" {
+			// No code yet: tell the client to ask for one. A success envelope with no session -
+			// totpRequired is how the login form knows to show the code field.
+			httpx.Write(w, httpx.Envelope{Code: 200, Status: httpx.True(), TotpRequired: true,
+				Message: "Enter the 6-digit code from your authenticator app."})
+			return
+		}
+		if !totp.Verify(user.TotpSecret, code, h.Now()) {
+			httpx.Write(w, httpx.Envelope{Code: 422, Status: httpx.False(), TotpRequired: true,
+				Message: "That code isn't right. Codes change every 30 seconds - try the current one."})
+			return
+		}
 	}
 
 	// What actually locks a login out, checked before a session is created rather than after.

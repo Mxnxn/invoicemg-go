@@ -470,3 +470,7 @@ func TestNumberingUpdate(t *testing.T) {
 		t.Errorf("not found: %v", b)
 	}
 }
+
+func (s *stubUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
+func (s *stubUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
+func (s *stubUsers) ClearTotp(context.Context, store.ID) error             { return nil }

@@ -150,3 +150,30 @@ func (u *usersStore) UpdatePassword(ctx context.Context, uid store.ID, passwordH
 	}
 	return res.MatchedCount > 0, nil
 }
+
+func (u *usersStore) SetTotpSecret(ctx context.Context, uid store.ID, secret string) error {
+	oid, err := objectID(uid)
+	if err != nil {
+		return err
+	}
+	_, err = u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"totpSecret": secret}})
+	return err
+}
+
+func (u *usersStore) SetTotpEnabled(ctx context.Context, uid store.ID, enabled bool) error {
+	oid, err := objectID(uid)
+	if err != nil {
+		return err
+	}
+	_, err = u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"totpEnabled": enabled}})
+	return err
+}
+
+func (u *usersStore) ClearTotp(ctx context.Context, uid store.ID) error {
+	oid, err := objectID(uid)
+	if err != nil {
+		return err
+	}
+	_, err = u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"totpEnabled": false, "totpSecret": nil}})
+	return err
+}

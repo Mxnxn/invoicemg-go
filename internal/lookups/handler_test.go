@@ -83,3 +83,7 @@ func TestPeople_PrependsOwnerAsAdmin(t *testing.T) {
 func (s *stubUsers) UpdatePassword(context.Context, store.ID, string) (bool, error) {
 	return false, nil
 }
+
+func (s *stubUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
+func (s *stubUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
+func (s *stubUsers) ClearTotp(context.Context, store.ID) error             { return nil }

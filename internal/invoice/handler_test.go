@@ -430,3 +430,7 @@ func (s *stubCompanies) Numbering(context.Context, store.ID, store.ID) (map[stri
 func (s *stubCompanies) SetNumbering(context.Context, store.ID, store.ID, string, json.RawMessage) (bool, error) {
 	return false, nil
 }
+
+func (s *stubUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
+func (s *stubUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
+func (s *stubUsers) ClearTotp(context.Context, store.ID) error             { return nil }
