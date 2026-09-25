@@ -1269,9 +1269,29 @@ type EnquiryWrite struct {
 	UserAgent   string
 }
 
+// Enquiry is a stored landing-page enquiry (the dev panel's list row).
+type Enquiry struct {
+	ID          ID
+	Name        string
+	Email       string
+	Phone       string
+	CompanyName string
+	Note        string
+	Source      string
+	UserAgent   string
+	Handled     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Version     int
+}
+
 // Enquiries records landing-page demo/pricing enquiries (routes/Enquiry.js).
 type Enquiries interface {
 	Create(ctx context.Context, in EnquiryWrite) (ID, error)
+	// List returns the newest enquiries (capped 200) for the dev panel.
+	List(ctx context.Context) ([]Enquiry, error)
+	// SetHandled flips an enquiry's handled flag (dev panel). A miss is not an error (Node's updateOne).
+	SetHandled(ctx context.Context, id ID, handled bool) error
 }
 
 // POActionStatus is the outcome of a purchase-order state transition (approve/revoke).

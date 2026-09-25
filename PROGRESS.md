@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (182 of 209)
+## Routes ready (184 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -111,6 +111,8 @@ the 209 routes the Node API declares.
 | `POST /purchase-order/convert` | requireCreate("purchase_invoices"); mints a purchase invoice from an approved PO (rows + total copied, dimensions preserved), links + logs "Converted to Purchase Invoice"; 422 missing number/date, 404 miss, 409 already-converted/not-approved | Unit |
 | `GET /po-public/:supplier_id/:po_id` | unauthenticated supplier link; both ids must match; `{closed:true}` once converted, else order (supplier name/firm only) + company letterhead; 404 mismatch/malformed | Unit |
 | `POST /enquiry` | unauthenticated landing form; honeypot (fake success), optional shared token (401), per-IP fixed-window rate limit (5/10min → 429), name/email/phone validation (400); records to new `enquiries` table with title/sentence casing | Unit |
+| `POST /dev/enquiries` | superadmin; newest 200 landing enquiries for the operator panel | Unit |
+| `POST /dev/enquiries/handled` | superadmin; flip an enquiry's handled flag; 422 no id | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

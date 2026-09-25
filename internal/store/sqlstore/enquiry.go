@@ -39,3 +39,29 @@ func cap160(s string, n int) string {
 	}
 	return s
 }
+
+func (e *enquiries) List(ctx context.Context) ([]store.Enquiry, error) {
+	rows, err := e.pool.Query(ctx, `
+		SELECT id, name, email, phone, company_name, note, source, user_agent, handled, created_at, updated_at
+		  FROM enquiries ORDER BY created_at DESC LIMIT 200`)
+	if err != nil {
+		return nil, fmt.Errorf("list enquiries: %w", err)
+	}
+	defer rows.Close()
+	out := []store.Enquiry{}
+	for rows.Next() {
+		var q store.Enquiry
+		if err := rows.Scan(&q.ID, &q.Name, &q.Email, &q.Phone, &q.CompanyName, &q.Note, &q.Source, &q.UserAgent, &q.Handled, &q.CreatedAt, &q.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, q)
+	}
+	return out, rows.Err()
+}
+
+func (e *enquiries) SetHandled(ctx context.Context, id store.ID, handled bool) error {
+	if _, err := e.pool.Exec(ctx, `UPDATE enquiries SET handled=$2, updated_at=now() WHERE id=$1`, string(id), handled); err != nil {
+		return fmt.Errorf("set enquiry handled: %w", err)
+	}
+	return nil
+}

@@ -23,6 +23,8 @@ func (s *stubEnq) Create(_ context.Context, in store.EnquiryWrite) (store.ID, er
 	s.got = in
 	return s.id, nil
 }
+func (s *stubEnq) List(context.Context) ([]store.Enquiry, error)      { return nil, nil }
+func (s *stubEnq) SetHandled(context.Context, store.ID, bool) error { return nil }
 
 func newH(s store.Enquiries, token string) *Handler {
 	return &Handler{store: s, token: token, attempts: map[string][]time.Time{}, now: func() time.Time { return time.Unix(1700000000, 0) }}

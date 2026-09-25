@@ -30,6 +30,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/challan"
 	"github.com/mxnxn/invoicemg-go/internal/client"
 	"github.com/mxnxn/invoicemg-go/internal/company"
+	"github.com/mxnxn/invoicemg-go/internal/devadmin"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
 	"github.com/mxnxn/invoicemg-go/internal/enquiry"
@@ -152,6 +153,10 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	// authed is just a valid session, no role or feature gate - what routes/Company.js applies
 	// to /list and /active (the writes add requireAdmin on top).
 	authed := func(h http.HandlerFunc) http.Handler { return auth.Chain(h, guard.Require) }
+	// superadmin gates the /dev operator console (routes/DevAdmin.js requireSuperAdmin).
+	superadmin := func(h http.HandlerFunc) http.Handler {
+		return auth.Chain(h, guard.Require, auth.RequireRole("superadmin"))
+	}
 	// Units live inside the Products manager, so they carry the products permission - and the
 	// write routes carry the write-level gate ON TOP of it, exactly as routes/Unit.js layers
 	// requireCreate and requireDelete under its router-wide requireFeature.
@@ -187,6 +192,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	purchaseOrderHandler := purchaseorder.New(db.PurchaseOrders())
 	enquiryHandler := enquiry.New(db.Enquiries())
+	devAdminHandler := devadmin.New(db.Enquiries())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
@@ -475,6 +481,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	// review GET/POST are not ported yet.
 	mux.HandleFunc("GET /po-public/{supplier_id}/{po_id}", purchaseOrderHandler.PublicView)
 	mux.HandleFunc("POST /enquiry", enquiryHandler.Create)
+	mux.Handle("POST /dev/enquiries", superadmin(devAdminHandler.Enquiries))
+	mux.Handle("POST /dev/enquiries/handled", superadmin(devAdminHandler.EnquiriesHandled))
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)
