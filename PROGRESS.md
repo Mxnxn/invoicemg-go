@@ -16,7 +16,7 @@ the 209 routes the Node API declares.
 
 ---
 
-## Routes ready (189 of 209)
+## Routes ready (196 of 209)
 
 | Route | Notes | Verified |
 |---|---|---|
@@ -114,6 +114,11 @@ the 209 routes the Node API declares.
 | `POST /enquiry` | unauthenticated landing form; honeypot (fake success), optional shared token (401), per-IP fixed-window rate limit (5/10min → 429), name/email/phone validation (400); records to new `enquiries` table with title/sentence casing | Unit |
 | `POST /dev/enquiries` | superadmin; newest 200 landing enquiries for the operator panel | Unit |
 | `POST /dev/enquiries/handled` | superadmin; flip an enquiry's handled flag; 422 no id | Unit |
+| `POST /user/register` | redeem a registration token (new `registration_tokens` table) → create the account (activeUntil +1y); 422 missing/no-token, 401 expired-token/dup-email | Unit |
+| `POST /user/password/request-reset` | queue a reset ask (new `password_reset_requests` table), one pending per email; always the same answer (no account-enumeration) | Unit |
+| `POST /dev/registration-token/create` \| `list` | superadmin; mint a token (optional yyyymmdd expiry via new `internal/tokenexpiry`, ≤90d) / newest 25 | Unit |
+| `GET /dev/registration-token` | unauth but DEV_TOTP_SECRET-gated, rate-limited, step-burned (one code mints one token) | — |
+| `POST /dev/password-requests` \| `resolve` | superadmin; pending queue / dismiss or reset to a one-time temp password (bcrypt, kills all the user's sessions) | Unit |
 | `POST /supplier-payment/lookups/open-invoices` | supplier's unpaid POs (amount<total), oldest first, due | Live · Unit |
 | `POST /supplier-payment/create` | pay a supplier; auto (oldest-first, refuse excess) or manual (full allocation, per-invoice due cap); bumps PO amount | Live · Unit |
 | `POST /supplier-payment/delete` | reverses each PO amount bump (clamped ≥0), then removes; 404 on miss | Live · Unit |

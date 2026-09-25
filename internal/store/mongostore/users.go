@@ -177,3 +177,24 @@ func (u *usersStore) ClearTotp(ctx context.Context, uid store.ID) error {
 	_, err = u.db.Collection(colUsers).UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": bson.M{"totpEnabled": false, "totpSecret": nil}})
 	return err
 }
+
+func (u *usersStore) Register(ctx context.Context, email, passwordHash, name string, activeUntil time.Time) (store.ID, bool, error) {
+	cnt, err := u.db.Collection(colUsers).CountDocuments(ctx, bson.M{"email": email})
+	if err != nil {
+		return "", false, fmt.Errorf("register dup check: %w", err)
+	}
+	if cnt > 0 {
+		return "", true, nil
+	}
+	now := time.Now().UTC()
+	doc := bson.M{"email": email, "password": passwordHash, "name": name, "role": "admin",
+		"companyLimit": 1, "activeUntil": activeUntil, "totpEnabled": false, "createdAt": now, "updatedAt": now, "__v": 0}
+	res, err := u.db.Collection(colUsers).InsertOne(ctx, doc)
+	if err != nil {
+		return "", false, fmt.Errorf("register user: %w", err)
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		return idOf(oid), false, nil
+	}
+	return "", false, nil
+}

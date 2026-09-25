@@ -1,6 +1,7 @@
 package person
 
 import (
+	"time"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -116,3 +117,7 @@ func (u *loginUsers) UpdatePassword(context.Context, store.ID, string) (bool, er
 func (u *loginUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
 func (u *loginUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
 func (u *loginUsers) ClearTotp(context.Context, store.ID) error             { return nil }
+
+func (u *loginUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
+	return "", false, nil
+}

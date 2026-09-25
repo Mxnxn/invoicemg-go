@@ -168,6 +168,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	dayHandler := days.New(db.Days())
 	unitHandler := units.New(db.Units())
 	userHandler := users.New(db.Users(), db.Sessions())
+	userHandler.RegTokens = db.RegistrationTokens()
+	userHandler.PasswordResets = db.PasswordResetRequests()
 	alertHandler := alerts.New(db.Alerts())
 	bankHandler := bank.New(db.Banks())
 	batchReceiveHandler := batchreceive.New(db.BatchReceives())
@@ -192,7 +194,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	purchaseOrderHandler := purchaseorder.New(db.PurchaseOrders())
 	enquiryHandler := enquiry.New(db.Enquiries())
-	devAdminHandler := devadmin.New(db.Enquiries())
+	devAdminHandler := devadmin.New(db.Enquiries(), db.RegistrationTokens(), db.PasswordResetRequests(), db.Users(), db.Sessions(), os.Getenv("DEV_TOTP_SECRET"))
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
@@ -227,6 +229,8 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.Handle("POST /user/totp/disable", authed(userHandler.TotpDisable))
 	mux.Handle("POST /user/totp/reveal", authed(userHandler.TotpReveal))
 	mux.HandleFunc("POST /sessions", userHandler.Login)
+	mux.HandleFunc("POST /user/register", userHandler.Register)
+	mux.HandleFunc("POST /user/password/request-reset", userHandler.PasswordRequestReset)
 
 	// Reads. GET under REST, so they are cacheable, safe to retry, and visible as reads in
 	// any log - none of which is true of a POST.
@@ -488,6 +492,11 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	mux.HandleFunc("POST /enquiry", enquiryHandler.Create)
 	mux.Handle("POST /dev/enquiries", superadmin(devAdminHandler.Enquiries))
 	mux.Handle("POST /dev/enquiries/handled", superadmin(devAdminHandler.EnquiriesHandled))
+	mux.Handle("POST /dev/registration-token/create", superadmin(devAdminHandler.RegistrationTokenCreate))
+	mux.Handle("POST /dev/registration-token/list", superadmin(devAdminHandler.RegistrationTokenList))
+	mux.HandleFunc("GET /dev/registration-token", devAdminHandler.RegistrationTokenGet)
+	mux.Handle("POST /dev/password-requests", superadmin(devAdminHandler.PasswordRequests))
+	mux.Handle("POST /dev/password-requests/resolve", superadmin(devAdminHandler.PasswordRequestsResolve))
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)

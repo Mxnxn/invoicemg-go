@@ -23,9 +23,11 @@ import (
 )
 
 type Handler struct {
-	Users    store.Users
-	Sessions store.Sessions
-	Now      func() time.Time
+	Users          store.Users
+	Sessions       store.Sessions
+	RegTokens      store.RegistrationTokens
+	PasswordResets store.PasswordResetRequests
+	Now            func() time.Time
 }
 
 func New(users store.Users, sessions store.Sessions) *Handler {

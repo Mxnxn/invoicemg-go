@@ -5,14 +5,33 @@ package devadmin
 
 import (
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/mxnxn/invoicemg-go/internal/httpx"
 	"github.com/mxnxn/invoicemg-go/internal/store"
 )
 
-type Handler struct{ enquiries store.Enquiries }
+type Handler struct {
+	enquiries      store.Enquiries
+	regTokens      store.RegistrationTokens
+	passwordResets store.PasswordResetRequests
+	users          store.Users
+	sessions       store.Sessions
+	devTotpSecret  string
+	now            func() time.Time
 
-func New(e store.Enquiries) *Handler { return &Handler{enquiries: e} }
+	mu        sync.Mutex
+	usedSteps map[int64]time.Time
+	attempts  []time.Time
+}
+
+func New(e store.Enquiries, rt store.RegistrationTokens, pr store.PasswordResetRequests, u store.Users, s store.Sessions, devTotpSecret string) *Handler {
+	return &Handler{
+		enquiries: e, regTokens: rt, passwordResets: pr, users: u, sessions: s,
+		devTotpSecret: devTotpSecret, now: time.Now, usedSteps: map[int64]time.Time{},
+	}
+}
 
 type enquiryDTO struct {
 	ID          string     `json:"_id"`

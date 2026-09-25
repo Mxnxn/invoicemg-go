@@ -223,6 +223,9 @@ type Users interface {
 	// UpdatePassword replaces a user's bcrypt hash (for /user/password/change). found is false
 	// when no such user. The caller has already verified the current password.
 	UpdatePassword(ctx context.Context, uid ID, passwordHash string) (found bool, err error)
+	// Register creates a user (self-registration, /user/register). dup is true when the email is
+	// already taken; nothing is written then.
+	Register(ctx context.Context, email, passwordHash, name string, activeUntil time.Time) (uid ID, dup bool, err error)
 	// SetTotpSecret stores a (not-yet-enabled) TOTP secret during enrolment (/user/totp/setup).
 	SetTotpSecret(ctx context.Context, uid ID, secret string) error
 	// SetTotpEnabled flips the enabled flag (/user/totp/enable).
@@ -1273,6 +1276,53 @@ type EnquiryWrite struct {
 	Note        string
 	Source      string
 	UserAgent   string
+}
+
+// RegistrationToken is a one-time invite for /user/register (minted by the dev panel).
+type RegistrationToken struct {
+	ID        ID
+	Token     string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	UsedBy    ID
+	CreatedAt time.Time
+}
+
+// RegistrationTokens mints and redeems registration invites.
+type RegistrationTokens interface {
+	// FindByToken looks up a token by its value; found is false on a miss.
+	FindByToken(ctx context.Context, token string) (RegistrationToken, bool, error)
+	// MarkUsed stamps a token as redeemed by uid.
+	MarkUsed(ctx context.Context, id, uid ID) error
+	// Create issues a new token valid until expiresAt.
+	Create(ctx context.Context, token string, expiresAt time.Time) (RegistrationToken, error)
+	// List returns the newest tokens (capped 25) for the dev panel.
+	List(ctx context.Context) ([]RegistrationToken, error)
+}
+
+// PasswordResetRequest is a self-service ask that a superadmin resolves.
+type PasswordResetRequest struct {
+	ID         ID
+	Email      string
+	UID        ID
+	Status     string
+	Note       string
+	ResolvedAt *time.Time
+	CreatedAt  time.Time
+}
+
+// PasswordResetRequests queues password-reset asks.
+type PasswordResetRequests interface {
+	// Create records a pending request (email + optional uid).
+	Create(ctx context.Context, email string, uid ID) error
+	// HasPending reports whether an unresolved request already exists for the email.
+	HasPending(ctx context.Context, email string) (bool, error)
+	// ListPending returns the pending requests (capped 50) for the dev panel.
+	ListPending(ctx context.Context) ([]PasswordResetRequest, error)
+	// Get fetches one request; found is false on a miss.
+	Get(ctx context.Context, id ID) (PasswordResetRequest, bool, error)
+	// Resolve sets a request's status (done|dismissed) and stamps resolvedAt.
+	Resolve(ctx context.Context, id ID, status string) error
 }
 
 // Enquiry is a stored landing-page enquiry (the dev panel's list row).
@@ -2669,6 +2719,8 @@ type Store interface {
 	PurchaseInvoices() PurchaseInvoices
 	PurchaseOrders() PurchaseOrders
 	Enquiries() Enquiries
+	RegistrationTokens() RegistrationTokens
+	PasswordResetRequests() PasswordResetRequests
 	Invoices() Invoices
 	Entries() Entries
 	Sheets() Sheets

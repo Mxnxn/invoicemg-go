@@ -147,3 +147,16 @@ func (u *users) ClearTotp(ctx context.Context, uid store.ID) error {
 	}
 	return nil
 }
+
+func (u *users) Register(ctx context.Context, email, passwordHash, name string, activeUntil time.Time) (store.ID, bool, error) {
+	var id string
+	err := u.pool.QueryRow(ctx, `INSERT INTO users (email, password, name, active_until) VALUES ($1,$2,$3,$4) RETURNING id`,
+		email, passwordHash, name, activeUntil).Scan(&id)
+	if isUniqueViolation(err) {
+		return "", true, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("register user: %w", err)
+	}
+	return store.ID(id), false, nil
+}

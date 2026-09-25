@@ -50,13 +50,20 @@ func hotp(secret []byte, counter uint64) string {
 
 // Verify checks a 6-digit code against the base32 secret within ±1 step of now.
 func Verify(secret, code string, now time.Time) bool {
+	ok, _ := VerifyStep(secret, code, now)
+	return ok
+}
+
+// VerifyStep is Verify plus the matching step, so a caller (the dev-token route) can burn a step to
+// stop one observed code minting more than once. step is -1 when invalid.
+func VerifyStep(secret, code string, now time.Time) (bool, int64) {
 	candidate := strings.TrimSpace(code)
 	if !sixDigits.MatchString(candidate) {
-		return false
+		return false, -1
 	}
 	buf, err := decode(secret)
 	if err != nil {
-		return false
+		return false, -1
 	}
 	current := now.Unix() / stepSeconds
 	for offset := int64(-1); offset <= 1; offset++ {
@@ -66,10 +73,10 @@ func Verify(secret, code string, now time.Time) bool {
 		}
 		want := hotp(buf, uint64(step))
 		if subtle.ConstantTimeCompare([]byte(want), []byte(candidate)) == 1 {
-			return true
+			return true, step
 		}
 	}
-	return false
+	return false, -1
 }
 
 // GenerateSecret returns a fresh base32 secret (20 random bytes, no padding).

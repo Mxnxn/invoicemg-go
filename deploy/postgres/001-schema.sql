@@ -806,3 +806,27 @@ CREATE TABLE enquiries (
     updated_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX enquiries_created_idx ON enquiries (created_at DESC);
+
+-- Registration tokens (routes/User.js /register redeems one; DevAdmin mints them).
+CREATE TABLE registration_tokens (
+    id         text PRIMARY KEY DEFAULT gen_ulid(),
+    token      text NOT NULL UNIQUE,
+    expires_at timestamptz NOT NULL,
+    used_at    timestamptz,
+    used_by    text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Password-reset requests (self-service ask; a superadmin resolves them from the dev panel).
+CREATE TABLE password_reset_requests (
+    id          text PRIMARY KEY DEFAULT gen_ulid(),
+    email       text NOT NULL,
+    uid         text,
+    status      text NOT NULL DEFAULT 'pending',
+    note        text NOT NULL DEFAULT '',
+    resolved_at timestamptz,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX password_reset_requests_status_idx ON password_reset_requests (status, created_at DESC);

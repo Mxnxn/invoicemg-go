@@ -1,6 +1,7 @@
 package userinfo
 
 import (
+	"time"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -222,3 +223,7 @@ func (s *stubCompanies) SetNumbering(context.Context, store.ID, store.ID, string
 func (s *stubUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
 func (s *stubUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
 func (s *stubUsers) ClearTotp(context.Context, store.ID) error             { return nil }
+
+func (s *stubUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
+	return "", false, nil
+}

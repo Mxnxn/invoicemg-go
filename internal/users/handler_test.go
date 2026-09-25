@@ -1,6 +1,7 @@
 package users
 
 import (
+	"time"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -200,3 +201,11 @@ func TestPasswordChange_AccountGone(t *testing.T) {
 func (s *pwUsers) SetTotpSecret(context.Context, store.ID, string) error { return nil }
 func (s *pwUsers) SetTotpEnabled(context.Context, store.ID, bool) error  { return nil }
 func (s *pwUsers) ClearTotp(context.Context, store.ID) error             { return nil }
+
+func (stubUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
+	return "", false, nil
+}
+
+func (s *pwUsers) Register(context.Context, string, string, string, time.Time) (store.ID, bool, error) {
+	return "", false, nil
+}
