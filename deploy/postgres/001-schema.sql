@@ -790,3 +790,19 @@ CREATE TABLE po_approval_dismissals (
     created_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (actor_id, purchase_order_id)
 );
+
+-- Landing-page demo/pricing enquiries (routes/Enquiry.js). The one unauthenticated write.
+CREATE TABLE enquiries (
+    id           text PRIMARY KEY DEFAULT gen_ulid(),
+    name         text NOT NULL DEFAULT '',
+    email        text NOT NULL DEFAULT '',
+    phone        text NOT NULL DEFAULT '',
+    company_name text NOT NULL DEFAULT '',
+    note         text NOT NULL DEFAULT '',
+    source       text NOT NULL DEFAULT 'landing',
+    user_agent   text NOT NULL DEFAULT '',
+    handled      boolean NOT NULL DEFAULT false,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX enquiries_created_idx ON enquiries (created_at DESC);

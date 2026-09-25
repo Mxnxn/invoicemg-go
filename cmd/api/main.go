@@ -32,6 +32,7 @@ import (
 	"github.com/mxnxn/invoicemg-go/internal/company"
 	"github.com/mxnxn/invoicemg-go/internal/config"
 	"github.com/mxnxn/invoicemg-go/internal/days"
+	"github.com/mxnxn/invoicemg-go/internal/enquiry"
 	"github.com/mxnxn/invoicemg-go/internal/entry"
 	"github.com/mxnxn/invoicemg-go/internal/expense"
 	"github.com/mxnxn/invoicemg-go/internal/gstreport"
@@ -185,6 +186,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	invoiceHandler := invoice.New(db.Invoices(), db.Companies(), db.Users(), db.Clients(), db.Jobs(), exportsDir)
 	purchaseReportHandler := purchasereport.New(db.PurchaseReport())
 	purchaseOrderHandler := purchaseorder.New(db.PurchaseOrders())
+	enquiryHandler := enquiry.New(db.Enquiries())
 	lookupHandler := lookups.New(db.Lookups(), db.Users())
 	lifecycleHandler := lifecycle.New(db.Jobs(), db.JobNotes(), db.Materials())
 	companyHandler := company.New(db.Companies(), db.Users(), db.Sessions())
@@ -472,6 +474,7 @@ func routes(db store.Store, uploadsDir, exportsDir string) http.Handler {
 	// sent, so it is served as-is rather than under a REST alias nothing would call. The
 	// review GET/POST are not ported yet.
 	mux.HandleFunc("GET /po-public/{supplier_id}/{po_id}", purchaseOrderHandler.PublicView)
+	mux.HandleFunc("POST /enquiry", enquiryHandler.Create)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}", alertHandler.Detail)
 	mux.HandleFunc("GET /alert/{job_id}/job/{jobcard_id}/review", alertHandler.Review)
 	mux.HandleFunc("POST /alert/{job_id}/job/{jobcard_id}/review", alertHandler.CreateReview)

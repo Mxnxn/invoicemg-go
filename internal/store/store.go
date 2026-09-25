@@ -1257,6 +1257,23 @@ type POUpdateResult struct {
 	RevokedApproval  bool // approval dropped because price-bearing content changed
 }
 
+// EnquiryWrite is a landing-page enquiry before the store applies casing (name/company titleCase,
+// note sentenceCase, email lowercase).
+type EnquiryWrite struct {
+	Name        string
+	Email       string
+	Phone       string
+	CompanyName string
+	Note        string
+	Source      string
+	UserAgent   string
+}
+
+// Enquiries records landing-page demo/pricing enquiries (routes/Enquiry.js).
+type Enquiries interface {
+	Create(ctx context.Context, in EnquiryWrite) (ID, error)
+}
+
 // POActionStatus is the outcome of a purchase-order state transition (approve/revoke).
 type POActionStatus int
 
@@ -2625,6 +2642,7 @@ type Store interface {
 	Quotations() Quotations
 	PurchaseInvoices() PurchaseInvoices
 	PurchaseOrders() PurchaseOrders
+	Enquiries() Enquiries
 	Invoices() Invoices
 	Entries() Entries
 	Sheets() Sheets
